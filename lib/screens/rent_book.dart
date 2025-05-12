@@ -1,0 +1,1380 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:immo/screens/dashboard/setting_screen.dart';
+import 'package:immo/widgets/image_viewer.dart';
+import 'package:immo/widgets/custom_skeletons.dart';
+import 'package:intl/intl.dart';
+import '../cubit/auth_cubit.dart';
+import '../cubits/tenant_rentbook/tenant_rentbook_cubit.dart';
+import '../cubits/tenant_rentbook/tenant_rentbook_state.dart';
+import '../constants.dart';
+import 'dart:io';
+import 'package:flutter/services.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:path_provider/path_provider.dart';
+import 'package:printing/printing.dart';
+
+class ListRentBook extends StatefulWidget {
+  const ListRentBook({super.key});
+
+  @override
+  State<ListRentBook> createState() => _ListRentBookState();
+}
+
+class _ListRentBookState extends State<ListRentBook> {
+  @override
+  void initState() {
+    super.initState();
+    _loadRentbooks();
+  }
+
+  void _loadRentbooks() {
+    final authState = context.read<AuthCubit>().state;
+    if (authState is AuthSuccess && authState.token != null) {
+      context.read<TenantRentbookCubit>().getTenantRentbooks(
+            token: authState.token!,
+            page: 1,
+            limit: 10,
+          );
+    }
+  }
+
+  String _formatDate(String dateString) {
+    final date = DateTime.parse(dateString);
+    return DateFormat('dd/MM/yyyy').format(date);
+  }
+
+  Color _getStatusColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'actif':
+      case 'payé':
+        return Colors.green;
+      case 'terminé':
+        return Colors.red;
+      case 'en attente':
+        return Colors.orange;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final authState = context.watch<AuthCubit>().state;
+    bool isAuthenticated = authState is AuthSuccess && authState.token != null;
+
+    if (!isAuthenticated) {
+      return const Scaffold(
+        backgroundColor: Colors.white,
+        body: Center(
+          child: Text(
+              'Veuillez vous connecter pour accéder à vos carnets de loyer'),
+        ),
+      );
+    }
+
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        leading: BlocBuilder<AuthCubit, AuthState>(
+          builder: (context, state) {
+            if (state is AuthSuccess && 
+                state.user != null && 
+                state.user!['profileImage'] != null) {
+              // Display profile image if available
+              return CircleAvatar(
+                radius: 26,
+                backgroundColor: AppColors.white,
+                child: CircleAvatar(
+                  radius: 23,
+                  backgroundColor: AppColors.buttonColor,
+                  backgroundImage: NetworkImage(state.user!['profileImage']),
+                  child: IconButton(
+                    icon: const Icon(Icons.person, color: Colors.transparent),
+                    onPressed: () {
+                      Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (context) => const SettingScreen()));
+                    },
+                  ),
+                ),
+              );
+            } else {
+              // Show default person icon if no profile image
+              return CircleAvatar(
+                radius: 26,
+                backgroundColor: AppColors.white,
+                child: CircleAvatar(
+                  radius: 23,
+                  backgroundColor: AppColors.buttonColor,
+                  child: CircleAvatar(
+                    backgroundColor: AppColors.white,
+                    child: IconButton(
+                      icon: const Icon(Icons.person, color: AppColors.buttonColor),
+                      onPressed: () {
+                        Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (context) => const SettingScreen()));
+                      },
+                    ),
+                  ),
+                ),
+              );
+            }
+          },
+        ),
+        backgroundColor: Colors.white,
+        automaticallyImplyLeading: false,
+        title: const Text('Mes Carnets de Loyer',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _loadRentbooks,
+          ),
+        ],
+      ),
+      body: BlocBuilder<TenantRentbookCubit, TenantRentbookState>(
+        builder: (context, state) {
+          if (state is TenantRentbookLoading) {
+            return Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Title skeleton
+                  const SkeletonLine(
+                    style: SkeletonLineStyle(
+                      width: 200,
+                      height: 24,
+                      borderRadius: BorderRadius.all(Radius.circular(8)),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  
+                  // Rentbook cards skeletons
+                  ListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: 3,
+                    itemBuilder: (context, index) {
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 16),
+                        decoration: BoxDecoration(
+                          color: Colors.grey[100],
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.1),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  SkeletonAvatar(
+                                    style: SkeletonAvatarStyle(
+                                      width: 60,
+                                      height: 60,
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 16),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: const [
+                                        SkeletonLine(
+                                          style: SkeletonLineStyle(
+                                            width: 120,
+                                            height: 16,
+                                          ),
+                                        ),
+                                        SizedBox(height: 8),
+                                        SkeletonLine(
+                                          style: SkeletonLineStyle(
+                                            width: 180,
+                                            height: 12,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 6,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey[200],
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: const SkeletonLine(
+                                      style: SkeletonLineStyle(
+                                        width: 60,
+                                        height: 12,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 16),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Expanded(
+                                    child: Row(
+                                      children: const [
+                                        SkeletonLine(
+                                          style: SkeletonLineStyle(
+                                            width: 80,
+                                            height: 14,
+                                          ),
+                                        ),
+                                        SizedBox(width: 8),
+                                        SkeletonLine(
+                                          style: SkeletonLineStyle(
+                                            width: 60,
+                                            height: 14,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SkeletonLine(
+                                    style: SkeletonLineStyle(
+                                      width: 100,
+                                      height: 14,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            );
+          } else if (state is TenantRentbookError) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.error_outline, size: 60, color: Colors.red),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Erreur: ${state.message}',
+                    style: const TextStyle(fontSize: 16),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: _loadRentbooks,
+                    child: const Text('Réessayer'),
+                  ),
+                ],
+              ),
+            );
+          } else if (state is TenantRentbookLoaded) {
+            if (state.rentbooks.isEmpty) {
+              return const Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.book_outlined, size: 60, color: Colors.grey),
+                    SizedBox(height: 16),
+                    Text(
+                      'Aucun carnet de loyer trouvé',
+                      style:
+                          TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    SizedBox(height: 8),
+                    Text(
+                      'Vous n\'avez pas encore de carnet de loyer',
+                      style: TextStyle(fontSize: 16, color: Colors.grey),
+                    ),
+                  ],
+                ),
+              );
+            }
+
+            return ListView.builder(
+              itemCount: state.rentbooks.length,
+              padding: const EdgeInsets.all(16),
+              itemBuilder: (context, index) {
+                final rentbook = state.rentbooks[index];
+                final apartment = rentbook['apartmentId'];
+                final building = apartment['buildingId'];
+                final images = apartment['images'] as List?;
+                final image = (images != null && images.isNotEmpty)
+                    ? images[0]
+                    : 'https://via.placeholder.com/150';
+
+                return Card(
+                  color: Colors.grey[100],
+                  margin: const EdgeInsets.only(bottom: 16),
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: const BorderSide(
+                      color: AppColors.buttonColor,
+                      width: 2,
+                    ),
+                  ),
+                  child: InkWell(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => RentBookScreen(
+                              rentbook: rentbook,
+                              currency: apartment['price']['currency']),
+                        ),
+                      );
+                    },
+                    borderRadius: BorderRadius.circular(12),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              ImageViewerWidget(
+                                  url: image,
+                                  width: 80,
+                                  height: 80,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                      color: Colors.grey.withOpacity(0.5),
+                                      width: 1)),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      building['name'] ?? 'Appartement',
+                                      style: const TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'Appartement ${apartment['number'] ?? ''}, Étage ${apartment['floor'] ?? ''}',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.grey[600],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: AppColors.buttonColor,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  (rentbook['status'] ?? 'INCONNU')
+                                      .toUpperCase(),
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'Loyer: ${rentbook['monthlyRent']} ${apartment['price']['currency']}',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              Text(
+                                'Fin: ${_formatDate(rentbook['leaseEndDate'])}',
+                                style: TextStyle(
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            );
+          }
+
+          return const Center(child: Text('Chargement...'));
+        },
+      ),
+    );
+  }
+}
+
+class RentBookScreen extends StatefulWidget {
+  final Map<String, dynamic> rentbook;
+  final String currency;
+
+  const RentBookScreen(
+      {super.key, required this.rentbook, required this.currency});
+
+  @override
+  State<RentBookScreen> createState() => _RentBookScreenState();
+}
+
+class _RentBookScreenState extends State<RentBookScreen> {
+  @override
+  void initState() {
+    super.initState();
+    _loadRentbooks();
+  }
+
+  void _loadRentbooks() {
+    final authState = context.read<AuthCubit>().state;
+    if (authState is AuthSuccess && authState.token != null) {
+      context.read<TenantRentbookCubit>().getTenantRentbooks(
+            token: authState.token!,
+            page: 1,
+            limit: 10,
+          );
+    }
+  }
+
+  String _formatDate(String dateString) {
+    final date = DateTime.parse(dateString);
+    return DateFormat('dd/MM/yyyy').format(date);
+  }
+
+  String _getRemainingDays(String endDateString) {
+    final endDate = DateTime.parse(endDateString);
+    final today = DateTime.now();
+    final difference = endDate.difference(today).inDays;
+
+    if (difference < 0) {
+      return 'Expiré';
+    } else if (difference == 0) {
+      return 'Expire aujourd\'hui';
+    } else {
+      return '$difference jours restants';
+    }
+  }
+
+  Color _getStatusColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'actif':
+      case 'payé':
+        return Colors.green;
+      case 'terminé':
+        return Colors.red;
+      case 'en attente':
+        return Colors.orange;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  Future<void> generateContract({
+    required String currency,
+    required String province,
+    required String ville,
+    required String territoire,
+    required String cite,
+    required String bailleur,
+    required String locataire,
+    required String adresse,
+    required String montantLoyer,
+    required String montantLoyerLettres,
+    required String usage,
+    required String garantie,
+    required String dureeContrat,
+    required String dateContrat,
+  }) async {
+    final pdf = pw.Document();
+
+    // 🔥 Charger l'image du logo
+    final ByteData data = await rootBundle.load('assets/images/kin.png');
+    final Uint8List logoBytes = data.buffer.asUint8List();
+
+    pdf.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        build: (pw.Context context) => [
+          pw.Center(
+            child: pw.Image(pw.MemoryImage(logoBytes), width: 50),
+          ),
+          pw.SizedBox(height: 10),
+          pw.Center(
+            child: pw.Text(
+              'CONTRAT DE LOCATION',
+              style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold),
+            ),
+          ),
+          pw.SizedBox(height: 10),
+          pw.Text('Province de : $province'),
+          pw.Text('Ville de : $ville'),
+          pw.Text('Territoire de : $territoire'),
+          pw.Text('Cité de : $cite'),
+          pw.SizedBox(height: 10),
+          pw.Text(
+            'Entre les soussignés :',
+            style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold),
+          ),
+          pw.SizedBox(height: 5),
+          pw.Text('- Bailleur : $bailleur'),
+          pw.Text('- Locataire : $locataire'),
+          pw.SizedBox(height: 10),
+          pw.Header(level: 1, text: 'I. Description du bien'),
+          pw.Text('Adresse : $adresse'),
+          pw.SizedBox(height: 10),
+          pw.Header(level: 1, text: 'II. Usage'),
+          pw.Text('Usage : $usage'),
+          pw.SizedBox(height: 10),
+          pw.Header(level: 1, text: 'III. Loyer'),
+          pw.Text('Montant du loyer : $montantLoyer $currency'),
+          pw.SizedBox(height: 10),
+          pw.Header(level: 1, text: 'IV. Modalités de paiement'),
+          pw.Text(
+            'Le paiement s\'effectue en espèces, par chèque certifié ou par virement bancaire, anticipativement ou à terme échu selon l’accord des parties.',
+          ),
+          pw.SizedBox(height: 10),
+          pw.Header(level: 1, text: 'V. Garantie'),
+          pw.Text('Montant de la garantie locative : $garantie'),
+          pw.SizedBox(height: 10),
+          pw.Header(level: 1, text: 'VI. Durée'),
+          pw.Text('Durée du contrat : $dureeContrat an(s)'),
+          pw.SizedBox(height: 10),
+          pw.Header(level: 1, text: 'VII. Obligations du Bailleur'),
+          pw.Bullet(text: 'Mettre à disposition un bien en bon état'),
+          pw.Bullet(text: 'Garantir la jouissance paisible du bien loué'),
+          pw.Bullet(text: 'S’acquitter des taxes légales'),
+          pw.SizedBox(height: 10),
+          pw.Header(level: 1, text: 'VIII. Obligations du Locataire'),
+          pw.Bullet(text: 'Payer son loyer régulièrement'),
+          pw.Bullet(text: 'User du bien en bon père de famille'),
+          pw.Bullet(
+              text: 'Ne pas modifier le bien sans accord écrit du bailleur'),
+          pw.SizedBox(height: 10),
+          pw.Header(level: 1, text: 'IX. Résiliation'),
+          pw.Text(
+            'Le contrat prend fin à l\'expiration du terme convenu, sur accord des parties, ou en cas de destruction du bien.',
+          ),
+          pw.SizedBox(height: 10),
+          pw.Header(level: 1, text: 'X. Conditions de résiliation'),
+          pw.Bullet(text: "Expiration du terme et non-renouvellement"),
+          pw.Bullet(text: "Accord mutuel des parties"),
+          pw.Bullet(text: "Non-respect des obligations par une des parties"),
+          pw.Bullet(text: "Perte du bien loué dû à un désastre naturel"),
+          pw.SizedBox(height: 10),
+          pw.Header(level: 1, text: 'XI. Instance d’arbitrage'),
+          pw.Text(
+            'En cas de litige, l\’affaire est soumise au Service local de l’Habitat.',
+          ),
+          pw.SizedBox(height: 10),
+          pw.Header(level: 1, text: 'XII. Sanction'),
+          pw.Text(
+            'Tout contrat non légalisé sous 72h entraîne une amende équivalente à un mois de loyer.',
+          ),
+          pw.SizedBox(height: 20),
+          pw.Text('Fait à $ville, le $dateContrat',
+              style: pw.TextStyle(fontSize: 14)),
+          pw.SizedBox(height: 30),
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              pw.Column(
+                children: [
+                  pw.Text('Le Bailleur',
+                      style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                  pw.SizedBox(height: 40),
+                  pw.Text('(Signature)'),
+                ],
+              ),
+              pw.Column(
+                children: [
+                  pw.Text('Le Locataire',
+                      style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                  pw.SizedBox(height: 40),
+                  pw.Text('(Signature)'),
+                ],
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+
+    final output = await getTemporaryDirectory();
+    final file = File('${output.path}/contrat_bail.pdf');
+    await file.writeAsBytes(await pdf.save());
+
+    await Printing.layoutPdf(
+      onLayout: (PdfPageFormat format) async => pdf.save(),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final authState = context.watch<AuthCubit>().state;
+    bool isAuthenticated = authState is AuthSuccess && authState.token != null;
+
+    if (!isAuthenticated) {
+      return const Scaffold(
+        backgroundColor: Colors.white,
+        body: Center(
+          child: Text(
+              'Veuillez vous connecter pour accéder à votre carnet de loyer'),
+        ),
+      );
+    }
+
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text('Détails du Carnet',
+            style: TextStyle(fontWeight: FontWeight.bold)),
+        elevation: 0,
+      ),
+      body: BlocBuilder<TenantRentbookCubit, TenantRentbookState>(
+        builder: (context, state) {
+          if (state is TenantRentbookLoading) {
+            return Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Title skeleton
+                  const SkeletonLine(
+                    style: SkeletonLineStyle(
+                      width: 200,
+                      height: 24,
+                      borderRadius: BorderRadius.all(Radius.circular(8)),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  
+                  // Rentbook cards skeletons
+                  ListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: 3,
+                    itemBuilder: (context, index) {
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 16),
+                        decoration: BoxDecoration(
+                          color: Colors.grey[100],
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.1),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  SkeletonAvatar(
+                                    style: SkeletonAvatarStyle(
+                                      width: 60,
+                                      height: 60,
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 16),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: const [
+                                        SkeletonLine(
+                                          style: SkeletonLineStyle(
+                                            width: 120,
+                                            height: 16,
+                                          ),
+                                        ),
+                                        SizedBox(height: 8),
+                                        SkeletonLine(
+                                          style: SkeletonLineStyle(
+                                            width: 180,
+                                            height: 12,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 6,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey[200],
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: const SkeletonLine(
+                                      style: SkeletonLineStyle(
+                                        width: 60,
+                                        height: 12,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 16),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Expanded(
+                                    child: Row(
+                                      children: const [
+                                        SkeletonLine(
+                                          style: SkeletonLineStyle(
+                                            width: 80,
+                                            height: 14,
+                                          ),
+                                        ),
+                                        SizedBox(width: 8),
+                                        SkeletonLine(
+                                          style: SkeletonLineStyle(
+                                            width: 60,
+                                            height: 14,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SkeletonLine(
+                                    style: SkeletonLineStyle(
+                                      width: 100,
+                                      height: 14,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            );
+          } else if (state is TenantRentbookError) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.error_outline, size: 60, color: Colors.red),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Erreur: ${state.message}',
+                    style: const TextStyle(fontSize: 16),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: _loadRentbooks,
+                    child: const Text('Réessayer'),
+                  ),
+                ],
+              ),
+            );
+          } else if (state is TenantRentbookLoaded) {
+            if (state.rentbooks.isEmpty) {
+              return const Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.book_outlined, size: 60, color: Colors.grey),
+                    SizedBox(height: 16),
+                    Text(
+                      'Aucun carnet de loyer trouvé',
+                      style:
+                          TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    SizedBox(height: 8),
+                    Text(
+                      'Vous n\'avez pas encore de carnet de loyer',
+                      style: TextStyle(fontSize: 16, color: Colors.grey),
+                    ),
+                  ],
+                ),
+              );
+            }
+
+            // Afficher le premier carnet de loyer (généralement un locataire n'en a qu'un)
+            final rentbook = widget.rentbook;
+            final apartment = rentbook['apartmentId'];
+            final building = apartment['buildingId'];
+            final owner = rentbook['ownerId'];
+            final tenant = rentbook['tenantId'];
+            final paymentHistory = rentbook['paymentHistory'] != null
+                ? List<Map<String, dynamic>>.from(
+                    rentbook['paymentHistory'] as List? ?? [])
+                : <Map<String, dynamic>>[];
+
+            return SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Informations sur l'appartement
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    margin: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey.withOpacity(0.5)),
+                      color: AppColors.buttonColor,
+                      borderRadius: const BorderRadius.only(
+                        bottomLeft: Radius.circular(20),
+                        bottomRight: Radius.circular(20),
+                        topLeft: Radius.circular(20),
+                        topRight: Radius.circular(20),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: AppColors.white,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Icon(Icons.apartment,
+                                  size: 32, color: AppColors.buttonColor),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    building['name'] ?? 'Appartement',
+                                    style: const TextStyle(
+                                      fontSize: 18,
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'Appartement ${apartment['number'] ?? ''}, Étage ${apartment['floor'] ?? ''}',
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: AppColors.white,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: InkWell(
+                                onTap: () {
+                                  generateContract(
+                                    currency: widget.currency,
+                                    province: "Kinshasa",
+                                    ville: "Kinshasa",
+                                    territoire: "N/A",
+                                    cite: "N/A",
+                                    bailleur: rentbook['ownerId']['firstName'] +
+                                        // ignore: prefer_interpolation_to_compose_strings
+                                        " " +
+                                        rentbook['ownerId']['lastName'],
+                                    locataire: rentbook['tenantId']
+                                            ['firstName'] +
+                                        // ignore: prefer_interpolation_to_compose_strings
+                                        " " +
+                                        rentbook['tenantId']['lastName'],
+                                    adresse: building['address'] != null
+                                        ? '${building['address']['street']}, ${building['address']['city']}, ${building['address']['country']}'
+                                        : 'Adresse non disponible',
+                                    montantLoyer:
+                                        rentbook['monthlyRent'].toString(),
+                                    montantLoyerLettres: "N/A",
+                                    usage: "Résidentiel",
+                                    garantie: "3 mois de loyer",
+                                    dureeContrat: "1",
+                                    dateContrat:
+                                        _formatDate(rentbook['leaseStartDate']),
+                                  );
+                                },
+                                child: const Text(
+                                  "Contrat Bail",
+                                  style: const TextStyle(
+                                    color: AppColors.buttonColor,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          building['address'] != null
+                              ? '${building['address']['street']}, ${building['address']['city']}, ${building['address']['country']}'
+                              : 'Adresse non disponible',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceAround,
+                          children: [
+                            _buildFeatureItem(Icons.king_bed,
+                                '${apartment['rooms'] ?? '?'} chambres'),
+                            _buildFeatureItem(Icons.bathtub,
+                                '${apartment['bathrooms'] ?? '?'} sdb'),
+                            _buildFeatureItem(Icons.square_foot,
+                                '${apartment['surface'] ?? '?'} m²'),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Détails du bail
+                  _buildSectionTitle('Détails du Bail'),
+                  Card(
+                    color: Colors.white,
+                    margin:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      side: const BorderSide(
+                        color: AppColors.buttonColor,
+                        width: 2,
+                      ),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        children: [
+                          _buildInfoRow(
+                            icon: Icons.calendar_today,
+                            title: 'Début du bail',
+                            value: _formatDate(rentbook['leaseStartDate']),
+                          ),
+                          const Divider(),
+                          _buildInfoRow(
+                            icon: Icons.event,
+                            title: 'Fin du bail',
+                            value: _formatDate(rentbook['leaseEndDate']),
+                          ),
+                          const Divider(),
+                          _buildInfoRow(
+                            icon: Icons.timer,
+                            title: 'Statut',
+                            value: _getRemainingDays(rentbook['leaseEndDate']),
+                            valueColor:
+                                _getRemainingDays(rentbook['leaseEndDate']) ==
+                                        'Expiré'
+                                    ? Colors.red
+                                    : null,
+                          ),
+                          const Divider(),
+                          _buildInfoRow(
+                            icon: Icons.attach_money,
+                            title: 'Loyer mensuel',
+                            value:
+                                '${rentbook['monthlyRent']} ${widget.currency}',
+                          ),
+                          const Divider(),
+                          _buildInfoRow(
+                            icon: Icons.security,
+                            title: 'Caution',
+                            value:
+                                '${rentbook['securityDeposit']} ${widget.currency}',
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  // Informations sur le propriétaire
+                  _buildSectionTitle('Propriétaire'),
+                  Card(
+                    color: Colors.white,
+                    margin:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      side: const BorderSide(
+                        color: AppColors.buttonColor,
+                        width: 2,
+                      ),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        children: [
+                          _buildInfoRow(
+                            icon: Icons.person,
+                            title: 'Nom',
+                            value:
+                                '${owner['firstName'] ?? ''} ${owner['lastName'] ?? ''}',
+                          ),
+                          const Divider(),
+                          _buildInfoRow(
+                            icon: Icons.phone,
+                            title: 'Téléphone',
+                            value: owner['phone'] ?? 'Non disponible',
+                          ),
+                          const Divider(),
+                          _buildInfoRow(
+                            icon: Icons.email,
+                            title: 'Email',
+                            value: owner['email'] ?? 'Non disponible',
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  // Informations sur le locataire
+                  _buildSectionTitle('Locataire'),
+                  Card(
+                    color: Colors.white,
+                    margin:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      side: const BorderSide(
+                        color: AppColors.buttonColor,
+                        width: 2,
+                      ),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        children: [
+                          _buildInfoRow(
+                            icon: Icons.person,
+                            title: 'Nom',
+                            value:
+                                '${tenant['firstName'] ?? ''} ${tenant['lastName'] ?? ''}',
+                          ),
+                          const Divider(),
+                          _buildInfoRow(
+                            icon: Icons.phone,
+                            title: 'Téléphone',
+                            value: tenant['phone'] ?? 'Non disponible',
+                          ),
+                          const Divider(),
+                          _buildInfoRow(
+                            icon: Icons.email,
+                            title: 'Email',
+                            value: tenant['email'] ?? 'Non disponible',
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  // Caractéristiques de l'appartement
+                  _buildSectionTitle('Caractéristiques'),
+                  Card(
+                    color: Colors.white,
+                    margin:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      side: const BorderSide(
+                        color: AppColors.buttonColor,
+                        width: 2,
+                      ),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        children: [
+                          if (apartment['features'] != null) ...[
+                            Wrap(
+                              spacing: 10,
+                              runSpacing: 10,
+                              children: [
+                                if (apartment['features']['water'] == true)
+                                  _buildFeatureChip(Icons.water_drop, 'Eau'),
+                                if (apartment['features']['electricity'] ==
+                                    true)
+                                  _buildFeatureChip(
+                                      Icons.electric_bolt, 'Électricité'),
+                                if (apartment['features']['gas'] == true)
+                                  _buildFeatureChip(
+                                      Icons.local_fire_department, 'Gaz'),
+                                if (apartment['features']['furnished'] == true)
+                                  _buildFeatureChip(Icons.chair, 'Meublé'),
+                                if (apartment['features']['airConditioning'] ==
+                                    true)
+                                  _buildFeatureChip(
+                                      Icons.ac_unit, 'Climatisation'),
+                                if (apartment['features']['balcony'] == true)
+                                  _buildFeatureChip(Icons.balcony, 'Balcon'),
+                                if (apartment['features']['internet'] == true)
+                                  _buildFeatureChip(Icons.wifi, 'Internet'),
+                                if (apartment['features']['parking'] == true)
+                                  _buildFeatureChip(
+                                      Icons.local_parking, 'Parking'),
+                                if (apartment['features']['securitySystem'] ==
+                                    true)
+                                  _buildFeatureChip(Icons.security, 'Sécurité'),
+                                if (apartment['features']['elevator'] == true)
+                                  _buildFeatureChip(
+                                      Icons.elevator, 'Ascenseur'),
+                                if (apartment['features']['garden'] == true)
+                                  _buildFeatureChip(Icons.yard, 'Jardin'),
+                                if (apartment['features']['terrace'] == true)
+                                  _buildFeatureChip(Icons.deck, 'Terrasse'),
+                                if (apartment['features']['fitted_kitchen'] ==
+                                    true)
+                                  _buildFeatureChip(
+                                      Icons.kitchen, 'Cuisine équipée'),
+                                if (apartment['features']['pool'] == true)
+                                  _buildFeatureChip(Icons.pool, 'Piscine'),
+                              ],
+                            ),
+                          ] else ...[
+                            const Center(
+                              child: Text(
+                                'Aucune caractéristique disponible',
+                                style: TextStyle(color: Colors.grey),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  // Historique des paiements
+                  if (paymentHistory.isNotEmpty) ...[
+                    _buildSectionTitle('Historique des Paiements'),
+                    ListView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: paymentHistory.length,
+                      itemBuilder: (context, index) {
+                        final payment = paymentHistory[index];
+                        return Card(
+                          color: Colors.white,
+                          margin: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 8),
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            side: const BorderSide(
+                              color: AppColors.buttonColor,
+                              width: 2,
+                            ),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: ListTile(
+                            contentPadding: const EdgeInsets.all(16),
+                            leading: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: AppColors.buttonColor,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(
+                                Icons.payment,
+                                color: AppColors.white,
+                              ),
+                            ),
+                            title: Text(
+                              payment['description'] ?? 'Paiement',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Date: ${_formatDate(payment['date'])}',
+                                  style: TextStyle(
+                                    color: Colors.grey[700],
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Montant: ${payment['amount']} USD',
+                                  style: TextStyle(
+                                    color: Colors.grey[700],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            trailing: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: _getStatusColor(
+                                    payment['status'] ?? 'inconnu'),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                (payment['status'] ?? 'INCONNU').toUpperCase(),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+
+                  const SizedBox(height: 24),
+                ],
+              ),
+            );
+          }
+
+          return const Center(
+            child: Text('Chargement des données...'),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildSectionTitle(String title) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
+      child: Row(
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: AppColors.primary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFeatureItem(IconData icon, String text) {
+    return Column(
+      children: [
+        Icon(icon, color: AppColors.white),
+        const SizedBox(height: 4),
+        Text(
+          text,
+          style: const TextStyle(
+            fontSize: 12,
+            color: Colors.white,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildInfoRow({
+    required IconData icon,
+    required String title,
+    required String value,
+    Color? valueColor,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 18, color: AppColors.primary),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey[600],
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w500,
+                    color: valueColor,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFeatureChip(IconData icon, String label) {
+    return Chip(
+      avatar: Icon(icon, size: 16, color: AppColors.white),
+      label: Text(label, style: const TextStyle(color: Colors.white)),
+      backgroundColor: AppColors.buttonColor,
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+      labelStyle: const TextStyle(fontSize: 12),
+    );
+  }
+}
