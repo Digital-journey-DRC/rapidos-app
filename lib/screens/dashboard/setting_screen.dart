@@ -182,7 +182,7 @@ class _SettingScreenState extends State<SettingScreen>
                         icon: const Icon(Icons.close),
                         label: const Text('Fermer'),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.red,
+                          backgroundColor: AppColors.buttonColor,
                           foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10),
@@ -742,7 +742,7 @@ class _SettingScreenState extends State<SettingScreen>
                           tabs: const [
                             Tab(text: 'Profil', icon: Icon(Icons.person)),
                             Tab(
-                                text: 'Solde',
+                                text: 'Mes transactions',
                                 icon: Icon(Icons.account_balance_wallet)),
                           ],
                         ),
@@ -788,7 +788,7 @@ class _SettingScreenState extends State<SettingScreen>
           end: Alignment.bottomRight,
           colors: [
             AppColors.buttonColor,
-            Color.fromARGB(255, 230, 98, 88),
+            AppColors.buttonColor,
           ],
         ),
       ),
@@ -850,13 +850,13 @@ class _SettingScreenState extends State<SettingScreen>
             ),
           ),
           const SizedBox(height: 5),
-          Text(
-            user['role'] ?? 'Utilisateur',
-            style: const TextStyle(
-              color: Colors.white70,
-              fontSize: 16,
-            ),
-          ),
+          // Text(
+          //   user['role'] ?? 'Utilisateur',
+          //   style: const TextStyle(
+          //     color: Colors.white70,
+          //     fontSize: 16,
+          //   ),
+          // ),
           if (isProprietaire) ...[
             const SizedBox(height: 5),
             Text(
@@ -1101,7 +1101,7 @@ class _SettingScreenState extends State<SettingScreen>
                           end: Alignment.bottomRight,
                           colors: [
                             AppColors.buttonColor,
-                            Color.fromARGB(255, 230, 98, 88),
+                            AppColors.buttonColor,
                           ],
                         ),
                         borderRadius: BorderRadius.circular(15),
@@ -1157,13 +1157,13 @@ class _SettingScreenState extends State<SettingScreen>
                               Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Text(
-                                    'Propriétaire',
-                                    style: TextStyle(
-                                      color: Colors.white70,
-                                      fontSize: 14,
-                                    ),
-                                  ),
+                                  // const Text(
+                                  //   'Propriétaire',
+                                  //   style: TextStyle(
+                                  //     color: Colors.white70,
+                                  //     fontSize: 14,
+                                  //   ),
+                                  // ),
                                   const SizedBox(height: 5),
                                   Text(
                                     '${user['firstName']} ${user['lastName']}',

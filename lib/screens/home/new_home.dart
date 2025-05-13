@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:immo/constants.dart';
 import 'package:immo/screens/product/product_detail_screen.dart';
 import '../merchant/merchant_profile_screen.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:immo/cubit/auth_cubit.dart';
+import 'package:immo/screens/dashboard/setting_screen.dart';
 
 class NewHomeScreen extends StatelessWidget {
   const NewHomeScreen({Key? key}) : super(key: key);
@@ -10,6 +13,9 @@ class NewHomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        centerTitle: false,
         title: const Text(
           'RAPIDOS',
           style: TextStyle(
@@ -18,9 +24,52 @@ class NewHomeScreen extends StatelessWidget {
             fontSize: 16,
           ),
         ),
-        backgroundColor: Colors.white,
-        elevation: 0,
-        centerTitle: false,
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: BlocBuilder<AuthCubit, AuthState>(
+              builder: (context, state) {
+                if (state is AuthSuccess && state.user != null && state.user!['profileImage'] != null) {
+                  return GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const SettingScreen()),
+                      );
+                    },
+                    child: CircleAvatar(
+                      radius: 20,
+                      backgroundColor: AppColors.white,
+                      child: CircleAvatar(
+                        radius: 17,
+                        backgroundColor: AppColors.buttonColor,
+                        backgroundImage: NetworkImage(state.user!['profileImage']),
+                      ),
+                    ),
+                  );
+                } else {
+                  return GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const SettingScreen()),
+                      );
+                    },
+                    child: CircleAvatar(
+                      radius: 20,
+                      backgroundColor: AppColors.white,
+                      child: CircleAvatar(
+                        radius: 17,
+                        backgroundColor: AppColors.buttonColor,
+                        child: Icon(Icons.person, color: AppColors.white),
+                      ),
+                    ),
+                  );
+                }
+              },
+            ),
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         child: Column(
