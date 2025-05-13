@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:immo/constants.dart';
+import '../merchant/merchant_profile_screen.dart';
 
 class ProductDetailScreen extends StatefulWidget {
   final String tag;
@@ -298,21 +299,27 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         ),
                         ElevatedButton(
                           onPressed: () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Message envoyé au vendeur'),
-                                duration: Duration(seconds: 1),
+                            Navigator.push(
+                              context, 
+                              MaterialPageRoute(
+                                builder: (context) => MerchantProfileScreen(
+                                  name: 'Rapidos Store',
+                                  imagePath: widget.imagePath,
+                                  category: widget.category,
+                                  rating: 4.8,
+                                  isVerified: true,
+                                ),
                               ),
                             );
                           },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.primary,
                             foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
                             minimumSize: Size.zero,
                             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                           ),
-                          child: const Text('Contacter'),
+                          child: const Text('Voir'),
                         ),
                       ],
                     ),

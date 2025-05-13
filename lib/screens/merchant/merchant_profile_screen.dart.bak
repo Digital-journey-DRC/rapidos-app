@@ -339,42 +339,36 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> with Sing
         'price': '20 000 FC',
         'image': 'https://images.unsplash.com/photo-1574781330855-d0db8cc6a79c?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80',
         'tag': 'Nouveau',
-        'category': 'Alimentation',
       },
       {
         'name': 'Laptop Pro',
         'price': '500 USD',
         'image': 'https://images.unsplash.com/photo-1496181133206-80ce9b88a853?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80',
         'tag': 'Populaire',
-        'category': 'Informatique',
       },
       {
         'name': 'Smart Watch',
         'price': '200 USD',
         'image': 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80',
         'tag': 'En vente',
-        'category': 'Électronique',
       },
       {
         'name': 'T-shirt Classique',
         'price': '25 000 FC',
         'image': 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80',
         'tag': 'Nouveau',
-        'category': 'Vêtements',
       },
       {
         'name': 'Smartphone Pro',
         'price': '450 USD',
         'image': 'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80',
         'tag': 'En vente',
-        'category': 'Électronique',
       },
       {
         'name': 'Chaussures Sport',
         'price': '80 USD',
         'image': 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80',
         'tag': 'Populaire',
-        'category': 'Vêtements',
       },
     ];
 
@@ -394,7 +388,6 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> with Sing
           price: product['price'],
           imagePath: product['image'],
           tag: product['tag'],
-          category: product['category'],
         );
       },
     );
@@ -405,7 +398,6 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> with Sing
     required String price,
     required String imagePath,
     required String tag,
-    required String category,
   }) {
     return GestureDetector(
       onTap: () {
@@ -414,7 +406,7 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> with Sing
           MaterialPageRoute(
             builder: (context) => ProductDetailScreen(
               tag: tag,
-              category: category,  // Utilise la catégorie spécifique de chaque produit
+              category: widget.category,
               name: name,
               price: price,
               imagePath: imagePath,
@@ -428,8 +420,8 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> with Sing
           borderRadius: BorderRadius.circular(8),
         ),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
           // Product image with tag
           Stack(
             children: [
@@ -551,7 +543,7 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> with Sing
           ),
         ],
       ),
-    ));
+    );
   }
 }
 
