@@ -779,7 +779,6 @@ class _SettingScreenState extends State<SettingScreen>
     String profileImage = user['profileImage'] ?? '';
     String fullName = '${user['firstName'] ?? ''} ${user['lastName'] ?? ''}';
     bool isProprietaire = user['role'] == 'proprietaire';
-
     return Container(
       width: double.infinity,
       decoration: const BoxDecoration(
