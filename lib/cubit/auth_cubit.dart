@@ -1,5 +1,7 @@
 import 'dart:convert';
+import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:immo/screens/auth/otp_screen.dart';
 import '../services/auth_service.dart';
 import '../services/storage_service.dart';
 
@@ -37,36 +39,53 @@ class AuthCubit extends Cubit<AuthState> {
   AuthCubit(this._authService) : super(AuthInitial());
 
   Future<void> register({
-    required String otp,
+    required String email,
     required String phone,
     required String password,
     required String firstName,
     required String lastName,
     required String role,
+    required BuildContext context,
   }) async {
     try {
       emit(AuthLoading());
       final response = await _authService.register(
-        otp: otp,
+        email: email,
         phone: phone,
         password: password,
         firstName: firstName,
         lastName: lastName,
         role: role,
       );
-      
+      if (response['status'] == 200 || response['status'] == 201) {
+        Navigator.of(context).push(MaterialPageRoute(
+          builder: (context) => OTPScreen(user: {
+            'id': response['id'].toString(),
+            'otp': response['otp'],
+            'phone': phone,
+            'password': password,
+            'firstName': firstName,
+            'lastName': lastName,
+            'role': role,
+            'resetPassword': false,
+          }),
+        ));
+      }
+
       // Sauvegarder le token et les données utilisateur
       if (response['token'] != null) {
         await _storageService.saveToken(response['token']);
         await _storageService.saveUserData(jsonEncode(response['user']));
       }
-      
-      emit(AuthSuccess(
-        success: response['success'],
-        message: response['message'],
-        token: response['token'],
-        user: response['user'],
-      ));
+
+      emit(AuthInitial());
+
+      // emit(AuthSuccess(
+      //   success: response['success'],
+      //   message: response['message'],
+      //   token: response['token'],
+      //   user: response['user'],
+      // ));
     } catch (e) {
       emit(AuthError(e.toString()));
     }
@@ -80,7 +99,7 @@ class AuthCubit extends Cubit<AuthState> {
       final response = await _authService.sendOTP(
         phone: phone,
       );
-      
+
       // Revenir à l'état initial après l'envoi de l'OTP
       emit(AuthInitial());
     } catch (e) {
@@ -88,19 +107,25 @@ class AuthCubit extends Cubit<AuthState> {
     }
   }
 
-  
-
-    Future<void> verifyOTP({
-    required String number,
-    required String otp,
+  Future<void> verifyOTP({
+    required String id,
+    required int otp,
+    required BuildContext context,
   }) async {
     try {
       emit(AuthLoading());
       final response = await _authService.verifyOTP(
-        number: number,
+        id: id,
         otp: otp,
       );
-      
+
+      print(response);
+       Navigator.pushNamed(context, '/login');
+
+      if (response['status'] == 200 || response['status'] == 201) {
+        Navigator.pushNamed(context, '/login');
+      }
+
       // Émettre un état de succès au lieu de revenir à l'état initial
       emit(AuthInitial());
     } catch (e) {
@@ -108,28 +133,31 @@ class AuthCubit extends Cubit<AuthState> {
     }
   }
 
-
   Future<void> login({
-    required String identifier,
+    required String uid,
     required String password,
   }) async {
     try {
       emit(AuthLoading());
       final response = await _authService.login(
-        identifier: identifier,
+        uid: uid,
         password: password,
       );
-      
+
+      print(response);
+
       // Sauvegarder le token et les données utilisateur
       if (response['token'] != null) {
-        await _storageService.saveToken(response['token']);
+        await _storageService.saveToken(response['token']['token']);
         await _storageService.saveUserData(jsonEncode(response['user']));
       }
-      
+
+      print(response);
+
       emit(AuthSuccess(
-        success: response['success'],
+        success: true,
         message: 'Connexion réussie',
-        token: response['token'],
+        token: response['token']['token'],
         user: response['user'],
       ));
     } catch (e) {
@@ -141,13 +169,13 @@ class AuthCubit extends Cubit<AuthState> {
     await _storageService.clearAll();
     emit(AuthInitial());
   }
-  
+
   Future<void> checkAuth() async {
     try {
       final token = await _storageService.getToken();
       final userData = await _storageService.getUserData();
       final lastLogin = await _storageService.getLastLoginTime();
-      
+
       if (token != null && userData != null && lastLogin != null) {
         // Check if 23 hours have passed since last login
         final now = DateTime.now();
@@ -185,7 +213,7 @@ class AuthCubit extends Cubit<AuthState> {
     try {
       // Save the updated user data
       await _storageService.saveUserData(jsonEncode(userData));
-      
+
       // Update the current state with the new user data
       emit(AuthSuccess(
         success: true,

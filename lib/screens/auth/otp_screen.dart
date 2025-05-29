@@ -169,8 +169,8 @@ class _OTPScreenState extends State<OTPScreen> {
         // Vérifier l'OTP directement avec le service
         final authService = AuthService();
         final response = await authService.verifyOTP(
-          number: widget.user!['phone'],
-          otp: _otp
+          id: widget.user!['id'],
+          otp:  int.parse(_otp)
         );
         
         // Si nous arrivons ici, c'est que l'OTP est correct
@@ -214,13 +214,10 @@ class _OTPScreenState extends State<OTPScreen> {
         // Attendre 2 secondes pour montrer le chargement
         await Future.delayed(const Duration(seconds: 2));
         
-        context.read<AuthCubit>().register(
-          otp: _otp,
-          phone: widget.user!['phone'],
-          password: widget.user!['password'],
-          firstName: widget.user!['firstName'],
-          lastName: widget.user!['lastName'],
-          role: widget.user!['role'],
+        context.read<AuthCubit>().verifyOTP(
+          context: context,
+          otp:int.parse(_otp),
+          id: widget.user!['id'].toString(),
         );
         
         setState(() {

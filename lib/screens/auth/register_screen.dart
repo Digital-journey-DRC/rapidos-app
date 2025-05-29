@@ -15,11 +15,11 @@ class RegisterScreen extends StatefulWidget {
 class _RegisterScreenState extends State<RegisterScreen> {
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
-  // final _emailController = TextEditingController();
+  final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
-  String _selectedRole = 'locataire';
+  String _selectedRole = 'acheteur';
   Country _selectedCountry = Country(
     phoneCode: "243",
     countryCode: "CD",
@@ -37,7 +37,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   void dispose() {
     _firstNameController.dispose();
     _lastNameController.dispose();
-    // _emailController.dispose();
+    _emailController.dispose();
     _phoneController.dispose();
     _passwordController.dispose();
     super.dispose();
@@ -57,12 +57,25 @@ class _RegisterScreenState extends State<RegisterScreen> {
             listener: (context, state) {
               if (state is AuthSuccess) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Inscription réussie'),
+                  SnackBar(
+                    content: Text(state.message),
                     backgroundColor: Colors.green,
                   ),
                 );
-                Navigator.pushReplacementNamed(context, AppRoutes.login);
+                final phoneNumber = '+${_selectedCountry.phoneCode}${_phoneController.text}';
+                Navigator.of(context).push(MaterialPageRoute(
+                  builder: (context) => OTPScreen(user: {
+                    'phone': phoneNumber,
+                    'password': _passwordController.text,
+                    'firstName': _firstNameController.text.trim(),
+                    'lastName': _lastNameController.text.trim(),
+                    'role': _selectedRole,
+                    'resetPassword': false,
+                    'otp': state.user?['otp'],
+                    'userId': state.user?['id'],
+                    'expiresAt': state.user?['expiresAt'],
+                  }),
+                ));
               } else if (state is AuthError) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
@@ -76,20 +89,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                //   Image.asset(
-                //   AppAssets.backgroundImage,
-                //   height: 100,
-                //   width: 200,
-                //   fit: BoxFit.contain,
-                // ),
-                Text(
-                  'Rapidos',
-                  style: AppStyles.heading1.copyWith(color: AppColors.primary),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 10),      
+                  Image.asset(AppAssets.logo, width: 100, height: 100),
                   Text(
-                    'Commencez votre expérience immobilière',
+                    'Mbangu na confiance',
                     style: AppStyles.body.copyWith(color: AppColors.textLight),
                     textAlign: TextAlign.center,
                   ),
@@ -115,18 +117,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ),
                     ),
                   ),
-                  // const SizedBox(height: 16),
-                  // TextFormField(
-                  //   controller: _emailController,
-                  //   keyboardType: TextInputType.emailAddress,
-                  //   decoration: InputDecoration(
-                  //     labelText: 'Email',
-                  //     prefixIcon: const Icon(Icons.email_outlined),
-                  //     border: OutlineInputBorder(
-                  //       borderRadius: BorderRadius.circular(12),
-                  //     ),
-                  //   ),
-                  // ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _emailController,
+                    keyboardType: TextInputType.emailAddress,
+                    decoration: InputDecoration(
+                      labelText: 'Email',
+                      prefixIcon: const Icon(Icons.email_outlined),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
                   const SizedBox(height: 16),
                   TextFormField(
                     controller: _phoneController,
@@ -135,7 +137,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       labelText: 'Numéro de téléphone',
                       hintText: '826016607',
                       prefixIcon: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 6),
                         margin: const EdgeInsets.symmetric(horizontal: 8),
                         child: InkWell(
                           onTap: () {
@@ -196,8 +199,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ),
                     ),
                     items: const [
-                      DropdownMenuItem(value: 'locataire', child: Text('Locataire')),
-                      DropdownMenuItem(value: 'proprietaire', child: Text('Propriétaire'))
+                      DropdownMenuItem(
+                          value: 'acheteur', child: Text('Acheteur')),
+                      DropdownMenuItem(
+                          value: 'vendeur', child: Text('Vendeur')),
+                      DropdownMenuItem(
+                          value: 'livreur', child: Text('Livreur')),
                     ],
                     onChanged: (value) {
                       if (value != null) {
@@ -216,8 +223,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       prefixIcon: const Icon(Icons.lock_outline),
                       suffixIcon: IconButton(
                         icon: Icon(
-                          _obscurePassword 
-                              ? Icons.visibility_off 
+                          _obscurePassword
+                              ? Icons.visibility_off
                               : Icons.visibility,
                           color: AppColors.textLight,
                         ),
@@ -232,11 +239,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: AppColors.secondary, width: 1.0),
+                        borderSide: const BorderSide(
+                            color: AppColors.secondary, width: 1.0),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: AppColors.primary, width: 2.0),
+                        borderSide: const BorderSide(
+                            color: AppColors.primary, width: 2.0),
                       ),
                       filled: true,
                       fillColor: Colors.white,
@@ -255,7 +264,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 _passwordController.text.isEmpty) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
-                                  content: Text('Tous les champs sont requis pour finaliser votre inscription'),
+                                  content: Text(
+                                      'Tous les champs sont requis pour finaliser votre inscription'),
                                   backgroundColor: Colors.red,
                                 ),
                               );
@@ -263,22 +273,24 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             }
 
                             // Validation de l'email
-                            // if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
-                            //     .hasMatch(_emailController.text)) {
-                            //   ScaffoldMessenger.of(context).showSnackBar(
-                            //     const SnackBar(
-                            //       content: Text('L\'adresse email saisie n\'est pas valide'),
-                            //       backgroundColor: Colors.red,
-                            //     ),
-                            //   );
-                            //   return;
-                            // }
+                            if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
+                                .hasMatch(_emailController.text)) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                      'L\'adresse email saisie n\'est pas valide'),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                              return;
+                            }
 
                             // Validation du mot de passe
                             if (_passwordController.text.length < 6) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
-                                  content: Text('Le mot de passe doit contenir au moins 6 caractères'),
+                                  content: Text(
+                                      'Le mot de passe doit contenir au moins 6 caractères'),
                                 ),
                               );
                               return;
@@ -288,39 +300,28 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             if (_phoneController.text.length < 9) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
-                                  content: Text('Le numéro de téléphone doit contenir au moins 9 chiffres'),
+                                  content: Text(
+                                      'Le numéro de téléphone doit contenir au moins 9 chiffres'),
                                   backgroundColor: Colors.red,
                                 ),
                               );
                               return;
                             }
 
-                            final phoneNumber = '+${_selectedCountry.phoneCode}${_phoneController.text}';
-                            // context.read<AuthCubit>().register(
-                            //       email: _emailController.text.trim(),
-                            //       phone: phoneNumber,
-                            //       password: _passwordController.text,
-                            //       firstName: _firstNameController.text.trim(),
-                            //       lastName: _lastNameController.text.trim(),
-                            //       role: _selectedRole,
-                            //     );
-                                  context.read<AuthCubit>().sendOTP(
+                            final phoneNumber =
+                                '+${_selectedCountry.phoneCode}${_phoneController.text}';
+                            context.read<AuthCubit>().register(
+                                  context: context,
+                                  email: _emailController.text.trim(),
                                   phone: phoneNumber,
-
+                                  password: _passwordController.text,
+                                  firstName: _firstNameController.text.trim(),
+                                  lastName: _lastNameController.text.trim(),
+                                  role: _selectedRole,
                                 );
-
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (context) => OTPScreen(user: {
-                                  
-                                  'phone': phoneNumber,
-                                  'password': _passwordController.text,
-                                  'firstName': _firstNameController.text.trim(),
-                                  'lastName': _lastNameController.text.trim(),
-                                  'role': _selectedRole,
-                                  'resetPassword': false,
-                                } ),
-                                ));
+                            // context.read<AuthCubit>().sendOTP(
+                            //       phone: phoneNumber,
+                            //     );
                           },
                     style: ElevatedButton.styleFrom(
                       elevation: 0,

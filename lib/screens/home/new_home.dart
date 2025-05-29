@@ -16,14 +16,9 @@ class NewHomeScreen extends StatelessWidget {
         backgroundColor: Colors.white,
         elevation: 0,
         centerTitle: false,
-        title: const Text(
-          'RAPIDOS',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: AppColors.primary,
-            fontSize: 16,
-          ),
-        ),
+        automaticallyImplyLeading: false,
+
+        title: Image.asset(AppAssets.logo, width: 100, height: 100),
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 12),
@@ -39,10 +34,10 @@ class NewHomeScreen extends StatelessWidget {
                     },
                     child: CircleAvatar(
                       radius: 20,
-                      backgroundColor: AppColors.white,
+                      backgroundColor: AppColors.buttonColor2,
                       child: CircleAvatar(
                         radius: 17,
-                        backgroundColor: AppColors.buttonColor,
+                        backgroundColor: AppColors.white,
                         backgroundImage: NetworkImage(state.user!['profileImage']),
                       ),
                     ),
@@ -55,9 +50,9 @@ class NewHomeScreen extends StatelessWidget {
                         MaterialPageRoute(builder: (context) => const SettingScreen()),
                       );
                     },
-                    child: CircleAvatar(
+                    child: const CircleAvatar(
                       radius: 20,
-                      backgroundColor: AppColors.white,
+                      backgroundColor: AppColors.buttonColor2,
                       child: CircleAvatar(
                         radius: 17,
                         backgroundColor: AppColors.buttonColor,
@@ -111,7 +106,7 @@ class NewHomeScreen extends StatelessWidget {
                   const SizedBox(height: 20),
                   const Text(
                     'Trouvez ce dont vous avez besoin',
-                    style: TextStyle( fontSize: 12, fontWeight: FontWeight.bold),
+                    style: TextStyle( fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black),
                   ),
                 ],
               ),
@@ -121,7 +116,7 @@ class NewHomeScreen extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 12.0),
               child: SizedBox(
-                height: 80,
+                height: 40,
                 child: ListView(
                   scrollDirection: Axis.horizontal,
                   padding: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -158,7 +153,7 @@ class NewHomeScreen extends StatelessWidget {
                     padding: EdgeInsets.symmetric(horizontal: 16.0),
                     child: Text(
                       'Produits vedettes',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.primary),
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black),
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -218,7 +213,7 @@ class NewHomeScreen extends StatelessWidget {
                     padding: EdgeInsets.symmetric(horizontal: 16.0),
                     child: Text(
                       'Top Marchands',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.primary),
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black),
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -291,7 +286,7 @@ class NewHomeScreen extends StatelessWidget {
                     children: [
                       const Text(
                         'John Doe',
-                        style: TextStyle(fontWeight: FontWeight.w500, fontSize: 14, color: AppColors.primary),
+                        style: TextStyle(fontWeight: FontWeight.w500, fontSize: 14, color: Colors.black),
                       ),
                       Text(
                         'Heureux de vous revoir !',
@@ -311,7 +306,7 @@ class NewHomeScreen extends StatelessWidget {
                 children: [
                   const Text(
                     'Avis des clients',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.primary),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black),
                   ),
                   const SizedBox(height: 12),
                   Row(
@@ -352,7 +347,7 @@ class NewHomeScreen extends StatelessWidget {
                       bottom: 10,
                       child: Text(
                         'Position Livraison',
-                        style: TextStyle(fontWeight: FontWeight.w500, fontSize: 14, color: AppColors.primary),
+                        style: TextStyle(fontWeight: FontWeight.w500, fontSize: 14, color: Colors.black),
                       ),
                     ),
                   ],
@@ -367,20 +362,43 @@ class NewHomeScreen extends StatelessWidget {
   }
 
   Widget _buildCategoryItem(String title, IconData icon) {
-    return Column(
-      children: [
-        Container(
-          margin: EdgeInsets.all(5),
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: AppColors.primary,
-            borderRadius: BorderRadius.circular(4),
+    // return Column(
+    //   children: [
+    //     Container(
+    //       margin: EdgeInsets.all(5),
+    //       padding: const EdgeInsets.all(12),
+    //       decoration: BoxDecoration(
+    //         color: AppColors.primary,
+    //         borderRadius: BorderRadius.circular(4),
+    //       ),
+    //       child: Icon(icon, color: Colors.grey.shade100, size: 20),
+    //     ),
+    //     const SizedBox(height: 4),
+    //     Text(title, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+    //   ],
+    // );
+    return Container(
+      padding: const EdgeInsets.only(right: 12, left: 3, top: 3, bottom: 3),
+      decoration: BoxDecoration(
+        // color: AppColors.primary,
+        borderRadius: BorderRadius.circular(60),
+        border: Border.all(color: AppColors.primary),
+      ),
+      child: Row(
+        children: [
+          Container(
+            decoration: BoxDecoration(
+              color: AppColors.primary,
+              borderRadius: BorderRadius.circular(60),
+            ),
+            padding: const EdgeInsets.all(12),
+            child:Icon(icon, color: Colors.grey.shade100, size: 10),
           ),
-          child: Icon(icon, color: Colors.grey.shade100, size: 20),
-        ),
-        const SizedBox(height: 4),
-        Text(title, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-      ],
+          
+          const SizedBox(width: 4),
+          Text(title, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+        ],
+      ),
     );
   }
   
@@ -452,7 +470,7 @@ class NewHomeScreen extends StatelessWidget {
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: AppColors.buttonColor2,
                           borderRadius: BorderRadius.circular(2),
                           boxShadow: [
                             BoxShadow(
@@ -464,7 +482,7 @@ class NewHomeScreen extends StatelessWidget {
                         ),
                         child: Text(
                           tag,
-                          style: const TextStyle(fontSize: 10),
+                          style: const TextStyle(fontSize: 10, color: Colors.white),
                         ),
                       ),
                     ),

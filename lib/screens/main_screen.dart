@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:immo/cubit/listing_cubit.dart';
+import 'package:immo/screens/cart/cart_screen.dart';
 import 'package:immo/screens/favoris_screen.dart';
+import 'package:immo/screens/home/home_livreur.dart';
+import 'package:immo/screens/home/home_marchant.dart';
 import 'package:immo/screens/home/new_home.dart';
 import 'package:immo/screens/messages_screen.dart';
 import 'package:immo/screens/payment_screen.dart';
@@ -10,6 +13,9 @@ import '../constants.dart';
 import '../cubit/auth_cubit.dart';
 import 'home_screen.dart';
 import 'dashboard/dashboard_screen.dart';
+import 'package:immo/widgets/cart_badge.dart';
+import 'package:immo/screens/cart/cart_notifier.dart';
+import 'dart:async';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -21,19 +27,29 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
   int _previousIndex = 0;
+  late final StreamController<void> _cartStreamController;
 
   final List<Widget> _screens = [
     // const DashboardScreen(),
     const NewHomeScreen(),
+    const CartScreen(backNavigaton: false),
     const FavorisScreen(),
-    const FavorisScreen(),
+    const HomeMarchantScreen(),
+    const HomeLivreurScreen()
   ];
 
   @override
   void initState() {
     super.initState();
+    _cartStreamController = StreamController<void>.broadcast();
     // Charger les données au démarrage
     context.read<ListingCubit>().getListings();
+  }
+
+  @override
+  void dispose() {
+    _cartStreamController.close();
+    super.dispose();
   }
 
   void _onItemTapped(int index) {
@@ -51,17 +67,23 @@ class _MainScreenState extends State<MainScreen> {
   @override
   Widget build(BuildContext context) {
     final authState = context.watch<AuthCubit>().state;
-    final bool isLocataire = authState is AuthSuccess &&
+    final bool isAcheteur = authState is AuthSuccess &&
         authState.user != null &&
-        authState.user!['role'] == 'locataire';
+        authState.user!['role'] == 'acheteur';
+    final bool isVendeur = authState is AuthSuccess &&
+        authState.user != null &&
+        authState.user!['role'] == 'vendeur';
+    final bool isLivreur = authState is AuthSuccess &&
+        authState.user != null &&
+        authState.user!['role'] == 'livreur';
 
-    final List<BottomNavigationBarItem> navigationItems = [
+    List<BottomNavigationBarItem> navigationItems = [
       const BottomNavigationBarItem(
         icon: Icon(Icons.home_outlined),
         label: 'Accueil',
       ),
       const BottomNavigationBarItem(
-        icon: Icon(Icons.shopping_bag_outlined),
+        icon: CartBadge(),
         label: 'Panier',
       ),
       const BottomNavigationBarItem(
@@ -77,32 +99,51 @@ class _MainScreenState extends State<MainScreen> {
     // Filtrer les écrans en fonction du rôle
     List<Widget> filteredScreens = [];
 
-    // if (isLocataire) {
-    //   filteredScreens.add(_screens[4]); // PaymentScreen
-    //   filteredScreens.add(_screens[1]); // FavorisScreen
-    //   filteredScreens.add(_screens[3]); // ListRentBook
-    //   filteredScreens.add(_screens[0]); // HomeScreen (Découvrir)
-    //   filteredScreens.add(_screens[5]); // MessagesScreen
-    // } else {
-    //   filteredScreens.add(_screens[2]); // DashboardScreen
-    //   filteredScreens.add(_screens[0]); // HomeScreen (Découvrir)
-    //   filteredScreens.add(_screens[1]); // FavorisScreen
-    //   filteredScreens.add(_screens[5]); // MessagesScreen
-    // }
+    if (isAcheteur) {
+      filteredScreens = [
+        _screens[0], // NewHomeScreen
+        _screens[1], // CartScreen
+        _screens[2], // FavorisScreen
+        _screens[3], // HomeMarchantScreen
+      ];
+    } else if (isVendeur) {
+      filteredScreens = [
+        _screens[3], // HomeMarchantScreen
+        _screens[3], // HomeMarchantScreen (pour l'onglet Produits)
+        _screens[3], // HomeMarchantScreen (pour l'onglet Profil)
+      ];
+      navigationItems = const [
+        BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Accueil'),
+        BottomNavigationBarItem(icon: Icon(Icons.inventory_2), label: 'Produits'),
+        BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profil'),
+      ];
+    } else if (isLivreur) {
+      filteredScreens = [
+        _screens[4], // HomeLivreurScreen
+        _screens[1], // CartScreen
+        _screens[2], // FavorisScreen
+        _screens[3], // HomeMarchantScreen
+      ];
+    } else {
+      filteredScreens = _screens;
+    }
 
-    return Scaffold(
-      body: IndexedStack(
-        index: _currentIndex,
-        children: _screens,
-      ),
-      bottomNavigationBar: BottomNavigationBar(
-        backgroundColor: const Color.fromARGB(255, 250, 250, 250),
-        currentIndex: _currentIndex,
-        onTap: _onItemTapped,
-        items: navigationItems,
-        type: BottomNavigationBarType.fixed,
-        selectedItemColor: AppColors.primary,
-        unselectedItemColor: Colors.grey,
+    return CartNotifier(
+      streamController: _cartStreamController,
+      child: Scaffold(
+        body: IndexedStack(
+          index: _currentIndex,
+          children: filteredScreens,
+        ),
+        bottomNavigationBar: BottomNavigationBar(
+          backgroundColor: const Color.fromARGB(255, 250, 250, 250),
+          currentIndex: _currentIndex,
+          onTap: _onItemTapped,
+          items: navigationItems,
+          type: BottomNavigationBarType.fixed,
+          selectedItemColor: AppColors.primary,
+          unselectedItemColor: Colors.grey,
+        ),
       ),
     );
   }

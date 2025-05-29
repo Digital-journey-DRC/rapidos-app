@@ -49,13 +49,8 @@ class _LoginScreenState extends State<LoginScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [  
+                Image.asset(AppAssets.logo, width: 100, height: 100),
 
-                const SizedBox(height: 10),
-                Text(
-                  'Rapidos',
-                  style: AppStyles.heading1.copyWith(color: AppColors.primary),
-                  textAlign: TextAlign.center,
-                ),
                 const SizedBox(height: 8),
                 Text(
                   'Connectez-vous pour continuer',
@@ -199,7 +194,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                       final phoneNumber =
                                           '+${_selectedCountry.phoneCode}${_phoneController.text}';
                                       context.read<AuthCubit>().login(
-                                            identifier: phoneNumber,
+                                            uid: phoneNumber,
                                             password: _passwordController.text,
                                           );
                                     },

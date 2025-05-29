@@ -17,11 +17,13 @@ class AppAssets {
   static const String house1 = 'assets/images/house1.jpg';
   static const String house2 = 'assets/images/house2.jpg';
   static const String house3 = 'assets/images/house3.jpg';
+  static const String logo = 'assets/images/rapidos.png';
 }
 
 class AppColors {
-  static const Color primary = Color(0xFF2B2D42);
-  static const Color buttonColor = Color(0xFF2B2D42);
+  static const Color primary = Color(0xFF147C3C);
+  static const Color buttonColor = Color(0xFF147C3C);
+  static const Color buttonColor2 = Color(0xFFF3B30C);
   static const Color secondary = Color(0xFF8D99AE);
   static const Color accent = Color(0xFFEF233C);
   static const Color background = Color(0xFFF8F9FA);

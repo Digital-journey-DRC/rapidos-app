@@ -290,353 +290,59 @@ class _SettingScreenState extends State<SettingScreen>
     );
   }
 
-  Future<void> _pickImage() async {
-    // Utiliser une seule image à la fois
-    List<dynamic> selectedImages = [];
-    if (_selectedImage != null) {
-      selectedImages.add(_selectedImage);
-    }
-
-    // Afficher le dialogue de gestion d'images
-    showDialog(
+  void _showImageSourceDialog() {
+    showModalBottomSheet(
       context: context,
-      builder: (BuildContext context) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return _buildImageDialog(context, selectedImages, setDialogState);
-          },
-        );
-      },
-    );
-  }
-
-  Widget _buildImageDialog(BuildContext context, List<dynamic> selectedImages,
-      StateSetter setDialogState) {
-    void _showImageSourceOptions() {
-      showModalBottomSheet(
-        context: context,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        builder: (context) => Container(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'Sélectionner une image',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 20),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  _buildImageSourceOption(
-                    icon: Icons.photo_library,
-                    title: 'Galerie',
-                    onTap: () async {
-                      Navigator.pop(context);
-                      final XFile? image =
-                          await _picker.pickImage(source: ImageSource.gallery);
-                      if (image != null) {
-                        setDialogState(() {
-                          // Remplacer l'image existante
-                          selectedImages.clear();
-                          selectedImages.add(File(image.path));
-                        });
-                      }
-                    },
-                  ),
-                  _buildImageSourceOption(
-                    icon: Icons.camera_alt,
-                    title: 'Caméra',
-                    onTap: () async {
-                      Navigator.pop(context);
-                      final XFile? photo =
-                          await _picker.pickImage(source: ImageSource.camera);
-                      if (photo != null) {
-                        setDialogState(() {
-                          // Remplacer l'image existante
-                          selectedImages.clear();
-                          selectedImages.add(File(photo.path));
-                        });
-                      }
-                    },
-                  ),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(20),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            GestureDetector(
+              onTap: () async {
+                Navigator.pop(context);
+                final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+                if (image != null) {
+                  setState(() {
+                    _selectedImage = File(image.path);
+                  });
+                }
+              },
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: const [
+                  Icon(Icons.photo_library, size: 40, color: AppColors.buttonColor),
+                  SizedBox(height: 8),
+                  Text('Galerie'),
                 ],
               ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    return Dialog(
-      insetPadding: const EdgeInsets.all(20),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(15),
-      ),
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Text(
-                  'Photo de profil',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const Spacer(),
-                IconButton(
-                  icon: const Icon(Icons.close),
-                  onPressed: () {
-                    Navigator.pop(context);
-                  },
-                ),
-              ],
             ),
-            const SizedBox(height: 20),
-            // Affichage de l'image sélectionnée
-            selectedImages.isEmpty
-                ? Container(
-                    height: 200,
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      color: Colors.grey[100],
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: Colors.grey[300]!),
-                    ),
-                    child: Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.image_not_supported,
-                            size: 48,
-                            color: Colors.grey[500],
-                          ),
-                          const SizedBox(height: 15),
-                          Text(
-                            'Aucune image sélectionnée',
-                            style: TextStyle(
-                              color: Colors.grey[600],
-                              fontSize: 16,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  )
-                : Container(
-                    height: 250,
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: Colors.grey[300]!),
-                    ),
-                    child: Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        // L'image
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(10),
-                          child: selectedImages.first is File
-                              ? Image.file(
-                                  selectedImages.first as File,
-                                  fit: BoxFit.cover,
-                                )
-                              : Image.network(
-                                  selectedImages.first as String,
-                                  fit: BoxFit.cover,
-                                ),
-                        ),
-                        // Bouton de suppression
-                        Positioned(
-                          top: 10,
-                          right: 10,
-                          child: GestureDetector(
-                            onTap: () {
-                              setDialogState(() {
-                                selectedImages.clear();
-                              });
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.8),
-                                borderRadius: BorderRadius.circular(30),
-                              ),
-                              child: const Icon(
-                                Icons.delete,
-                                size: 24,
-                                color: Colors.red,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-            const SizedBox(height: 20),
-            // Bouton pour choisir une image
-            InkWell(
-              onTap: () {
-                _showImageSourceOptions();
+            GestureDetector(
+              onTap: () async {
+                Navigator.pop(context);
+                final XFile? photo = await _picker.pickImage(source: ImageSource.camera);
+                if (photo != null) {
+                  setState(() {
+                    _selectedImage = File(photo.path);
+                  });
+                }
               },
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 15),
-                decoration: BoxDecoration(
-                  color: AppColors.buttonColor.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: AppColors.buttonColor.withOpacity(0.3),
-                    width: 1,
-                  ),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                        selectedImages.isEmpty
-                            ? Icons.add_photo_alternate
-                            : Icons.edit,
-                        color: AppColors.buttonColor,
-                        size: 24),
-                    const SizedBox(width: 10),
-                    Text(
-                      selectedImages.isEmpty
-                          ? 'Ajouter une photo'
-                          : 'Changer la photo',
-                      style: const TextStyle(
-                        color: AppColors.buttonColor,
-                        fontWeight: FontWeight.w500,
-                        fontSize: 16,
-                      ),
-                    ),
-                  ],
-                ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: const [
+                  Icon(Icons.camera_alt, size: 40, color: AppColors.buttonColor),
+                  SizedBox(height: 8),
+                  Text('Caméra'),
+                ],
               ),
-            ),
-            const SizedBox(height: 20),
-            // Boutons d'action
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.grey[200],
-                      foregroundColor: Colors.black87,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      padding: const EdgeInsets.symmetric(vertical: 15),
-                    ),
-                    onPressed: () {
-                      Navigator.pop(context);
-                    },
-                    child: const Text(
-                      'Annuler',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 15),
-                Expanded(
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.buttonColor,
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      padding: const EdgeInsets.symmetric(vertical: 15),
-                    ),
-                    onPressed: () async {
-                      if (selectedImages.isEmpty) {
-                        Navigator.pop(context);
-                        return;
-                      }
-
-                      // Utiliser l'image sélectionnée comme photo de profil
-                      final File imageFile = selectedImages.first as File;
-
-                      setState(() {
-                        _selectedImage = imageFile;
-                      });
-
-                      // Fermer le dialogue
-                      Navigator.pop(context);
-
-                      // Uploader l'image de profil en utilisant le cubit
-                      final authState = context.read<AuthCubit>().state;
-                      if (authState is AuthSuccess && authState.user != null) {
-                        _profileCubit.uploadProfileImage(
-                          token: authState.token!,
-                          imageFile: imageFile,
-                        );
-                      }
-                    },
-                    child: const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.check, size: 18, color: Colors.white),
-                        SizedBox(width: 5),
-                        Text(
-                          'Enregistrer',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
             ),
           ],
         ),
       ),
     );
-  }
-
-  Future<void> _updateProfile() async {
-    if (_formKey.currentState!.validate()) {
-      final authState = context.read<AuthCubit>().state;
-      if (authState is AuthSuccess && authState.user != null) {
-        // Conserver les valeurs à mettre à jour pour confirmer qu'elles sont correctement sauvegardées
-        final String firstName = _firstNameController.text;
-        final String lastName = _lastNameController.text;
-        final String phone = _phoneController.text;
-        
-        // Appeler la mise à jour du profil
-        await _profileCubit.updateProfile(
-          userId: authState.user!['id'],
-          token: authState.token!,
-          firstName: firstName,
-          lastName: lastName,
-          phone: phone,
-        );
-        
-        // Mettre à jour directement l'UI avec les nouvelles valeurs en attendant la confirmation API
-        setState(() {
-          // Les données seront officiellement mises à jour via le listener du ProfileCubit
-        });
-      }
-    }
   }
 
   @override
@@ -822,7 +528,7 @@ class _SettingScreenState extends State<SettingScreen>
                 ),
               ),
               GestureDetector(
-                onTap: _pickImage,
+                onTap: _showImageSourceDialog,
                 child: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
@@ -1395,5 +1101,31 @@ class _SettingScreenState extends State<SettingScreen>
         ],
       ),
     );
+  }
+
+  Future<void> _updateProfile() async {
+    if (_formKey.currentState!.validate()) {
+      final authState = context.read<AuthCubit>().state;
+      if (authState is AuthSuccess && authState.user != null) {
+        // Conserver les valeurs à mettre à jour pour confirmer qu'elles sont correctement sauvegardées
+        final String firstName = _firstNameController.text;
+        final String lastName = _lastNameController.text;
+        final String phone = _phoneController.text;
+        
+        // Appeler la mise à jour du profil
+        await _profileCubit.updateProfile(
+          userId: authState.user!['id'],
+          token: authState.token!,
+          firstName: firstName,
+          lastName: lastName,
+          phone: phone,
+        );
+        
+        // Mettre à jour directement l'UI avec les nouvelles valeurs en attendant la confirmation API
+        setState(() {
+          // Les données seront officiellement mises à jour via le listener du ProfileCubit
+        });
+      }
+    }
   }
 }

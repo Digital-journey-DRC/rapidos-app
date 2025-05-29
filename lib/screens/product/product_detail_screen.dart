@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:immo/constants.dart';
 import '../merchant/merchant_profile_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
+import '../cart/cart_screen.dart';
+import '../cart/cart_notifier.dart';
+import 'package:immo/widgets/cart_badge.dart';
 
 class ProductDetailScreen extends StatefulWidget {
   final String tag;
@@ -24,6 +29,131 @@ class ProductDetailScreen extends StatefulWidget {
 
 class _ProductDetailScreenState extends State<ProductDetailScreen> {
   int quantity = 1;
+  bool isInCart = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkIfInCart();
+  }
+
+  Future<void> _checkIfInCart() async {
+    final prefs = await SharedPreferences.getInstance();
+    final cartItems = prefs.getStringList('cart_items') ?? [];
+    setState(() {
+      isInCart = cartItems.contains(jsonEncode({
+        'name': widget.name,
+        'price': widget.price,
+        'imagePath': widget.imagePath,
+        'category': widget.category,
+      }));
+    });
+  }
+
+  Future<void> _addToCart() async {
+    final prefs = await SharedPreferences.getInstance();
+    final items = prefs.getStringList('cart_items') ?? [];
+    
+    final newItem = {
+      'name': widget.name,
+      'category': widget.category,
+      'price': widget.price,
+      'imagePath': widget.imagePath,
+      'quantity': quantity,
+    };
+
+    // Vérifier si le produit existe déjà dans le panier
+    bool productExists = false;
+    for (int i = 0; i < items.length; i++) {
+      final existingItem = jsonDecode(items[i]);
+      if (existingItem['name'] == widget.name) {
+        // Mettre à jour la quantité du produit existant
+        existingItem['quantity'] = (existingItem['quantity'] as int) + quantity;
+        items[i] = jsonEncode(existingItem);
+        productExists = true;
+        break;
+      }
+    }
+
+    // Si le produit n'existe pas, l'ajouter au panier
+    if (!productExists) {
+      items.add(jsonEncode(newItem));
+    }
+
+    await prefs.setStringList('cart_items', items);
+
+    // Mettre à jour le compteur global
+    cartItemCount += quantity;
+
+    setState(() {
+      isInCart = true;
+    });
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Article ajouté au panier'),
+          backgroundColor: AppColors.primary,
+          duration: const Duration(seconds: 2),
+          action: SnackBarAction(
+            label: 'Voir le panier',
+            textColor: Colors.white,
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const CartScreen(),
+                ),
+              );
+            },
+          ),
+        ),
+      );
+      
+      // Notifier le badge du panier de manière sécurisée
+      try {
+        CartNotifier.of(context).notifyCartChanged();
+      } catch (e) {
+        // Ignorer l'erreur si le CartNotifier n'est pas disponible
+        debugPrint('CartNotifier non disponible: $e');
+      }
+    }
+  }
+
+  Future<void> _removeFromCart() async {
+    final prefs = await SharedPreferences.getInstance();
+    final cartItems = prefs.getStringList('cart_items') ?? [];
+    
+    // Trouver l'élément à supprimer et sa quantité
+    int removedQuantity = 0;
+    cartItems.removeWhere((item) {
+      final decodedItem = jsonDecode(item);
+      if (decodedItem['name'] == widget.name) {
+        removedQuantity = decodedItem['quantity'] as int;
+        return true;
+      }
+      return false;
+    });
+
+    await prefs.setStringList('cart_items', cartItems);
+
+    // Mettre à jour le compteur global
+    cartItemCount -= removedQuantity;
+
+    setState(() {
+      isInCart = false;
+    });
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${widget.name} retiré du panier'),
+          backgroundColor: AppColors.primary,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -384,26 +514,17 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     width: double.infinity,
                     height: 50,
                     child: ElevatedButton(
-                      onPressed: () {
-                        // Ajouter au panier
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('$quantity ${widget.name} ajouté(s) au panier!'),
-                            backgroundColor: AppColors.primary,
-                            duration: const Duration(seconds: 2),
-                          ),
-                        );
-                      },
+                      onPressed: isInCart ? _removeFromCart : _addToCart,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
+                        backgroundColor: isInCart ? Colors.red : AppColors.primary,
                         foregroundColor: Colors.white,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(4),
                         ),
                       ),
-                      child: const Text(
-                        'AJOUTER AU PANIER',
-                        style: TextStyle(
+                      child: Text(
+                        isInCart ? 'RETIRER DU PANIER' : 'AJOUTER AU PANIER',
+                        style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 16,
                         ),
