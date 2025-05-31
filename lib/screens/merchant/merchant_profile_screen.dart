@@ -9,6 +9,7 @@ class MerchantProfileScreen extends StatefulWidget {
   final String category;
   final double rating;
   final bool isVerified;
+  final List<Map<String, dynamic>> products;
 
   const MerchantProfileScreen({
     Key? key,
@@ -17,6 +18,7 @@ class MerchantProfileScreen extends StatefulWidget {
     required this.category,
     required this.rating,
     required this.isVerified,
+    required this.products,
   }) : super(key: key);
 
   @override
@@ -332,52 +334,7 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> with Sing
   }
 
   Widget _buildProductsGrid() {
-    // Dummy product data
-    final List<Map<String, dynamic>> products = [
-      {
-        'name': 'Poisson Shaba',
-        'price': '20 000 FC',
-        'image': 'https://images.unsplash.com/photo-1574781330855-d0db8cc6a79c?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80',
-        'tag': 'Nouveau',
-        'category': 'Alimentation',
-      },
-      {
-        'name': 'Laptop Pro',
-        'price': '500 USD',
-        'image': 'https://images.unsplash.com/photo-1496181133206-80ce9b88a853?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80',
-        'tag': 'Populaire',
-        'category': 'Informatique',
-      },
-      {
-        'name': 'Smart Watch',
-        'price': '200 USD',
-        'image': 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80',
-        'tag': 'En vente',
-        'category': 'Électronique',
-      },
-      {
-        'name': 'T-shirt Classique',
-        'price': '25 000 FC',
-        'image': 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80',
-        'tag': 'Nouveau',
-        'category': 'Vêtements',
-      },
-      {
-        'name': 'Smartphone Pro',
-        'price': '450 USD',
-        'image': 'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80',
-        'tag': 'En vente',
-        'category': 'Électronique',
-      },
-      {
-        'name': 'Chaussures Sport',
-        'price': '80 USD',
-        'image': 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80',
-        'tag': 'Populaire',
-        'category': 'Vêtements',
-      },
-    ];
-
+    final List<Map<String, dynamic>> products = widget.products;
     return GridView.builder(
       padding: const EdgeInsets.all(8),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -390,13 +347,15 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> with Sing
       itemBuilder: (context, index) {
         final product = products[index];
         return _buildProductItem(
-          stock: product['stock'],
-          id: index,
-          name: product['name'],
-          price: product['price'],
-          imagePath: product['image'],
-          tag: product['tag'],
-          category: product['category'],
+          stock: product['stock'] ?? 0,
+          id: product['id'] ?? index,
+          name: product['name'] ?? '',
+          price: product['price'] != null ? '${product['price']} FC' : '',
+          imagePath: product['media'] != null && product['media']['mediaUrl'] != null
+              ? 'http://24.144.87.127:3333/${product['media']['mediaUrl']}'
+              : 'https://via.placeholder.com/150',
+          tag: 'Produit',
+          category: product['description'] ?? '',
         );
       },
     );

@@ -37,6 +37,7 @@ import 'package:immo/cubit/featured_product_cubit.dart';
 import 'package:immo/cubit/category_cubit.dart';
 import 'package:immo/cubit/cart_cubit.dart';
 import 'package:immo/cubit/order_cubit.dart';
+import 'package:immo/cubit/merchant_cubit.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -122,6 +123,7 @@ class _MyAppState extends State<MyApp> {
         BlocProvider(create: (context) => CategoryCubit()),
         BlocProvider(create: (context) => CartCubit()),
         BlocProvider(create: (context) => OrderCubit()),
+        BlocProvider(create: (context) => MerchantCubit()),
       ],
       child: BlocBuilder<AuthCubit, AuthState>(
         builder: (context, state) {

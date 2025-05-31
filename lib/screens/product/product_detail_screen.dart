@@ -7,6 +7,7 @@ import '../cart/cart_screen.dart';
 import 'package:immo/widgets/cart_badge.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:immo/cubit/cart_cubit.dart';
+import 'package:immo/cubit/merchant_cubit.dart';
 
 class ProductDetailScreen extends StatefulWidget {
   final int id;
@@ -42,6 +43,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   void initState() {
     super.initState();
     _checkIfInCart();
+    context.read<MerchantCubit>().fetchMerchants();
   }
 
   void _checkIfInCart() {
@@ -395,18 +397,37 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         ),
                         ElevatedButton(
                           onPressed: () {
-                            Navigator.push(
-                              context, 
-                              MaterialPageRoute(
-                                builder: (context) => MerchantProfileScreen(
-                                  name: 'Rapidos Store',
-                                  imagePath: widget.imagePath,
-                                  category: widget.category,
-                                  rating: 4.8,
-                                  isVerified: true,
+                            final merchantState = context.read<MerchantCubit>().state;
+                            if (merchantState is MerchantLoaded) {
+                              // Trouver le marchand correspondant au produit
+                              final merchant = merchantState.merchants.firstWhere(
+                                (m) => (m['products'] as List).any((p) => p['id'] == widget.id),
+                                orElse: () => {
+                                  'vendeur': {'firstName': 'Rapidos', 'lastName': 'Store'},
+                                  'products': []
+                                },
+                              );
+                              final products = (merchant['products'] as List).cast<Map<String, dynamic>>();
+                              final vendeur = merchant['vendeur'];
+                              final name = '${vendeur['firstName']} ${vendeur['lastName']}';
+                              final image = products.isNotEmpty && products[0]['media'] != null
+                                  ? 'http://24.144.87.127:3333/${products[0]['media']['mediaUrl']}'
+                                  : widget.imagePath;
+                              
+                              Navigator.push(
+                                context, 
+                                MaterialPageRoute(
+                                  builder: (context) => MerchantProfileScreen(
+                                    name: name,
+                                    imagePath: image,
+                                    category: widget.category,
+                                    rating: 4.8,
+                                    isVerified: true,
+                                    products: products,
+                                  ),
                                 ),
-                              ),
-                            );
+                              );
+                            }
                           },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.primary,

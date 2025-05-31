@@ -103,22 +103,26 @@ class _TwitterStyleProductCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            ClipRRect(
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(16),
-                topRight: Radius.circular(16),
-              ),
-              child: Image.network(
-                product.media?.mediaUrl != null
-                  ? 'http://24.144.87.127:3333/${product.media!.mediaUrl}'
-                  : 'https://via.placeholder.com/150',
-                height: 110,
-                width: double.infinity,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) => Container(
+            Center(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: Image.network(
+                  product.media?.mediaUrl != null
+                    ? 'http://24.144.87.127:3333/${product.media!.mediaUrl}'
+                    : 'https://via.placeholder.com/150',
                   height: 110,
-                  color: Colors.grey[200],
-                  child: const Icon(Icons.image, color: Colors.grey),
+                  width: 110,
+                  fit: BoxFit.cover,
+                  alignment: Alignment.center,
+                  errorBuilder: (context, error, stackTrace) => Container(
+                    height: 110,
+                    width: MediaQuery.of(context).size.width,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[200],
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: const Icon(Icons.image, color: Colors.grey, size: 40),
+                  ),
                 ),
               ),
             ),

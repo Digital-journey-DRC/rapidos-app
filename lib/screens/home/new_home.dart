@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:immo/constants.dart';
+import 'package:immo/screens/home/all_merchants_screen.dart';
 import 'package:immo/screens/product/product_detail_screen.dart';
 import '../merchant/merchant_profile_screen.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -10,6 +11,7 @@ import 'package:immo/widgets/image_viewer.dart' as img_viewer;
 import 'package:immo/screens/product/all_products_screen.dart';
 import 'package:immo/cubit/category_cubit.dart';
 import 'package:immo/widgets/shimmer_loading.dart';
+import 'package:immo/cubit/merchant_cubit.dart';
 
 class NewHomeScreen extends StatefulWidget {
   const NewHomeScreen({Key? key}) : super(key: key);
@@ -24,6 +26,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
     super.initState();
     context.read<FeaturedProductCubit>().fetchFeaturedProducts();
     context.read<CategoryCubit>().fetchCategories();
+    context.read<MerchantCubit>().fetchMerchants();
   }
 
   @override
@@ -307,71 +310,93 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 16.0),
-                    child: Text(
-                      'Top Marchands',
-                      style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black),
-                    ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 16.0),
+                        child: Text(
+                          'Top Marchands',
+                          style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const AllMerchantsScreen(),
+                            ),
+                          );
+                        },
+                        child: const Text('Voir tout', style: TextStyle(color: AppColors.primary)),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 12),
 
                   // Horizontal scrollable merchants
-                  SizedBox(
-                    height: 100,
-                    child: ListView(
-                      scrollDirection: Axis.horizontal,
-                      padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                      children: [
-                        _buildMerchantCard(
-                          name: 'Rapidos Store',
-                          rating: 4.8,
-                          category: 'Électronique',
-                          imagePath:
-                              'https://images.unsplash.com/photo-1511649475669-e288648b2339?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80',
-                          isVerified: true,
-                        ),
-                        const SizedBox(width: 12),
-                        _buildMerchantCard(
-                          name: 'Fresh Foods',
-                          rating: 4.6,
-                          category: 'Alimentation',
-                          imagePath:
-                              'https://images.unsplash.com/photo-1533900298318-6b8da08a523e?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80',
-                          isVerified: true,
-                        ),
-                        const SizedBox(width: 12),
-                        _buildMerchantCard(
-                          name: 'Style Mode',
-                          rating: 4.7,
-                          category: 'Vêtements',
-                          imagePath:
-                              'https://images.unsplash.com/photo-1528698827591-e19ccd7bc23d?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80',
-                          isVerified: true,
-                        ),
-                        const SizedBox(width: 12),
-                        _buildMerchantCard(
-                          name: 'Tech Hub',
-                          rating: 4.5,
-                          category: 'Informatique',
-                          imagePath:
-                              'https://images.unsplash.com/photo-1518770660439-4636190af475?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80',
-                          isVerified: false,
-                        ),
-                        const SizedBox(width: 12),
-                        _buildMerchantCard(
-                          name: 'Déco Maison',
-                          rating: 4.4,
-                          category: 'Décoration',
-                          imagePath:
-                              'https://images.unsplash.com/photo-1538688525198-9b88f6f53126?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80',
-                          isVerified: false,
-                        ),
-                      ],
-                    ),
+                  BlocBuilder<MerchantCubit, MerchantState>(
+                    builder: (context, state) {
+                      if (state is MerchantLoading) {
+                        return MerchantShimmer();
+                      }
+                      if (state is MerchantLoaded) {
+                        final merchants = state.merchants;
+                        if (merchants.isEmpty) {
+                          return const Center(child: Text('Aucun marchand trouvé'));
+                        }
+                        return SizedBox(
+                          height: 100,
+                          child: ListView.separated(
+                            scrollDirection: Axis.horizontal,
+                            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                            itemCount: merchants.length,
+                            separatorBuilder: (_, __) => const SizedBox(width: 12),
+                            itemBuilder: (context, index) {
+                              final vendeur = merchants[index]['vendeur'];
+                              final products = (merchants[index]['products'] as List).cast<Map<String, dynamic>>();
+                              final image = products.isNotEmpty && products[0]['media'] != null
+                                  ? 'http://24.144.87.127:3333/${products[0]['media']['mediaUrl']}'
+                                  : 'https://via.placeholder.com/150';
+                              final name = '${vendeur['firstName']} ${vendeur['lastName']}';
+                              return GestureDetector(
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => MerchantProfileScreen(
+                                        name: name,
+                                        rating: 4.5,
+                                        category: products.isNotEmpty ? products[0]['description'] ?? '' : '',
+                                        imagePath: image,
+                                        isVerified: true,
+                                        products: products,
+                                      ),
+                                    ),
+                                  );
+                                },
+                                child: _buildMerchantCard(
+                                  name: name,
+                                  rating: 4.5,
+                                  category: products.isNotEmpty ? products[0]['description'] ?? '' : '',
+                                  imagePath: image,
+                                  isVerified: true,
+                                  products: products,
+                                ),
+                              );
+                            },
+                          ),
+                        );
+                      }
+                      if (state is MerchantError) {
+                        return Center(child: Text(state.message, style: const TextStyle(color: Colors.red)));
+                      }
+                      return const SizedBox.shrink();
+                    },
                   ),
                 ],
               ),
@@ -554,6 +579,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
     required String category,
     required String imagePath,
     required bool isVerified,
+    required List<Map<String, dynamic>> products,
   }) {
     return Builder(
       builder: (context) => GestureDetector(
@@ -567,6 +593,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                 category: category,
                 imagePath: imagePath,
                 isVerified: isVerified,
+                products: products,
               ),
             ),
           );
@@ -816,6 +843,27 @@ class FeaturedProductShimmer extends StatelessWidget {
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+class MerchantShimmer extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 100,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: 4,
+        separatorBuilder: (_, __) => const SizedBox(width: 12),
+        itemBuilder: (context, index) => Container(
+          width: 180,
+          decoration: BoxDecoration(
+            color: Colors.grey.shade200,
+            borderRadius: BorderRadius.circular(8),
+          ),
+        ),
       ),
     );
   }
