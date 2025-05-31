@@ -57,7 +57,7 @@ class ImageViewerWidget extends StatelessWidget {
         },
         loadingBuilder: (context, child, loadingProgress) {
           if (loadingProgress == null) return child;
-          return _ShimmerLoading(
+          return ShimmerLoading(
             width: width,
             height: height,
             borderRadius: borderRadius,
@@ -70,14 +70,14 @@ class ImageViewerWidget extends StatelessWidget {
   }
 }
 
-class _ShimmerLoading extends StatefulWidget {
+class ShimmerLoading extends StatefulWidget {
   final double width;
   final double height;
   final BorderRadius? borderRadius;
   final Border? border;
   final double? marginLeft;
 
-  const _ShimmerLoading({
+  const ShimmerLoading({
     required this.width,
     required this.height,
     this.borderRadius,
@@ -89,7 +89,7 @@ class _ShimmerLoading extends StatefulWidget {
   _ShimmerLoadingState createState() => _ShimmerLoadingState();
 }
 
-class _ShimmerLoadingState extends State<_ShimmerLoading> with SingleTickerProviderStateMixin {
+class _ShimmerLoadingState extends State<ShimmerLoading> with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _animation;
 

@@ -5,9 +5,26 @@ import '../merchant/merchant_profile_screen.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:immo/cubit/auth_cubit.dart';
 import 'package:immo/screens/dashboard/setting_screen.dart';
+import 'package:immo/cubit/featured_product_cubit.dart';
+import 'package:immo/widgets/image_viewer.dart' as img_viewer;
+import 'package:immo/screens/product/all_products_screen.dart';
+import 'package:immo/cubit/category_cubit.dart';
+import 'package:immo/widgets/shimmer_loading.dart';
 
-class NewHomeScreen extends StatelessWidget {
+class NewHomeScreen extends StatefulWidget {
   const NewHomeScreen({Key? key}) : super(key: key);
+
+  @override
+  State<NewHomeScreen> createState() => _NewHomeScreenState();
+}
+
+class _NewHomeScreenState extends State<NewHomeScreen> {
+  @override
+  void initState() {
+    super.initState();
+    context.read<FeaturedProductCubit>().fetchFeaturedProducts();
+    context.read<CategoryCubit>().fetchCategories();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -17,19 +34,21 @@ class NewHomeScreen extends StatelessWidget {
         elevation: 0,
         centerTitle: false,
         automaticallyImplyLeading: false,
-
         title: Image.asset(AppAssets.logo, width: 100, height: 100),
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 12),
             child: BlocBuilder<AuthCubit, AuthState>(
               builder: (context, state) {
-                if (state is AuthSuccess && state.user != null && state.user!['profileImage'] != null) {
+                if (state is AuthSuccess &&
+                    state.user != null &&
+                    state.user!['profileImage'] != null) {
                   return GestureDetector(
                     onTap: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (context) => const SettingScreen()),
+                        MaterialPageRoute(
+                            builder: (context) => const SettingScreen()),
                       );
                     },
                     child: CircleAvatar(
@@ -38,7 +57,8 @@ class NewHomeScreen extends StatelessWidget {
                       child: CircleAvatar(
                         radius: 17,
                         backgroundColor: AppColors.white,
-                        backgroundImage: NetworkImage(state.user!['profileImage']),
+                        backgroundImage:
+                            NetworkImage(state.user!['profileImage']),
                       ),
                     ),
                   );
@@ -47,7 +67,8 @@ class NewHomeScreen extends StatelessWidget {
                     onTap: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (context) => const SettingScreen()),
+                        MaterialPageRoute(
+                            builder: (context) => const SettingScreen()),
                       );
                     },
                     child: const CircleAvatar(
@@ -72,7 +93,8 @@ class NewHomeScreen extends StatelessWidget {
           children: [
             // Search bar
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -88,9 +110,11 @@ class NewHomeScreen extends StatelessWidget {
                           child: TextField(
                             decoration: InputDecoration(
                               hintText: 'Recherche',
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                              contentPadding:
+                                  const EdgeInsets.symmetric(horizontal: 16),
                               border: InputBorder.none,
-                              hintStyle: TextStyle(color: Colors.grey.shade500, fontSize: 14),
+                              hintStyle: TextStyle(
+                                  color: Colors.grey.shade500, fontSize: 14),
                             ),
                           ),
                         ),
@@ -98,7 +122,8 @@ class NewHomeScreen extends StatelessWidget {
                           color: AppColors.primary,
                           height: 40,
                           width: 40,
-                          child: const Icon(Icons.search, color: Colors.white, size: 20),
+                          child: const Icon(Icons.search,
+                              color: Colors.white, size: 20),
                         ),
                       ],
                     ),
@@ -106,7 +131,10 @@ class NewHomeScreen extends StatelessWidget {
                   const SizedBox(height: 20),
                   const Text(
                     'Trouvez ce dont vous avez besoin',
-                    style: TextStyle( fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black),
+                    style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black),
                   ),
                 ],
               ),
@@ -117,28 +145,67 @@ class NewHomeScreen extends StatelessWidget {
               padding: const EdgeInsets.symmetric(vertical: 12.0),
               child: SizedBox(
                 height: 40,
-                child: ListView(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                  children: [
-                    _buildCategoryItem('Food', Icons.fastfood),
-                    const SizedBox(width: 16),
-                    _buildCategoryItem('Laptop', Icons.laptop_mac),
-                    const SizedBox(width: 16),
-                    _buildCategoryItem('Smart Watch', Icons.watch),
-                    const SizedBox(width: 16),
-                    _buildCategoryItem('Téléphone', Icons.phone_android),
-                    const SizedBox(width: 16),
-                    _buildCategoryItem('Vêtements', Icons.shopping_bag),
-                    const SizedBox(width: 16),
-                    _buildCategoryItem('Meubles', Icons.chair),
-                    const SizedBox(width: 16),
-                    _buildCategoryItem('Beauté', Icons.face),
-                    const SizedBox(width: 16),
-                    _buildCategoryItem('Sport', Icons.fitness_center),
-                    const SizedBox(width: 16),
-                    _buildCategoryItem('Livres', Icons.book),
-                  ],
+                child: BlocBuilder<CategoryCubit, CategoryState>(
+                  builder: (context, state) {
+                    if (state is CategoryLoading) {
+                      return ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                        itemCount: 6,
+                        separatorBuilder: (_, __) => const SizedBox(width: 16),
+                        itemBuilder: (context, index) => ShimmerLoading(
+                          width: 90,
+                          height: 32,
+                          borderRadius: BorderRadius.circular(60),
+                        ),
+                      );
+                    }
+                    if (state is CategoryLoaded) {
+                      return ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                        itemCount: state.categories.length,
+                        separatorBuilder: (_, __) => const SizedBox(width: 16),
+                        itemBuilder: (context, index) {
+                          final cat = state.categories[index];
+                          return Container(
+                            padding: const EdgeInsets.only(
+                                right: 12, left: 3, top: 3, bottom: 3),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(60),
+                              border: Border.all(color: AppColors.primary),
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  decoration: BoxDecoration(
+                                    color: AppColors.primary,
+                                    border:
+                                        Border.all(color: AppColors.primary),
+                                    borderRadius: BorderRadius.circular(60),
+                                  ),
+                                  padding: const EdgeInsets.all(12),
+                                  child: Icon(Icons.category,
+                                      color: Colors.grey.shade100, size: 10),
+                                ),
+                                const SizedBox(width: 4),
+                                Text(cat.name,
+                                    style: const TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold)),
+                              ],
+                            ),
+                          );
+                        },
+                      );
+                    }
+                    if (state is CategoryError) {
+                      return Center(
+                          child: Text(state.message,
+                              style: const TextStyle(color: Colors.red)));
+                    }
+                    return const SizedBox.shrink();
+                  },
                 ),
               ),
             ),
@@ -149,55 +216,86 @@ class NewHomeScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 16.0),
-                    child: Text(
-                      'Produits vedettes',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black),
-                    ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Padding(
+                        padding: EdgeInsets.only(left: 16),
+                        child: Text(
+                          'Produits vedettes',
+                          style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black),
+                        ),
+                      ),
+                      BlocBuilder<FeaturedProductCubit, FeaturedProductState>(
+                        builder: (context, state) {
+                          if (state is FeaturedProductLoaded &&
+                              state.products.isNotEmpty) {
+                            return TextButton(
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => AllProductsScreen(
+                                        products: state.products),
+                                  ),
+                                );
+                              },
+                              child: const Text('Voir tout',
+                                  style: TextStyle(color: AppColors.primary)),
+                            );
+                          }
+                          return const SizedBox.shrink();
+                        },
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 12),
-
-                  // Horizontal scrollable products
-                  SizedBox(
-                    height: 190,
-                    child: ListView(
-                      scrollDirection: Axis.horizontal,
-                      padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                      children: [
-                        _buildProductCard(
-                          tag: 'Nouveau',
-                          category: 'Poisson',
-                          name: 'Poisson Shaba',
-                          price: '20 000 FC',
-                          imagePath: 'https://images.unsplash.com/photo-1574781330855-d0db8cc6a79c?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80',
-                        ),
-                        const SizedBox(width: 12),
-                        _buildProductCard(
-                          tag: 'En vente',
-                          category: 'Laptop',
-                          name: 'Laptop Pro',
-                          price: '5 00 \$',
-                          imagePath: 'https://images.unsplash.com/photo-1496181133206-80ce9b88a853?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80',
-                        ),
-                        const SizedBox(width: 12),
-                        _buildProductCard(
-                          tag: 'Populaire',
-                          category: 'Montre',
-                          name: 'Smart Watch',
-                          price: '200 \$',
-                          imagePath: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80',
-                        ),
-                        const SizedBox(width: 12),
-                        _buildProductCard(
-                          tag: 'Nouveau',
-                          category: 'Vêtements',
-                          name: 'T-shirt Classique',
-                          price: '25 000 FC',
-                          imagePath: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80',
-                        ),
-                      ],
-                    ),
+                  BlocBuilder<FeaturedProductCubit, FeaturedProductState>(
+                    builder: (context, state) {
+                      if (state is FeaturedProductLoading) {
+                        return const FeaturedProductShimmer();
+                      }
+                      if (state is FeaturedProductError) {
+                        return const Center(
+                            child: Text('Erreur lors du chargement'));
+                      }
+                      if (state is FeaturedProductLoaded) {
+                        final products = state.products;
+                        if (products.isEmpty) {
+                          return const Center(
+                              child: Text('Aucun produit vedette'));
+                        }
+                        return SizedBox(
+                          height: 190,
+                          child: ListView.separated(
+                            scrollDirection: Axis.horizontal,
+                            padding:
+                                const EdgeInsets.symmetric(horizontal: 16.0),
+                            itemCount: products.length,
+                            separatorBuilder: (_, __) =>
+                                const SizedBox(width: 12),
+                            itemBuilder: (context, index) {
+                              final product = products[index];
+                              return _buildProductCard(
+                                stock: product.stock,
+                                id: product.id,
+                                tag: 'Nouveau',
+                                category: 'Catégorie',
+                                name: product.name,
+                                price: '${product.price} FC',
+                                imagePath: product.media?.mediaUrl != null
+                                    ? 'http://24.144.87.127:3333/${product.media!.mediaUrl}'
+                                    : 'https://via.placeholder.com/150',
+                              );
+                            },
+                          ),
+                        );
+                      }
+                      return const SizedBox.shrink();
+                    },
                   ),
                 ],
               ),
@@ -213,7 +311,10 @@ class NewHomeScreen extends StatelessWidget {
                     padding: EdgeInsets.symmetric(horizontal: 16.0),
                     child: Text(
                       'Top Marchands',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black),
+                      style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black),
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -229,7 +330,8 @@ class NewHomeScreen extends StatelessWidget {
                           name: 'Rapidos Store',
                           rating: 4.8,
                           category: 'Électronique',
-                          imagePath: 'https://images.unsplash.com/photo-1511649475669-e288648b2339?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80',
+                          imagePath:
+                              'https://images.unsplash.com/photo-1511649475669-e288648b2339?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80',
                           isVerified: true,
                         ),
                         const SizedBox(width: 12),
@@ -237,7 +339,8 @@ class NewHomeScreen extends StatelessWidget {
                           name: 'Fresh Foods',
                           rating: 4.6,
                           category: 'Alimentation',
-                          imagePath: 'https://images.unsplash.com/photo-1533900298318-6b8da08a523e?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80',
+                          imagePath:
+                              'https://images.unsplash.com/photo-1533900298318-6b8da08a523e?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80',
                           isVerified: true,
                         ),
                         const SizedBox(width: 12),
@@ -245,7 +348,8 @@ class NewHomeScreen extends StatelessWidget {
                           name: 'Style Mode',
                           rating: 4.7,
                           category: 'Vêtements',
-                          imagePath: 'https://images.unsplash.com/photo-1528698827591-e19ccd7bc23d?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80',
+                          imagePath:
+                              'https://images.unsplash.com/photo-1528698827591-e19ccd7bc23d?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80',
                           isVerified: true,
                         ),
                         const SizedBox(width: 12),
@@ -253,7 +357,8 @@ class NewHomeScreen extends StatelessWidget {
                           name: 'Tech Hub',
                           rating: 4.5,
                           category: 'Informatique',
-                          imagePath: 'https://images.unsplash.com/photo-1518770660439-4636190af475?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80',
+                          imagePath:
+                              'https://images.unsplash.com/photo-1518770660439-4636190af475?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80',
                           isVerified: false,
                         ),
                         const SizedBox(width: 12),
@@ -261,7 +366,8 @@ class NewHomeScreen extends StatelessWidget {
                           name: 'Déco Maison',
                           rating: 4.4,
                           category: 'Décoration',
-                          imagePath: 'https://images.unsplash.com/photo-1538688525198-9b88f6f53126?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80',
+                          imagePath:
+                              'https://images.unsplash.com/photo-1538688525198-9b88f6f53126?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80',
                           isVerified: false,
                         ),
                       ],
@@ -271,62 +377,10 @@ class NewHomeScreen extends StatelessWidget {
               ),
             ),
 
-            // User profile
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-              child: Row(
-                children: [
-                  const CircleAvatar(
-                    backgroundColor: Colors.grey,
-                    radius: 16,
-                  ),
-                  const SizedBox(width: 12),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'John Doe',
-                        style: TextStyle(fontWeight: FontWeight.w500, fontSize: 14, color: Colors.black),
-                      ),
-                      Text(
-                        'Heureux de vous revoir !',
-                        style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-
-            // Customer reviews
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Avis des clients',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildReviewCard('Alice', 5, 'Excellent produit'),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _buildReviewCard('Bob', 5, 'Excellent service'),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-
             // Map
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
               child: Container(
                 height: 150,
                 width: double.infinity,
@@ -342,69 +396,33 @@ class NewHomeScreen extends StatelessWidget {
                       painter: MapPatternPainter(),
                       size: Size.infinite,
                     ),
-                    Icon(Icons.location_on, color: AppColors.primary.withOpacity(0.7)),
-                   const Positioned(
+                    Icon(Icons.location_on,
+                        color: AppColors.primary.withOpacity(0.7)),
+                    const Positioned(
                       bottom: 10,
                       child: Text(
-                        'Position Livraison',
-                        style: TextStyle(fontWeight: FontWeight.w500, fontSize: 14, color: Colors.black),
+                        'Pas de livraison pour le moment',
+                        style: TextStyle(
+                            fontWeight: FontWeight.w500,
+                            fontSize: 14,
+                            color: Colors.black),
                       ),
                     ),
                   ],
                 ),
               ),
             ),
-
           ],
         ),
       ),
     );
   }
 
-  Widget _buildCategoryItem(String title, IconData icon) {
-    // return Column(
-    //   children: [
-    //     Container(
-    //       margin: EdgeInsets.all(5),
-    //       padding: const EdgeInsets.all(12),
-    //       decoration: BoxDecoration(
-    //         color: AppColors.primary,
-    //         borderRadius: BorderRadius.circular(4),
-    //       ),
-    //       child: Icon(icon, color: Colors.grey.shade100, size: 20),
-    //     ),
-    //     const SizedBox(height: 4),
-    //     Text(title, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-    //   ],
-    // );
-    return Container(
-      padding: const EdgeInsets.only(right: 12, left: 3, top: 3, bottom: 3),
-      decoration: BoxDecoration(
-        // color: AppColors.primary,
-        borderRadius: BorderRadius.circular(60),
-        border: Border.all(color: AppColors.primary),
-      ),
-      child: Row(
-        children: [
-          Container(
-            decoration: BoxDecoration(
-              color: AppColors.primary,
-              borderRadius: BorderRadius.circular(60),
-            ),
-            padding: const EdgeInsets.all(12),
-            child:Icon(icon, color: Colors.grey.shade100, size: 10),
-          ),
-          
-          const SizedBox(width: 4),
-          Text(title, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-        ],
-      ),
-    );
-  }
-  
   Widget _buildProductCard({
+    required int id,
     required String tag,
     required String category,
+    required int stock,
     required String name,
     required String price,
     required String imagePath,
@@ -417,8 +435,10 @@ class NewHomeScreen extends StatelessWidget {
               context,
               MaterialPageRoute(
                 builder: (context) => ProductDetailScreen(
+                  id: id,
                   tag: tag,
                   category: category,
+                  stock: stock,
                   name: name,
                   price: price,
                   imagePath: imagePath,
@@ -457,7 +477,8 @@ class NewHomeScreen extends StatelessWidget {
                               height: 100,
                               width: 150,
                               color: Colors.grey.shade300,
-                              child: const Icon(Icons.image, color: Colors.grey),
+                              child:
+                                  const Icon(Icons.image, color: Colors.grey),
                             );
                           },
                         ),
@@ -468,7 +489,8 @@ class NewHomeScreen extends StatelessWidget {
                       top: 8,
                       left: 8,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 2),
                         decoration: BoxDecoration(
                           color: AppColors.buttonColor2,
                           borderRadius: BorderRadius.circular(2),
@@ -482,7 +504,8 @@ class NewHomeScreen extends StatelessWidget {
                         ),
                         child: Text(
                           tag,
-                          style: const TextStyle(fontSize: 10, color: Colors.white),
+                          style: const TextStyle(
+                              fontSize: 10, color: Colors.white),
                         ),
                       ),
                     ),
@@ -494,10 +517,6 @@ class NewHomeScreen extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        category,
-                        style: const TextStyle(fontSize: 12, color: Colors.grey),
-                      ),
                       const SizedBox(height: 2),
                       Text(
                         name,
@@ -505,10 +524,18 @@ class NewHomeScreen extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
+                      Text(
+                        stock.toString() + " en stock",
+                        style:
+                            const TextStyle(fontSize: 12, color: Colors.grey),
+                      ),
                       const SizedBox(height: 4),
                       Text(
                         price,
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.primary),
+                        style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                            color: AppColors.primary),
                       ),
                     ],
                   ),
@@ -520,7 +547,7 @@ class NewHomeScreen extends StatelessWidget {
       },
     );
   }
-  
+
   Widget _buildMerchantCard({
     required String name,
     required double rating,
@@ -710,9 +737,11 @@ class MapPatternPainter extends CustomPainter {
     }
 
     // Draw diagonal lines for a more map-like appearance
-    for (double i = -size.height; i < size.width + size.height; i += horizontalSpacing * 2) {
+    for (double i = -size.height;
+        i < size.width + size.height;
+        i += horizontalSpacing * 2) {
       canvas.drawLine(
-        Offset(i, 0), 
+        Offset(i, 0),
         Offset(i + size.height, size.height),
         paint,
       );
@@ -722,5 +751,72 @@ class MapPatternPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) {
     return false;
+  }
+}
+
+class FeaturedProductShimmer extends StatelessWidget {
+  const FeaturedProductShimmer({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 190,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+        itemCount: 3,
+        separatorBuilder: (_, __) => const SizedBox(width: 12),
+        itemBuilder: (context, index) {
+          return Container(
+            width: 150,
+            height: 180,
+            decoration: BoxDecoration(
+              color: Colors.grey.shade200,
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Shimmer image
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 0),
+                  child: ShimmerLoading(
+                    width: 150,
+                    height: 100,
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(4),
+                      topRight: Radius.circular(4),
+                    ),
+                  ),
+                ),
+                // Shimmer text
+                Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      ShimmerLoading(
+                          width: 60,
+                          height: 12,
+                          borderRadius: BorderRadius.circular(4)),
+                      const SizedBox(height: 8),
+                      ShimmerLoading(
+                          width: 90,
+                          height: 14,
+                          borderRadius: BorderRadius.circular(4)),
+                      const SizedBox(height: 8),
+                      ShimmerLoading(
+                          width: 40,
+                          height: 12,
+                          borderRadius: BorderRadius.circular(4)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
   }
 }

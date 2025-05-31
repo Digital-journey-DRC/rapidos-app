@@ -5,9 +5,12 @@ import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:immo/cubit/auth_cubit.dart';
+import 'package:immo/cubit/product_cubit.dart';
+import 'package:immo/models/product.dart';
 import 'package:immo/services/storage_service.dart';
 import 'dart:io';
 import 'package:flutter/services.dart';
+import 'package:immo/screens/dashboard/setting_screen.dart';
 
 class HomeMarchantScreen extends StatefulWidget {
   const HomeMarchantScreen({Key? key}) : super(key: key);
@@ -17,35 +20,19 @@ class HomeMarchantScreen extends StatefulWidget {
 }
 
 class _HomeMarchantScreenState extends State<HomeMarchantScreen> {
-  final List<Map<String, String>> _products = [
-    {
-      'badge': 'Nouveau',
-      'name': 'Produit 1',
-      'stock': 'In Stock',
-      'isPromo': 'false',
-      'imageUrl':
-          'https://images.unsplash.com/photo-1519125323398-675f0ddb6308?auto=format&fit=crop&w=400&q=80',
-    },
-    {
-      'badge': 'Promo',
-      'name': 'Produit 2',
-      'stock': 'En rupture',
-      'isPromo': 'true',
-      'imageUrl':
-          'https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=400&q=80',
-    },
-  ];
-
   String? _selectedCategory;
   final List<String> _categories = [
-    'Alimentation',
-    'Mode',
-    'Électronique',
     'sports',
-    'Autre',
+    
   ];
 
   bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    context.read<ProductCubit>().fetchProducts();
+  }
 
   void _showAddProductSheet() {
     final _nameController = TextEditingController();
@@ -256,6 +243,7 @@ class _HomeMarchantScreenState extends State<HomeMarchantScreen> {
                                     });
                                     if (response.statusCode == 201) {
                                       Navigator.pop(context);
+                                      context.read<ProductCubit>().fetchProducts();
                                       ScaffoldMessenger.of(context).showSnackBar(
                                         const SnackBar(
                                           content: Text('Produit ajouté avec succès !'),
@@ -375,15 +363,50 @@ class _HomeMarchantScreenState extends State<HomeMarchantScreen> {
             Image.asset(AppAssets.logo, width: 80, height: 80),
           ],
         ),
-        actions: const [
-          Row(
-            children: [
-              CircleAvatar(
-                  radius: 22,
-                  backgroundColor: AppColors.primary,
-                  child: Icon(Icons.person, color: Colors.white)),
-              SizedBox(width: 10),
-            ],
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: BlocBuilder<AuthCubit, AuthState>(
+              builder: (context, state) {
+                if (state is AuthSuccess && state.user != null && state.user!['profileImage'] != null) {
+                  return GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const SettingScreen()),
+                      );
+                    },
+                    child: CircleAvatar(
+                      radius: 20,
+                      backgroundColor: AppColors.buttonColor2,
+                      child: CircleAvatar(
+                        radius: 17,
+                        backgroundColor: AppColors.white,
+                        backgroundImage: NetworkImage(state.user!['profileImage']),
+                      ),
+                    ),
+                  );
+                } else {
+                  return GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const SettingScreen()),
+                      );
+                    },
+                    child: const CircleAvatar(
+                      radius: 20,
+                      backgroundColor: AppColors.buttonColor2,
+                      child: CircleAvatar(
+                        radius: 17,
+                        backgroundColor: AppColors.buttonColor,
+                        child: Icon(Icons.person, color: AppColors.white),
+                      ),
+                    ),
+                  );
+                }
+              },
+            ),
           ),
         ],
       ),
@@ -392,21 +415,21 @@ class _HomeMarchantScreenState extends State<HomeMarchantScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SizedBox(height: 30),
+            // const SizedBox(height: 30),
             // Navigation rapide
-            const Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                _QuickNavButton(
-                    icon: Icons.local_shipping, label: 'Livraisons'),
-                _QuickNavButton(icon: Icons.inventory_2, label: 'Produits'),
-                _QuickNavButton(icon: Icons.person, label: 'Profil'),
-              ],
-            ),
-            const SizedBox(height: 12),
+            // const Row(
+            //   mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            //   children: [
+            //     _QuickNavButton(
+            //         icon: Icons.local_shipping, label: 'Livraisons'),
+            //     _QuickNavButton(icon: Icons.inventory_2, label: 'Produits'),
+            //     _QuickNavButton(icon: Icons.person, label: 'Profil'),
+            //   ],
+            // ),
+            // const SizedBox(height: 12),
             // Profil
 
-            const SizedBox(height: 18),
+            // const SizedBox(height: 18),
             // Vos Produits
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -414,42 +437,124 @@ class _HomeMarchantScreenState extends State<HomeMarchantScreen> {
                 const Text('Vos Produits',
                     style:
                         TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                TextButton(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) =>
-                            VoirPlusProduitsScreen(products: _products),
-                      ),
-                    );
+                BlocBuilder<ProductCubit, ProductState>(
+                  builder: (context, state) {
+                    if (state is ProductLoaded) {
+                      if (state.products.isEmpty) {
+                        return TextButton(
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => VoirPlusProduitsScreen(
+                                  products: state.products.map((product) => {
+                                    'badge': 'Nouveau',
+                                    'name': product.name,
+                                    'stock': product.stock.toString(),
+                                    'price': product.price.toString(),
+                                    'isPromo': 'false',
+                                    'imageUrl': product.media?.mediaUrl ?? 'https://via.placeholder.com/150',
+                                  }).toList(),
+                                ),
+                              ),
+                            );
+                          },
+                          child: const Text('Voir plus',
+                              style: TextStyle(color: AppColors.primary)),
+                        );
+                      }
+                      return TextButton(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => VoirPlusProduitsScreen(
+                                products: state.products.map((product) => {
+                                  'badge': 'Nouveau',
+                                  'name': product.name,
+                                  'stock': product.stock.toString(),
+                                  'price': product.price.toString(),
+                                  'isPromo': 'false',
+                                  'imageUrl': product.media?.mediaUrl ?? 'https://via.placeholder.com/150',
+                                }).toList(),
+                              ),
+                            ),
+                          );
+                        },
+                        child: const Text('Voir plus',
+                            style: TextStyle(color: AppColors.primary)),
+                      );
+                    }
+                    return const SizedBox.shrink();
                   },
-                  child: const Text('Voir plus',
-                      style: TextStyle(color: AppColors.primary)),
                 ),
               ],
             ),
             const SizedBox(height: 8),
-            SizedBox(
-              height: 120,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: _products.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 12),
-                itemBuilder: (context, index) {
-                  final product = _products[index];
+            BlocBuilder<ProductCubit, ProductState>(
+              builder: (context, state) {
+                if (state is ProductLoading) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                
+                if (state is ProductError) {
+                  return Center(child: state.message == 'Pas de produits trouvés' ? const SizedBox(
+                      height: 120,
+                      child: Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.inbox, size: 48, color: Colors.grey),
+                            SizedBox(height: 8),
+                            Text('Aucun produit pour l’instant', style: TextStyle(color: Colors.grey)),
+                          ],
+                        ),
+                      ),
+                    ) : const Text('Erreur lors du chargement des produits'));
+                }
+                
+                if (state is ProductLoaded) {
+                  if (state.products.isEmpty) {
+                    return const SizedBox(
+                      height: 120,
+                      child: Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: const [
+                            Icon(Icons.inbox, size: 48, color: Colors.grey),
+                            SizedBox(height: 8),
+                            Text('Aucun produit pour l’instant', style: TextStyle(color: Colors.grey)),
+                          ],
+                        ),
+                      ),
+                    );
+                  }
                   return SizedBox(
-                    width: 220,
-                    child: _ProductCard(
-                      badge: product['badge'] ?? '',
-                      name: product['name'] ?? '',
-                      stock: product['stock'] ?? '',
-                      isPromo: product['isPromo'] == 'true',
-                      imageUrl: product['imageUrl'] ?? '',
+                    height: 120,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: state.products.length,
+                      separatorBuilder: (_, __) => const SizedBox(width: 12),
+                      itemBuilder: (context, index) {
+                        final product = state.products[index];
+                        return SizedBox(
+                          width: 220,
+                          child: _ProductCard(
+                            badge: 'Nouveau',
+                            name: product.name,
+                            stock: product.stock.toString(),
+                            isPromo: false,
+                            price: product.price.toString(),
+                            imageUrl: product.media?.mediaUrl ?? 'https://via.placeholder.com/150',
+                          ),
+                        );
+                      },
                     ),
                   );
-                },
-              ),
+                }
+                
+                return const SizedBox.shrink();
+              },
             ),
             const SizedBox(height: 18),
             // Avis Clients
@@ -478,13 +583,13 @@ class _HomeMarchantScreenState extends State<HomeMarchantScreen> {
             const Text('Livraisons en Cours',
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
             const SizedBox(height: 8),
-            _DeliveryRow(
+            const _DeliveryRow(
                 title: 'Livraison 1',
                 status: 'In Progress',
                 livreur: 'Marc',
                 icon: Icons.circle,
                 iconColor: Colors.red),
-            _DeliveryRow(
+            const _DeliveryRow(
                 title: 'Livraison 2',
                 status: 'En attente',
                 livreur: 'Sarah',
@@ -503,124 +608,14 @@ class _HomeMarchantScreenState extends State<HomeMarchantScreen> {
                   child: Text('Carte de Livraison en Temps Réel',
                       style: TextStyle(color: Colors.black54))),
             ),
-            const SizedBox(height: 12),
-            // Adresse de livraison
-            const Text('Adresse de Livraison',
-                style: TextStyle(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 6),
-            TextField(
-              decoration: InputDecoration(
-                hintText: "Entrez l'adresse",
-                border:
-                    OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              ),
-            ),
+
+
+
+     
+
             const SizedBox(height: 10),
-            // Livreurs
-            Row(
-              children: [
-                _ChipButton(label: 'Marc'),
-                const SizedBox(width: 8),
-                _ChipButton(label: 'Sarah'),
-                const SizedBox(width: 8),
-                _ChipButton(label: 'Alice'),
-              ],
-            ),
-            const SizedBox(height: 10),
-            // Recherche produit
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    decoration: InputDecoration(
-                      hintText: 'Recherche de Produits',
-                      border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10)),
-                      contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 8),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Container(
-                  decoration: BoxDecoration(
-                    color: Colors.black,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(Icons.search, color: Colors.white),
-                  padding: const EdgeInsets.all(10),
-                ),
-              ],
-            ),
-            const SizedBox(height: 18),
-            // Catégories
-            const Text('Catégories',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                _CategoryCard(label: 'Alimentation', icon: Icons.fastfood),
-                const SizedBox(width: 10),
-                _CategoryCard(label: 'Mode', icon: Icons.checkroom),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () {},
-                    child: const Text('Ajouter  une catégorie'),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () {},
-                    child: const Text('Statistiques'),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                    ),
-                    onPressed: () {},
-                    child: const Text('Ajouter un produit'),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.black,
-                    ),
-                    onPressed: () {},
-                    child: const Text('Commandes'),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 18),
             // Produits recommandés (carousel placeholder)
-            Container(
-              height: 80,
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: Colors.grey[200],
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Center(
-                  child: Text(
-                      'Produits Recommandés')), // Remplacer par un vrai carousel si besoin
-            ),
+
             const SizedBox(height: 18),
             // Statistiques de vente
             const Text('Statistiques de Vente',
@@ -678,10 +673,12 @@ class _ProductCard extends StatelessWidget {
   final String stock;
   final bool isPromo;
   final String imageUrl;
+  final String price;
   const _ProductCard(
       {required this.badge,
       required this.name,
       required this.stock,
+      required this.price,
       required this.isPromo,
       required this.imageUrl});
   @override
@@ -755,12 +752,12 @@ class _ProductCard extends StatelessWidget {
                         style: const TextStyle(
                             fontWeight: FontWeight.bold, fontSize: 15)),
                     const SizedBox(height: 4),
-                    Text('Nom du Produit',
+                    Text("En Stock: "+stock,
                         style:
                             TextStyle(color: Colors.grey[600], fontSize: 12)),
                     const SizedBox(height: 4),
                     Text(
-                      stock,
+                      "$price FC",
                       style: TextStyle(
                         color: isPromo ? Colors.red : Colors.green,
                         fontWeight: FontWeight.bold,

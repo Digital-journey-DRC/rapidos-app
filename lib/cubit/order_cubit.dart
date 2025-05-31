@@ -1,0 +1,154 @@
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'package:immo/services/storage_service.dart';
+import 'package:dio/dio.dart';
+
+class OrderState {
+  final bool isLoading;
+  final String? error;
+  final bool success;
+
+  OrderState({
+    this.isLoading = false,
+    this.error,
+    this.success = false,
+  });
+
+  OrderState copyWith({
+    bool? isLoading,
+    String? error,
+    bool? success,
+  }) {
+    return OrderState(
+      isLoading: isLoading ?? this.isLoading,
+      error: error ?? this.error,
+      success: success ?? this.success,
+    );
+  }
+}
+
+class OrderCubit extends Cubit<OrderState> {
+  OrderCubit() : super(OrderState());
+
+  Future<void> createOrder({
+    required List<Map<String, dynamic>> produits,
+    required String ville,
+    required String commune,
+    required String quartier,
+    required String avenue,
+    required String codePostale,
+    required String numero,
+    required String pays,
+  }) async {
+    emit(state.copyWith(isLoading: true, error: null, success: false));
+
+    try {
+      final token = await StorageService().getToken();
+      final headers = {
+        'Content-Type': 'application/json',
+        // 'Content-type' :"application/x-www-form-urlencoded",
+        'Authorization': 'Bearer oat_NDc.eFhWeFR1LXVoMHUwT0FUZF9Ed1ljQnJ4c25COXhCOXVpbGFGc3FqYjIzNDk3NTM5NzU',
+      };
+
+      final request = http.Request(
+        'POST',
+        Uri.parse('http://24.144.87.127:3333/commandes/store'),
+      );
+
+      request.body = json.encode({
+        "produits": produits,
+        "ville": ville,
+        "commune": commune,
+        "quartier": quartier,
+        "avenue": avenue,
+        "codePostale": "12345",
+        "numero": numero,
+        "isPrincipal": true,
+        "type": "livraison",
+        "pays": pays,
+      });
+
+      request.headers.addAll(headers);
+
+      print('URL: ${request.url}');
+      print('HEADERS: ${request.headers}');
+      print('BODY: ${request.body}');
+
+      final response = await request.send();
+      final responseBody = await response.stream.bytesToString();
+
+      print('STATUS: ${response.statusCode}');
+      print('RESPONSE: $responseBody');
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        emit(state.copyWith(isLoading: false, success: true));
+      } else {
+        emit(state.copyWith(
+          isLoading: false,
+          error: 'Erreur lors de la création de la commande: ${response.reasonPhrase}',
+        ));
+      }
+    } catch (e) {
+      emit(state.copyWith(
+        isLoading: false,
+        error: 'Erreur lors de la création de la commande: $e',
+      ));
+    }
+  }
+
+  Future<void> createOrderDio({
+    required List<Map<String, dynamic>> produits,
+    required String ville,
+    required String commune,
+    required String quartier,
+    required String avenue,
+    required String codePostale,
+    required String numero,
+    required String pays,
+  }) async {
+    emit(state.copyWith(isLoading: true, error: null, success: false));
+    try {
+      final token = await StorageService().getToken();
+      final dio = Dio();
+      final headers = {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      };
+      final body = {
+        "produits": produits,
+        "ville": ville,
+        "commune": commune,
+        "quartier": quartier,
+        "avenue": avenue,
+        "codePostale": codePostale,
+        "numero": numero,
+        "isPrincipal": true,
+        "type": "livraison",
+        "pays": pays,
+      };
+      print('DIO BODY: ' + body.toString());
+      print('DIO HEADERS: ' + headers.toString());
+      final response = await dio.post(
+        'http://24.144.87.127:3333/commandes/store',
+        data: json.encode(body),
+        options: Options(headers: headers),
+      );
+      print('DIO STATUS: ${response.statusCode}');
+      print('DIO RESPONSE: ${response.data}');
+      if (response.statusCode == 200) {
+        emit(state.copyWith(isLoading: false, success: true));
+      } else {
+        emit(state.copyWith(
+          isLoading: false,
+          error: 'Erreur lors de la création de la commande (Dio): ${response.statusMessage}',
+        ));
+      }
+    } catch (e) {
+      emit(state.copyWith(
+        isLoading: false,
+        error: 'Erreur lors de la création de la commande (Dio): $e',
+      ));
+    }
+  }
+} 

@@ -14,7 +14,6 @@ import '../cubit/auth_cubit.dart';
 import 'home_screen.dart';
 import 'dashboard/dashboard_screen.dart';
 import 'package:immo/widgets/cart_badge.dart';
-import 'package:immo/screens/cart/cart_notifier.dart';
 import 'dart:async';
 
 class MainScreen extends StatefulWidget {
@@ -128,22 +127,19 @@ class _MainScreenState extends State<MainScreen> {
       filteredScreens = _screens;
     }
 
-    return CartNotifier(
-      streamController: _cartStreamController,
-      child: Scaffold(
-        body: IndexedStack(
-          index: _currentIndex,
-          children: filteredScreens,
-        ),
-        bottomNavigationBar: BottomNavigationBar(
-          backgroundColor: const Color.fromARGB(255, 250, 250, 250),
-          currentIndex: _currentIndex,
-          onTap: _onItemTapped,
-          items: navigationItems,
-          type: BottomNavigationBarType.fixed,
-          selectedItemColor: AppColors.primary,
-          unselectedItemColor: Colors.grey,
-        ),
+    return Scaffold(
+      body: IndexedStack(
+        index: _currentIndex,
+        children: filteredScreens,
+      ),
+      bottomNavigationBar: BottomNavigationBar(
+        backgroundColor: const Color.fromARGB(255, 250, 250, 250),
+        currentIndex: _currentIndex,
+        onTap: _onItemTapped,
+        items: navigationItems,
+        type: BottomNavigationBarType.fixed,
+        selectedItemColor: AppColors.primary,
+        unselectedItemColor: Colors.grey,
       ),
     );
   }

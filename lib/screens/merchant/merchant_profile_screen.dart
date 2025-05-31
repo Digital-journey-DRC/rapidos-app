@@ -390,6 +390,8 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> with Sing
       itemBuilder: (context, index) {
         final product = products[index];
         return _buildProductItem(
+          stock: product['stock'],
+          id: index,
           name: product['name'],
           price: product['price'],
           imagePath: product['image'],
@@ -401,11 +403,13 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> with Sing
   }
 
   Widget _buildProductItem({
+    required int id,
     required String name,
     required String price,
     required String imagePath,
     required String tag,
     required String category,
+    required int stock,
   }) {
     return GestureDetector(
       onTap: () {
@@ -413,8 +417,10 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> with Sing
           context,
           MaterialPageRoute(
             builder: (context) => ProductDetailScreen(
+              stock: stock,
+              id: id,
               tag: tag,
-              category: category,  // Utilise la catégorie spécifique de chaque produit
+              category: category,
               name: name,
               price: price,
               imagePath: imagePath,

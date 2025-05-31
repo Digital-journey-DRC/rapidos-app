@@ -4,23 +4,30 @@ import '../merchant/merchant_profile_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import '../cart/cart_screen.dart';
-import '../cart/cart_notifier.dart';
 import 'package:immo/widgets/cart_badge.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:immo/cubit/cart_cubit.dart';
 
 class ProductDetailScreen extends StatefulWidget {
+  final int id;
+  final int stock;
   final String tag;
   final String category;
   final String name;
   final String price;
   final String imagePath;
+  final void Function()? goToCartTab;
 
   const ProductDetailScreen({
     Key? key,
+    required this.id,
+    required this.stock,
     required this.tag,
     required this.category,
     required this.name,
     required this.price,
     required this.imagePath,
+    this.goToCartTab,
   }) : super(key: key);
 
   @override
@@ -37,58 +44,38 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     _checkIfInCart();
   }
 
-  Future<void> _checkIfInCart() async {
-    final prefs = await SharedPreferences.getInstance();
-    final cartItems = prefs.getStringList('cart_items') ?? [];
+  void _checkIfInCart() {
+    final cartItems = context.read<CartCubit>().state.items;
     setState(() {
-      isInCart = cartItems.contains(jsonEncode({
-        'name': widget.name,
-        'price': widget.price,
-        'imagePath': widget.imagePath,
-        'category': widget.category,
-      }));
+      isInCart = cartItems.any((item) => item['name'] == widget.name);
     });
   }
 
-  Future<void> _addToCart() async {
-    final prefs = await SharedPreferences.getInstance();
-    final items = prefs.getStringList('cart_items') ?? [];
-    
+  void _addToCart() async {
     final newItem = {
+      'id': widget.id,
       'name': widget.name,
       'category': widget.category,
       'price': widget.price,
       'imagePath': widget.imagePath,
       'quantity': quantity,
+      'stock': widget.stock,
     };
-
-    // Vérifier si le produit existe déjà dans le panier
-    bool productExists = false;
-    for (int i = 0; i < items.length; i++) {
-      final existingItem = jsonDecode(items[i]);
-      if (existingItem['name'] == widget.name) {
-        // Mettre à jour la quantité du produit existant
-        existingItem['quantity'] = (existingItem['quantity'] as int) + quantity;
-        items[i] = jsonEncode(existingItem);
-        productExists = true;
-        break;
+    final success = await context.read<CartCubit>().addToCart(newItem);
+    if (!success) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Stock insuffisant : il ne reste que ${widget.stock} en stock.'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
+      return;
     }
-
-    // Si le produit n'existe pas, l'ajouter au panier
-    if (!productExists) {
-      items.add(jsonEncode(newItem));
-    }
-
-    await prefs.setStringList('cart_items', items);
-
-    // Mettre à jour le compteur global
-    cartItemCount += quantity;
-
     setState(() {
       isInCart = true;
     });
-
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -99,51 +86,23 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             label: 'Voir le panier',
             textColor: Colors.white,
             onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const CartScreen(),
-                ),
-              );
+              if (widget.goToCartTab != null) {
+                widget.goToCartTab!();
+              } else {
+                Navigator.of(context).popUntil((route) => route.isFirst);
+              }
             },
           ),
         ),
       );
-      
-      // Notifier le badge du panier de manière sécurisée
-      try {
-        CartNotifier.of(context).notifyCartChanged();
-      } catch (e) {
-        // Ignorer l'erreur si le CartNotifier n'est pas disponible
-        debugPrint('CartNotifier non disponible: $e');
-      }
     }
   }
 
-  Future<void> _removeFromCart() async {
-    final prefs = await SharedPreferences.getInstance();
-    final cartItems = prefs.getStringList('cart_items') ?? [];
-    
-    // Trouver l'élément à supprimer et sa quantité
-    int removedQuantity = 0;
-    cartItems.removeWhere((item) {
-      final decodedItem = jsonDecode(item);
-      if (decodedItem['name'] == widget.name) {
-        removedQuantity = decodedItem['quantity'] as int;
-        return true;
-      }
-      return false;
-    });
-
-    await prefs.setStringList('cart_items', cartItems);
-
-    // Mettre à jour le compteur global
-    cartItemCount -= removedQuantity;
-
+  void _removeFromCart() async {
+    await context.read<CartCubit>().removeFromCart(widget.name);
     setState(() {
       isInCart = false;
     });
-
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -232,7 +191,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     ),
                     child: Text(
                       widget.tag,
-                      style: TextStyle(
+                      style: const TextStyle(
                         color: AppColors.primary,
                         fontWeight: FontWeight.bold,
                         fontSize: 12,
@@ -245,6 +204,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   // Category and Name
                   Text(
                     widget.category,
+                    style: TextStyle(
+                      color: Colors.grey.shade600,
+                      fontSize: 14,
+                    ),
+                  ),
+                        Text(
+                    "${widget.stock} en stock",
                     style: TextStyle(
                       color: Colors.grey.shade600,
                       fontSize: 14,

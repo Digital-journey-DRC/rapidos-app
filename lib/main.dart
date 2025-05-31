@@ -32,6 +32,11 @@ import 'package:immo/services/utility_bill_service.dart';
 import 'repository/favorites_repository.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'services/payment_storage_service.dart';
+import 'package:immo/cubit/product_cubit.dart';
+import 'package:immo/cubit/featured_product_cubit.dart';
+import 'package:immo/cubit/category_cubit.dart';
+import 'package:immo/cubit/cart_cubit.dart';
+import 'package:immo/cubit/order_cubit.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -112,6 +117,11 @@ class _MyAppState extends State<MyApp> {
         BlocProvider(create: (context) => PaymentCubit()),
         BlocProvider(create: (context) => MaintenanceCubit(MaintenanceService())),
         BlocProvider(create: (context) => UtilityBillCubit(UtilityBillService())),
+        BlocProvider(create: (context) => ProductCubit()),
+        BlocProvider(create: (context) => FeaturedProductCubit()),
+        BlocProvider(create: (context) => CategoryCubit()),
+        BlocProvider(create: (context) => CartCubit()),
+        BlocProvider(create: (context) => OrderCubit()),
       ],
       child: BlocBuilder<AuthCubit, AuthState>(
         builder: (context, state) {
