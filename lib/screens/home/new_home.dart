@@ -242,7 +242,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                                   context,
                                   MaterialPageRoute(
                                     builder: (context) => AllProductsScreen(
-                                        products: state.products),
+                                        products: state.products.reversed.toList()),
                                   ),
                                 );
                               },
@@ -281,7 +281,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                             separatorBuilder: (_, __) =>
                                 const SizedBox(width: 12),
                             itemBuilder: (context, index) {
-                              final product = products[index];
+                              final product = products.reversed.toList()[index];
                               return _buildProductCard(
                                 stock: product.stock,
                                 id: product.id,
@@ -290,7 +290,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                                 name: product.name,
                                 price: '${product.price} FC',
                                 imagePath: product.media?.mediaUrl != null
-                                    ? 'http://24.144.87.127:3333/${product.media!.mediaUrl}'
+                                    ? product.media!.mediaUrl
                                     : 'https://via.placeholder.com/150',
                               );
                             },

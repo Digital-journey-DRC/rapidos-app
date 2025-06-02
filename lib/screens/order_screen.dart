@@ -172,13 +172,15 @@ class _OrderScreenState extends State<OrderScreen> {
           : orderListState.error != null
               ? Center(child: Text(orderListState.error!, style: const TextStyle(color: Colors.red)))
               : orderListState.commandes.isEmpty
-                  ? Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.inbox, size: 80, color: AppColors.buttonColor.withOpacity(0.3)),
-                        const SizedBox(height: 18),
-                        const Text('Aucune commande trouvée', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.primary)),
-                      ],
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.inbox, size: 80, color: AppColors.buttonColor.withOpacity(0.3)),
+                          const SizedBox(height: 18),
+                          const Text('Aucune commande trouvée', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.primary)),
+                        ],
+                      ),
                     )
                   : ListView.separated(
                       padding: const EdgeInsets.all(16),

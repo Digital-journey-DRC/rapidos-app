@@ -224,7 +224,7 @@ class AuthService {
       }
 
       if (response.statusCode != 200) {
-        throw data['message'] ?? 'Une erreur est survenue lors de la connexion';
+        throw 'Numéro de téléphone ou mot de passe incorrect';
       }
       return data;
     } catch (e) {

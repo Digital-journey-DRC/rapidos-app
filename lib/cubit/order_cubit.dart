@@ -177,8 +177,9 @@ class OrderCubit extends Cubit<OrderState> {
     try {
       final token = await StorageService().getToken();
       final headers = {
-        'Authorization': 'Bearer oat_NDc.eFhWeFR1LXVoMHUwT0FUZF9Ed1ljQnJ4c25COXhCOXVpbGFGc3FqYjIzNDk3NTM5NzU',
+        'Authorization': 'Bearer $token',
       };
+      print(token);
       final response = await http.get(
         Uri.parse('http://24.144.87.127:3333/commandes/vendeur'),
         headers: headers,
