@@ -8,6 +8,7 @@ import 'package:immo/widgets/cart_badge.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:immo/cubit/cart_cubit.dart';
 import 'package:immo/cubit/merchant_cubit.dart';
+import 'package:immo/cubit/favorites_cubit.dart';
 
 class ProductDetailScreen extends StatefulWidget {
   final int id;
@@ -38,12 +39,14 @@ class ProductDetailScreen extends StatefulWidget {
 class _ProductDetailScreenState extends State<ProductDetailScreen> {
   int quantity = 1;
   bool isInCart = false;
+  bool isFavorite = false;
 
   @override
   void initState() {
     super.initState();
     _checkIfInCart();
     context.read<MerchantCubit>().fetchMerchants();
+    _checkIfFavorite();
   }
 
   void _checkIfInCart() {
@@ -51,6 +54,34 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     setState(() {
       isInCart = cartItems.any((item) => item['name'] == widget.name);
     });
+  }
+
+  void _checkIfFavorite() async {
+    final fav = await context.read<FavoritesCubit>().isFavorite(widget.id);
+    if (mounted) {
+      setState(() {
+        isFavorite = fav;
+      });
+    }
+  }
+
+  void _toggleFavorite() async {
+    final productMap = {
+      'id': widget.id,
+      'name': widget.name,
+      'category': widget.category,
+      'price': widget.price,
+      'stock': widget.stock,
+      'media': {'mediaUrl': widget.imagePath},
+    };
+    await context.read<FavoritesCubit>().toggleFavorite(productMap);
+    _checkIfFavorite();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(isFavorite ? 'Retiré des favoris' : 'Ajouté aux favoris'),
+        duration: const Duration(seconds: 1),
+      ),
+    );
   }
 
   void _addToCart() async {
@@ -137,15 +168,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.favorite_border, color: AppColors.primary),
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Ajouté aux favoris!'),
-                  duration: Duration(seconds: 1),
-                ),
-              );
-            },
+            icon: Icon(
+              isFavorite ? Icons.favorite : Icons.favorite_border,
+              color: isFavorite ? Colors.red : AppColors.primary,
+            ),
+            onPressed: _toggleFavorite,
           ),
         ],
       ),
@@ -312,135 +339,135 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     ],
                   ),
                   
-                  const SizedBox(height: 24),
+                  // const SizedBox(height: 24),
                   
                   // Seller Information
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade100,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.grey.shade300),
-                    ),
-                    child: Row(
-                      children: [
-                        CircleAvatar(
-                          radius: 24,
-                          backgroundColor: AppColors.primary.withOpacity(0.1),
-                          child: Icon(
-                            Icons.store,
-                            color: AppColors.primary,
-                            size: 26,
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Row(
-                                children: [
-                                  Text(
-                                    'Rapidos Store',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 16,
-                                      color: AppColors.primary,
-                                    ),
-                                  ),
-                                  SizedBox(width: 8),
-                                  Icon(
-                                    Icons.verified,
-                                    color: AppColors.primary,
-                                    size: 16,
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 4),
-                              Row(
-                                children: [
-                                  Icon(
-                                    Icons.star,
-                                    color: Colors.amber,
-                                    size: 14,
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    '4.8 (520 ventes)',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.grey.shade700,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 8),
-                              Row(
-                                children: [
-                                  Icon(
-                                    Icons.location_on,
-                                    color: Colors.grey.shade600,
-                                    size: 14,
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    'Kinshasa, Congo',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.grey.shade700,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                        ElevatedButton(
-                          onPressed: () {
-                            final merchantState = context.read<MerchantCubit>().state;
-                            if (merchantState is MerchantLoaded) {
-                              // Trouver le marchand correspondant au produit
-                              final merchant = merchantState.merchants.firstWhere(
-                                (m) => (m['products'] as List).any((p) => p['id'] == widget.id),
-                                orElse: () => {
-                                  'vendeur': {'firstName': 'Rapidos', 'lastName': 'Store'},
-                                  'products': []
-                                },
-                              );
-                              final products = (merchant['products'] as List).cast<Map<String, dynamic>>();
-                              final vendeur = merchant['vendeur'];
-                              final name = '${vendeur['firstName']} ${vendeur['lastName']}';
-                              final image = products.isNotEmpty && products[0]['media'] != null
-                                  ? 'http://24.144.87.127:3333/${products[0]['media']['mediaUrl']}'
-                                  : widget.imagePath;
+                  // Container(
+                  //   padding: const EdgeInsets.all(16),
+                  //   decoration: BoxDecoration(
+                  //     color: Colors.grey.shade100,
+                  //     borderRadius: BorderRadius.circular(8),
+                  //     border: Border.all(color: Colors.grey.shade300),
+                  //   ),
+                  //   child: Row(
+                  //     children: [
+                  //       CircleAvatar(
+                  //         radius: 24,
+                  //         backgroundColor: AppColors.primary.withOpacity(0.1),
+                  //         child: Icon(
+                  //           Icons.store,
+                  //           color: AppColors.primary,
+                  //           size: 26,
+                  //         ),
+                  //       ),
+                  //       const SizedBox(width: 16),
+                  //       Expanded(
+                  //         child: Column(
+                  //           crossAxisAlignment: CrossAxisAlignment.start,
+                  //           children: [
+                  //             const Row(
+                  //               children: [
+                  //                 Text(
+                  //                   'Rapidos Store',
+                  //                   style: TextStyle(
+                  //                     fontWeight: FontWeight.bold,
+                  //                     fontSize: 16,
+                  //                     color: AppColors.primary,
+                  //                   ),
+                  //                 ),
+                  //                 SizedBox(width: 8),
+                  //                 Icon(
+                  //                   Icons.verified,
+                  //                   color: AppColors.primary,
+                  //                   size: 16,
+                  //                 ),
+                  //               ],
+                  //             ),
+                  //             const SizedBox(height: 4),
+                  //             Row(
+                  //               children: [
+                  //                 Icon(
+                  //                   Icons.star,
+                  //                   color: Colors.amber,
+                  //                   size: 14,
+                  //                 ),
+                  //                 const SizedBox(width: 4),
+                  //                 Text(
+                  //                   '4.8 (520 ventes)',
+                  //                   style: TextStyle(
+                  //                     fontSize: 12,
+                  //                     color: Colors.grey.shade700,
+                  //                   ),
+                  //                 ),
+                  //               ],
+                  //             ),
+                  //             const SizedBox(height: 8),
+                  //             Row(
+                  //               children: [
+                  //                 Icon(
+                  //                   Icons.location_on,
+                  //                   color: Colors.grey.shade600,
+                  //                   size: 14,
+                  //                 ),
+                  //                 const SizedBox(width: 4),
+                  //                 Text(
+                  //                   'Kinshasa, Congo',
+                  //                   style: TextStyle(
+                  //                     fontSize: 12,
+                  //                     color: Colors.grey.shade700,
+                  //                   ),
+                  //                 ),
+                  //               ],
+                  //             ),
+                  //           ],
+                  //         ),
+                  //       ),
+                  //       ElevatedButton(
+                  //         onPressed: () {
+                  //           final merchantState = context.read<MerchantCubit>().state;
+                  //           if (merchantState is MerchantLoaded) {
+                  //             // Trouver le marchand correspondant au produit
+                  //             final merchant = merchantState.merchants.firstWhere(
+                  //               (m) => (m['products'] as List).any((p) => p['id'] == widget.id),
+                  //               orElse: () => {
+                  //                 'vendeur': {'firstName': 'Rapidos', 'lastName': 'Store'},
+                  //                 'products': []
+                  //               },
+                  //             );
+                  //             final products = (merchant['products'] as List).cast<Map<String, dynamic>>();
+                  //             final vendeur = merchant['vendeur'];
+                  //             final name = '${vendeur['firstName']} ${vendeur['lastName']}';
+                  //             final image = products.isNotEmpty && products[0]['media'] != null
+                  //                 ? 'http://24.144.87.127:3333/${products[0]['media']['mediaUrl']}'
+                  //                 : widget.imagePath;
                               
-                              Navigator.push(
-                                context, 
-                                MaterialPageRoute(
-                                  builder: (context) => MerchantProfileScreen(
-                                    name: name,
-                                    imagePath: image,
-                                    category: widget.category,
-                                    rating: 4.8,
-                                    isVerified: true,
-                                    products: products,
-                                  ),
-                                ),
-                              );
-                            }
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-                            minimumSize: Size.zero,
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          ),
-                          child: const Text('Voir'),
-                        ),
-                      ],
-                    ),
-                  ),
+                  //             Navigator.push(
+                  //               context, 
+                  //               MaterialPageRoute(
+                  //                 builder: (context) => MerchantProfileScreen(
+                  //                   name: name,
+                  //                   imagePath: image,
+                  //                   category: widget.category,
+                  //                   rating: 4.8,
+                  //                   isVerified: true,
+                  //                   products: products,
+                  //                 ),
+                  //               ),
+                  //             );
+                  //           }
+                  //         },
+                  //         style: ElevatedButton.styleFrom(
+                  //           backgroundColor: AppColors.primary,
+                  //           foregroundColor: Colors.white,
+                  //           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                  //           minimumSize: Size.zero,
+                  //           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  //         ),
+                  //         child: const Text('Voir'),
+                  //       ),
+                  //     ],
+                  //   ),
+                  // ),
                   
                   const SizedBox(height: 24),
                   

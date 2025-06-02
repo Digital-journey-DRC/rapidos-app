@@ -6,13 +6,11 @@ import 'package:immo/screens/favoris_screen.dart';
 import 'package:immo/screens/home/home_livreur.dart';
 import 'package:immo/screens/home/home_marchant.dart';
 import 'package:immo/screens/home/new_home.dart';
-import 'package:immo/screens/messages_screen.dart';
-import 'package:immo/screens/payment_screen.dart';
-import 'package:immo/screens/rent_book.dart';
+
+import 'package:immo/screens/order_screen.dart';
+
 import '../constants.dart';
 import '../cubit/auth_cubit.dart';
-import 'home_screen.dart';
-import 'dashboard/dashboard_screen.dart';
 import 'package:immo/widgets/cart_badge.dart';
 import 'dart:async';
 
@@ -34,6 +32,7 @@ class _MainScreenState extends State<MainScreen> {
     const CartScreen(backNavigaton: false),
     const FavorisScreen(),
     const HomeMarchantScreen(),
+    const OrderScreen(),
     const HomeLivreurScreen()
   ];
 
@@ -103,25 +102,35 @@ class _MainScreenState extends State<MainScreen> {
         _screens[0], // NewHomeScreen
         _screens[1], // CartScreen
         _screens[2], // FavorisScreen
-        _screens[3], // HomeMarchantScreen
+        _screens[4], // HomeMarchantScreen
       ];
     } else if (isVendeur) {
       filteredScreens = [
         _screens[3], // HomeMarchantScreen
         _screens[3], // HomeMarchantScreen (pour l'onglet Produits)
-        _screens[3], // HomeMarchantScreen (pour l'onglet Profil)
+        _screens[4], // HomeMarchantScreen (pour l'onglet Profil)
       ];
       navigationItems = const [
         BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Accueil'),
-        BottomNavigationBarItem(icon: Icon(Icons.inventory_2), label: 'Produits'),
-        BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profil'),
+        BottomNavigationBarItem(
+            icon: Icon(Icons.inventory_2), label: 'Produits'),
+        BottomNavigationBarItem(
+            icon: Icon(Icons.shopping_cart_checkout), label: 'Commandes'),
       ];
     } else if (isLivreur) {
       filteredScreens = [
-        _screens[4], // HomeLivreurScreen
-        _screens[1], // CartScreen
-        _screens[2], // FavorisScreen
-        _screens[3], // HomeMarchantScreen
+        _screens[5],
+        _screens[4],
+         // HomeLivreurScreen
+         // CartScreen
+        // HomeMarchantScreen
+      ];
+      navigationItems = const [
+        BottomNavigationBarItem(icon: Icon(Icons.bar_chart_outlined), label: 'Statistiques'),
+        BottomNavigationBarItem(
+            icon: Icon(Icons.shopping_cart_checkout), label: 'Livraisons'),
+        
+        
       ];
     } else {
       filteredScreens = _screens;

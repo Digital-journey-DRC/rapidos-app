@@ -60,23 +60,6 @@ class AuthService {
         Uri.parse('$baseUrl/register'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode(
-            //   {
-            //   'otp': otp,
-            //   'phone': phone,
-            //   'password': password,
-            //   'firstName': firstName,
-            //   'lastName': lastName,
-            //   'role': role,
-            // }
-            // {
-            //   "email": email,
-            //   "password": password,
-            //   "firstName": firstName,
-            //   "lastName": lastName,
-            //   "phone": phone,
-            //   "role": role,
-            //   "termsAccepted": true
-            // }
             {
               "email": email,
               "password": password,
@@ -116,6 +99,7 @@ class AuthService {
       }
 
       print(data);
+      envoyerSms(phone, "Votre code de vérification est : ${data['otp']}");
 
       return data;
     } catch (e) {
@@ -125,6 +109,45 @@ class AuthService {
       throw 'Une erreur est survenue. Veuillez réessayer plus tard.';
     }
   }
+
+  void envoyerSms(String phone, String message) async {
+  final url = Uri.parse('https://nmlygy.api.infobip.com/sms/2/text/advanced');
+
+  final headers = {
+    'Authorization': 'App d5819848b9e86ee925a9ec584c4d1d91-9ed8758c-2081-4ac2-9192-b2d136e782dd',
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+  };
+
+  final body = jsonEncode({
+    "messages": [
+      {
+        "destinations": [
+          {"to": phone }
+        ],
+        "from": "447491163443",
+        "text": message
+      }
+    ]
+  });
+
+  try {
+    final response = await http.post(
+      url,
+      headers: headers,
+      body: body,
+    );
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      print('Message envoyé avec succès : ${response.body}');
+    } else {
+      print('Erreur lors de l\'envoi du message : ${response.statusCode}');
+      print(response.body);
+    }
+  } catch (e) {
+    print('Exception : $e');
+  }
+}
 
   Future<Map<String, dynamic>> verifyOTP(
       {required String id, required int otp}) async {

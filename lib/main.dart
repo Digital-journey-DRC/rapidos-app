@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:immo/constants.dart';
 import 'package:immo/cubit/auth_cubit.dart';
+import 'package:immo/cubit/favorites_cubit.dart';
 import 'package:immo/cubit/listing_cubit.dart';
 import 'package:immo/cubit/maintenance_cubit.dart';
 import 'package:immo/cubits/building/building_cubit.dart';
@@ -19,7 +20,6 @@ import 'package:immo/screens/auth/login_screen.dart';
 import 'package:immo/screens/auth/register_screen.dart';
 import 'package:immo/screens/dashboard/Annonce_screen.dart';
 import 'package:immo/screens/dashboard/dashboard_screen.dart';
-import 'package:immo/screens/home_screen.dart';
 import 'package:immo/screens/main_screen.dart';
 import 'package:immo/screens/messages_screen.dart';
 import 'package:immo/services/auth_service.dart';
@@ -124,6 +124,7 @@ class _MyAppState extends State<MyApp> {
         BlocProvider(create: (context) => CartCubit()),
         BlocProvider(create: (context) => OrderCubit()),
         BlocProvider(create: (context) => MerchantCubit()),
+        BlocProvider(create: (context) => FavoritesCubit()),
       ],
       child: BlocBuilder<AuthCubit, AuthState>(
         builder: (context, state) {

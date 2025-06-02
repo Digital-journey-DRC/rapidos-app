@@ -28,6 +28,22 @@ class OrderState {
   }
 }
 
+class OrderListState {
+  final bool isLoading;
+  final String? error;
+  final List<dynamic> commandes;
+
+  OrderListState({this.isLoading = false, this.error, this.commandes = const []});
+
+  OrderListState copyWith({bool? isLoading, String? error, List<dynamic>? commandes}) {
+    return OrderListState(
+      isLoading: isLoading ?? this.isLoading,
+      error: error ?? this.error,
+      commandes: commandes ?? this.commandes,
+    );
+  }
+}
+
 class OrderCubit extends Cubit<OrderState> {
   OrderCubit() : super(OrderState());
 
@@ -149,6 +165,34 @@ class OrderCubit extends Cubit<OrderState> {
         isLoading: false,
         error: 'Erreur lors de la création de la commande (Dio): $e',
       ));
+    }
+  }
+
+  OrderListState _orderListState = OrderListState();
+  OrderListState get orderListState => _orderListState;
+
+  Future<void> fetchOrders() async {
+    _orderListState = _orderListState.copyWith(isLoading: true, error: null);
+    emit(state.copyWith());
+    try {
+      final token = await StorageService().getToken();
+      final headers = {
+        'Authorization': 'Bearer oat_NDc.eFhWeFR1LXVoMHUwT0FUZF9Ed1ljQnJ4c25COXhCOXVpbGFGc3FqYjIzNDk3NTM5NzU',
+      };
+      final response = await http.get(
+        Uri.parse('http://24.144.87.127:3333/commandes/vendeur'),
+        headers: headers,
+      );
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        _orderListState = _orderListState.copyWith(isLoading: false, commandes: data['commandes']);
+      } else {
+        _orderListState = _orderListState.copyWith(isLoading: false, error: response.reasonPhrase);
+      }
+      emit(state.copyWith());
+    } catch (e) {
+      _orderListState = _orderListState.copyWith(isLoading: false, error: e.toString());
+      emit(state.copyWith());
     }
   }
 } 

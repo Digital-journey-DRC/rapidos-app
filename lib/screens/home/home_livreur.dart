@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:immo/constants.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:immo/cubit/auth_cubit.dart';
+import 'package:immo/screens/dashboard/setting_screen.dart';
 
 class HomeLivreurScreen extends StatelessWidget {
   const HomeLivreurScreen({Key? key}) : super(key: key);
@@ -12,12 +13,12 @@ class HomeLivreurScreen extends StatelessWidget {
       backgroundColor: const Color(0xFFF7F8FA),
       appBar: AppBar(
         backgroundColor: Colors.white,
+        automaticallyImplyLeading: false,
         elevation: 0,
         title: Row(
           children: [
-            Image.asset(AppAssets.logo, width: 40, height: 40),
-            const SizedBox(width: 8),
-            const Text('Profile Livreur', style: TextStyle(color: Colors.black)),
+            Image.asset(AppAssets.logo, width: 60, height: 60),
+            
           ],
         ),
         actions: [
@@ -26,23 +27,39 @@ class HomeLivreurScreen extends StatelessWidget {
             child: BlocBuilder<AuthCubit, AuthState>(
               builder: (context, state) {
                 if (state is AuthSuccess && state.user != null && state.user!['profileImage'] != null) {
-                  return CircleAvatar(
-                    radius: 20,
-                    backgroundColor: AppColors.buttonColor2,
+                  return GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const SettingScreen()),
+                      );
+                    },
                     child: CircleAvatar(
-                      radius: 17,
-                      backgroundColor: AppColors.white,
-                      backgroundImage: NetworkImage(state.user!['profileImage']),
+                      radius: 20,
+                      backgroundColor: AppColors.buttonColor2,
+                      child: CircleAvatar(
+                        radius: 17,
+                        backgroundColor: AppColors.white,
+                        backgroundImage: NetworkImage(state.user!['profileImage']),
+                      ),
                     ),
                   );
                 } else {
-                  return const CircleAvatar(
-                    radius: 20,
-                    backgroundColor: AppColors.buttonColor2,
-                    child: CircleAvatar(
-                      radius: 17,
-                      backgroundColor: AppColors.white,
-                      child: Icon(Icons.person, color: AppColors.buttonColor),
+                  return GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const SettingScreen()),
+                      );
+                    },
+                    child: const CircleAvatar(
+                      radius: 20,
+                      backgroundColor: AppColors.buttonColor2,
+                      child: CircleAvatar(
+                        radius: 17,
+                        backgroundColor: AppColors.white,
+                        child: Icon(Icons.person, color: AppColors.buttonColor),
+                      ),
                     ),
                   );
                 }
