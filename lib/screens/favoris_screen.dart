@@ -44,7 +44,7 @@ class FavorisScreen extends StatelessWidget {
                 final product = favoris[index];
                 final hasImage = product['media'] != null && product['media']['mediaUrl'] != null && product['media']['mediaUrl'].toString().isNotEmpty;
                 final imageUrl = hasImage
-                  ? 'http://24.144.87.127:3333/${product['media']['mediaUrl']}'
+                  ? product['media']['mediaUrl']
                   : 'https://via.placeholder.com/80';
                 return InkWell(
                   borderRadius: BorderRadius.circular(12),

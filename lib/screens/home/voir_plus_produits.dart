@@ -41,6 +41,11 @@ class _TwitterStyleProductCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final String imageUrl = (product['imageUrl'] == null || product['imageUrl']!.isEmpty || product['imageUrl'] == 'null')
+        ? 'https://via.placeholder.com/300x110'
+        : product['imageUrl']!.startsWith('http')
+            ? product['imageUrl']!
+            : 'http://24.144.87.127:3333/${product['imageUrl']}';
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       elevation: 1,
@@ -53,14 +58,16 @@ class _TwitterStyleProductCard extends StatelessWidget {
               topRight: Radius.circular(16),
             ),
             child: Image.network(
-              product['imageUrl'] ?? '',
+              imageUrl,
               height: 110,
               width: double.infinity,
               fit: BoxFit.cover,
               errorBuilder: (context, error, stackTrace) => Container(
                 height: 110,
+                width: double.infinity,
                 color: Colors.grey[200],
-                child: const Icon(Icons.image, color: Colors.grey),
+                alignment: Alignment.center,
+                child: const Icon(Icons.image, color: Colors.grey, size: 40),
               ),
             ),
           ),

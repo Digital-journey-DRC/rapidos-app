@@ -11,6 +11,12 @@ import 'package:immo/services/storage_service.dart';
 import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:immo/screens/dashboard/setting_screen.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:immo/cubit/order_cubit.dart';
+import 'package:immo/widgets/shimmer_loading.dart';
+import 'package:immo/cubit/category_cubit.dart';
 
 class HomeMarchantScreen extends StatefulWidget {
   const HomeMarchantScreen({Key? key}) : super(key: key);
@@ -27,11 +33,53 @@ class _HomeMarchantScreenState extends State<HomeMarchantScreen> {
   ];
 
   bool _isLoading = false;
+  GoogleMapController? _mapController;
+  Position? _currentPosition;
 
   @override
   void initState() {
     super.initState();
     context.read<ProductCubit>().fetchProducts();
+    context.read<CategoryCubit>().fetchCategories();
+    _getCurrentLocation();
+  }
+
+  Future<void> _getCurrentLocation() async {
+    try {
+      // Vérifier et demander les permissions
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          return;
+        }
+      }
+
+      // Obtenir la position actuelle
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high
+      );
+
+      setState(() {
+        _currentPosition = position;
+        _isLoading = false;
+      });
+
+      // Animer la caméra vers la position
+      _mapController?.animateCamera(
+        CameraUpdate.newCameraPosition(
+          CameraPosition(
+            target: LatLng(position.latitude, position.longitude),
+            zoom: 15,
+          ),
+        ),
+      );
+    } catch (e) {
+      print('Erreur de localisation: $e');
+      setState(() {
+        _isLoading = false;
+      });
+    }
   }
 
   void _showAddProductSheet() {
@@ -137,27 +185,40 @@ class _HomeMarchantScreenState extends State<HomeMarchantScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    DropdownButtonFormField<String>(
-                      value: _selectedCategory,
-                      decoration: InputDecoration(
-                        labelText: 'Catégorie',
-                        prefixIcon: const Icon(Icons.category_outlined),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        filled: true,
-                        fillColor: Colors.white,
-                      ),
-                      items: _categories
-                          .map((cat) => DropdownMenuItem(
-                                value: cat,
-                                child: Text(cat),
-                              ))
-                          .toList(),
-                      onChanged: (val) {
-                        setState(() {
-                          _selectedCategory = val;
-                        });
+                    BlocBuilder<CategoryCubit, CategoryState>(
+                      builder: (context, state) {
+                        if (state is CategoryLoading) {
+                          return const Center(child: CircularProgressIndicator());
+                        }
+                        if (state is CategoryLoaded) {
+                          return DropdownButtonFormField<String>(
+                            value: _selectedCategory,
+                            decoration: InputDecoration(
+                              labelText: 'Catégorie',
+                              prefixIcon: const Icon(Icons.category_outlined),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              filled: true,
+                              fillColor: Colors.white,
+                            ),
+                            items: state.categories
+                                .map((cat) => DropdownMenuItem(
+                                      value: cat.name,
+                                      child: Text(cat.name),
+                                    ))
+                                .toList(),
+                            onChanged: (val) {
+                              setState(() {
+                                _selectedCategory = val;
+                              });
+                            },
+                          );
+                        }
+                        if (state is CategoryError) {
+                          return Text('Erreur chargement catégories', style: TextStyle(color: Colors.red));
+                        }
+                        return const SizedBox.shrink();
                       },
                     ),
                     const SizedBox(height: 12),
@@ -470,7 +531,7 @@ class _HomeMarchantScreenState extends State<HomeMarchantScreen> {
                             context,
                             MaterialPageRoute(
                               builder: (context) => VoirPlusProduitsScreen(
-                                products: state.products.map((product) => {
+                                products: state.products.reversed.toList().map((product) => {
                                   'badge': 'Nouveau',
                                   'name': product.name,
                                   'stock': product.stock.toString(),
@@ -495,7 +556,15 @@ class _HomeMarchantScreenState extends State<HomeMarchantScreen> {
             BlocBuilder<ProductCubit, ProductState>(
               builder: (context, state) {
                 if (state is ProductLoading) {
-                  return const Center(child: CircularProgressIndicator());
+                  return SizedBox(
+                    height: 120,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: 3,
+                      separatorBuilder: (_, __) => const SizedBox(width: 12),
+                      itemBuilder: (context, index) => const ProductCardShimmer(),
+                    ),
+                  );
                 }
                 
                 if (state is ProductError) {
@@ -507,7 +576,7 @@ class _HomeMarchantScreenState extends State<HomeMarchantScreen> {
                           children: [
                             Icon(Icons.inbox, size: 48, color: Colors.grey),
                             SizedBox(height: 8),
-                            Text('Aucun produit pour l’instant', style: TextStyle(color: Colors.grey)),
+                            Text("Aucun produit pour l'instant", style: TextStyle(color: Colors.grey)),
                           ],
                         ),
                       ),
@@ -524,7 +593,7 @@ class _HomeMarchantScreenState extends State<HomeMarchantScreen> {
                           children: const [
                             Icon(Icons.inbox, size: 48, color: Colors.grey),
                             SizedBox(height: 8),
-                            Text('Aucun produit pour l’instant', style: TextStyle(color: Colors.grey)),
+                            Text("Aucun produit pour l'instant", style: TextStyle(color: Colors.grey)),
                           ],
                         ),
                       ),
@@ -537,7 +606,7 @@ class _HomeMarchantScreenState extends State<HomeMarchantScreen> {
                       itemCount: state.products.length,
                       separatorBuilder: (_, __) => const SizedBox(width: 12),
                       itemBuilder: (context, index) {
-                        final product = state.products[index];
+                        final product = state.products.reversed.toList()[index];
                         return SizedBox(
                           width: 220,
                           child: _ProductCard(
@@ -557,7 +626,239 @@ class _HomeMarchantScreenState extends State<HomeMarchantScreen> {
                 return const SizedBox.shrink();
               },
             ),
+
+            // Livraisons en cours
+            const Text('Livraisons en Cours',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            const SizedBox(height: 8),
+            BlocBuilder<OrderCubit, OrderState>(
+              builder: (context, state) {
+                final orderListState = context.read<OrderCubit>().orderListState;
+                if (orderListState.isLoading) {
+                  return Column(
+                    children: const [OrderCardShimmer(), SizedBox(height: 10), OrderCardShimmer()],
+                  );
+                }
+                if (orderListState.error != null) {
+                  return Center(child: Text(orderListState.error!, style: TextStyle(color: Colors.red)));
+                }
+                final commandes = orderListState.commandes;
+                if (commandes.isEmpty) {
+                  return const Center(child: Text('Aucune livraison en cours'));
+                }
+                final lastCommandes = commandes.length > 2 ? commandes.sublist(0, 2) : commandes;
+                return Column(
+                  children: lastCommandes.map<Widget>((commande) {
+                    final commandeData = commande['commande'];
+                    final user = commandeData != null ? commandeData['user'] : null;
+                    final status = commandeData != null ? (commandeData['status'] ?? '') : '';
+                    final date = commande['createdAt']?.toString().substring(0, 10) ?? '';
+                    final product = commande['product'] ?? {};
+                    final imageUrl = product['media'] != null && product['media']['mediaUrl'] != null
+                        ? 'http://24.144.87.127:3333/${product['media']['mediaUrl']}'
+                        : 'https://via.placeholder.com/80';
+                    Color _statusColor(String status) {
+                      switch (status) {
+                        case 'en attente':
+                          return AppColors.buttonColor;
+                        case 'livrée':
+                          return Colors.green;
+                        case 'annulée':
+                          return Colors.red;
+                        default:
+                          return Colors.grey;
+                      }
+                    }
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(18),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.06),
+                            blurRadius: 10,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Timeline
+                          Container(
+                            width: 6,
+                            height: 110,
+                            margin: const EdgeInsets.only(right: 10, top: 10, bottom: 10),
+                            decoration: BoxDecoration(
+                              color: _statusColor(status),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          // Image produit
+                          Padding(
+                            padding: const EdgeInsets.only(top: 16, left: 0, right: 10),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(14),
+                              child: Image.network(
+                                imageUrl,
+                                width: 70,
+                                height: 70,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return Container(
+                                    width: 70,
+                                    height: 70,
+                                    color: Colors.grey.shade200,
+                                    child: const Icon(Icons.image, color: Colors.grey),
+                                  );
+                                },
+                              ),
+                            ),
+                          ),
+                          // Détails commande
+                          Expanded(
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 0),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Flexible(
+                                        child: Text(
+                                          product['name'] ?? '',
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 16,
+                                            color: AppColors.primary,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: _statusColor(status).withOpacity(0.15),
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                        child: Text(
+                                          status.isNotEmpty ? status.toUpperCase() : 'N/A',
+                                          style: TextStyle(
+                                            color: _statusColor(status),
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    product['description'] ?? '',
+                                    style: TextStyle(
+                                      color: Colors.grey.shade600,
+                                      fontSize: 13,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    children: [
+                                      Text(
+                                        'Quantité : \t${commande['quantity']}',
+                                        style: const TextStyle(fontSize: 13),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Text(
+                                        '${commande['price']} FC',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 15,
+                                          color: AppColors.buttonColor,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 4),
+                                  if (user != null) ...[
+                                    const Icon(Icons.person, size: 14, color: AppColors.primary),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      '${user['firstName'] ?? ''} ${user['lastName'] ?? ''}',
+                                      style: const TextStyle(fontSize: 13),
+                                    ),
+                                  ],
+                                  const SizedBox(height: 2),
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.calendar_today, size: 13, color: Colors.grey),
+                                      const SizedBox(width: 4),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.buttonColor.withOpacity(0.13),
+                                          borderRadius: BorderRadius.circular(6),
+                                        ),
+                                        child: Text(
+                                          date,
+                                          style: const TextStyle(fontSize: 12, color: AppColors.buttonColor),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                );
+              },
+            ),
+
+            // Carte de livraison
             const SizedBox(height: 18),
+            // Carte de livraison
+            Container(
+              height: 200,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: Colors.grey[200],
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: _isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : _currentPosition == null
+                        ? const Center(
+                            child: Text('Impossible d\'obtenir la localisation',
+                                style: TextStyle(color: Colors.black54)))
+                        : GoogleMap(
+                            initialCameraPosition: CameraPosition(
+                              target: LatLng(
+                                _currentPosition!.latitude,
+                                _currentPosition!.longitude,
+                              ),
+                              zoom: 15,
+                            ),
+                            onMapCreated: (GoogleMapController controller) {
+                              _mapController = controller;
+                            },
+                            myLocationEnabled: true,
+                            myLocationButtonEnabled: true,
+                            zoomControlsEnabled: true,
+                            mapType: MapType.normal,
+                          ),
+              ),
+            ),
+
             // Avis Clients
             const Text('Avis Clients',
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
@@ -579,36 +880,7 @@ class _HomeMarchantScreenState extends State<HomeMarchantScreen> {
                 ],
               ),
             ),
-            const SizedBox(height: 18),
-            // Livraisons en cours
-            const Text('Livraisons en Cours',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            const SizedBox(height: 8),
-            const _DeliveryRow(
-                title: 'Livraison 1',
-                status: 'In Progress',
-                livreur: 'Marc',
-                icon: Icons.circle,
-                iconColor: Colors.red),
-            const _DeliveryRow(
-                title: 'Livraison 2',
-                status: 'En attente',
-                livreur: 'Sarah',
-                icon: Icons.circle,
-                iconColor: Colors.orange),
-            const SizedBox(height: 18),
-            // Carte de livraison
-            Container(
-              height: 120,
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: Colors.grey[200],
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Center(
-                  child: Text('Carte de Livraison en Temps Réel',
-                      style: TextStyle(color: Colors.black54))),
-            ),
+            
 
 
 
@@ -684,7 +956,13 @@ class _ProductCard extends StatelessWidget {
       required this.imageUrl});
   @override
   Widget build(BuildContext context) {
-    return Expanded(
+    final String displayImageUrl = (imageUrl.isEmpty || imageUrl == 'null')
+        ? 'https://via.placeholder.com/150'
+        : imageUrl.startsWith('http')
+            ? imageUrl
+            : 'http://24.144.87.127:3333/$imageUrl';
+    return SizedBox(
+      width: 220,
       child: Container(
         height: 110,
         margin: const EdgeInsets.only(bottom: 8),
@@ -710,7 +988,7 @@ class _ProductCard extends StatelessWidget {
                     bottomLeft: Radius.circular(14),
                   ),
                   child: Image.network(
-                    imageUrl,
+                    displayImageUrl,
                     width: 64,
                     height: 110,
                     fit: BoxFit.cover,
@@ -932,6 +1210,201 @@ class _StatCard extends StatelessWidget {
                             percent.startsWith('+') ? Colors.green : Colors.red,
                         fontWeight: FontWeight.bold)),
               ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class OrderCardShimmer extends StatelessWidget {
+  const OrderCardShimmer({Key? key}) : super(key: key);
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Timeline shimmer
+          Container(
+            width: 6,
+            height: 110,
+            margin: const EdgeInsets.only(right: 10, top: 10, bottom: 10),
+            decoration: BoxDecoration(
+              color: AppColors.buttonColor.withOpacity(0.3),
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+          // Image shimmer
+          Padding(
+            padding: const EdgeInsets.only(top: 16, left: 0, right: 10),
+            child: ShimmerLoading(
+              width: 70,
+              height: 70,
+              borderRadius: BorderRadius.circular(14),
+            ),
+          ),
+          // Détails shimmer
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      ShimmerLoading(
+                        width: 90,
+                        height: 16,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      const SizedBox(width: 8),
+                      ShimmerLoading(
+                        width: 60,
+                        height: 16,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  ShimmerLoading(
+                    width: 120,
+                    height: 12,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      ShimmerLoading(
+                        width: 60,
+                        height: 12,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      const SizedBox(width: 12),
+                      ShimmerLoading(
+                        width: 50,
+                        height: 14,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      ShimmerLoading(
+                        width: 80,
+                        height: 12,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      const SizedBox(width: 8),
+                      ShimmerLoading(
+                        width: 60,
+                        height: 12,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class ProductCardShimmer extends StatelessWidget {
+  const ProductCardShimmer({Key? key}) : super(key: key);
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 220,
+      child: Container(
+        height: 110,
+        margin: const EdgeInsets.only(bottom: 8),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Colors.grey.shade300),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.withOpacity(0.07),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(14),
+                    bottomLeft: Radius.circular(14),
+                  ),
+                  child: ShimmerLoading(
+                    width: 64,
+                    height: 110,
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(14),
+                      bottomLeft: Radius.circular(14),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  top: 8,
+                  left: 8,
+                  child: ShimmerLoading(
+                    width: 40,
+                    height: 16,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 4),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    ShimmerLoading(
+                      width: 80,
+                      height: 15,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    const SizedBox(height: 4),
+                    ShimmerLoading(
+                      width: 60,
+                      height: 12,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    const SizedBox(height: 4),
+                    ShimmerLoading(
+                      width: 50,
+                      height: 13,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ],
         ),

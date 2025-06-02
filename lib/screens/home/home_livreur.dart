@@ -3,9 +3,58 @@ import 'package:immo/constants.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:immo/cubit/auth_cubit.dart';
 import 'package:immo/screens/dashboard/setting_screen.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:geolocator/geolocator.dart';
 
-class HomeLivreurScreen extends StatelessWidget {
+class HomeLivreurScreen extends StatefulWidget {
   const HomeLivreurScreen({Key? key}) : super(key: key);
+
+  @override
+  State<HomeLivreurScreen> createState() => _HomeLivreurScreenState();
+}
+
+class _HomeLivreurScreenState extends State<HomeLivreurScreen> {
+  GoogleMapController? _mapController;
+  Position? _currentPosition;
+  bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _getCurrentLocation();
+  }
+
+  Future<void> _getCurrentLocation() async {
+    setState(() { _isLoading = true; });
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        setState(() { _isLoading = false; });
+        return;
+      }
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          setState(() { _isLoading = false; });
+          return;
+        }
+      }
+      if (permission == LocationPermission.deniedForever) {
+        setState(() { _isLoading = false; });
+        return;
+      }
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+      setState(() {
+        _currentPosition = position;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() { _isLoading = false; });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -123,30 +172,69 @@ class HomeLivreurScreen extends StatelessWidget {
                 ),
               ],
             ),
-            _CommandeRow(
-              icon: Icons.inventory_2,
-              title: 'Commande 1234',
-              heure: '14:00',
-              status: 'En route',
-              statusColor: Colors.green,
-            ),
-            _CommandeRow(
-              icon: Icons.inventory_2,
-              title: 'Commande 5678',
-              heure: '15:30',
-              status: 'Attente',
-              statusColor: Colors.orange,
+            Center(
+              child: Container(
+                width: double.infinity,
+                margin: const EdgeInsets.symmetric(vertical: 10),
+                padding: const EdgeInsets.symmetric(vertical: 30),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey.shade200),
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: const [
+                    Icon(
+                      Icons.local_shipping_outlined,
+                      size: 50,
+                      color: Colors.grey,
+                    ),
+                    SizedBox(height: 12),
+                    Text(
+                      'Aucune livraison pour vous',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Colors.grey,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
             const SizedBox(height: 16),
             // Carte de position livraison
             Container(
-              height: 120,
+              height: 200,
               width: double.infinity,
               decoration: BoxDecoration(
                 color: Colors.grey[200],
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Center(child: Text('Position Livraison', style: TextStyle(color: Colors.black54))),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: _isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : _currentPosition == null
+                        ? const Center(child: Text('Impossible d\'obtenir la localisation', style: TextStyle(color: Colors.black54)))
+                        : GoogleMap(
+                            initialCameraPosition: CameraPosition(
+                              target: LatLng(
+                                _currentPosition!.latitude,
+                                _currentPosition!.longitude,
+                              ),
+                              zoom: 15,
+                            ),
+                            onMapCreated: (GoogleMapController controller) {
+                              _mapController = controller;
+                            },
+                            myLocationEnabled: true,
+                            myLocationButtonEnabled: true,
+                            zoomControlsEnabled: true,
+                            mapType: MapType.normal,
+                          ),
+              ),
             ),
             const SizedBox(height: 18),
             // Evaluations clients

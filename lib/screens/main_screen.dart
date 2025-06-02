@@ -107,13 +107,11 @@ class _MainScreenState extends State<MainScreen> {
     } else if (isVendeur) {
       filteredScreens = [
         _screens[3], // HomeMarchantScreen
-        _screens[3], // HomeMarchantScreen (pour l'onglet Produits)
+        // _screens[3], // HomeMarchantScreen (pour l'onglet Produits)
         _screens[4], // HomeMarchantScreen (pour l'onglet Profil)
       ];
       navigationItems = const [
         BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Accueil'),
-        BottomNavigationBarItem(
-            icon: Icon(Icons.inventory_2), label: 'Produits'),
         BottomNavigationBarItem(
             icon: Icon(Icons.shopping_cart_checkout), label: 'Commandes'),
       ];

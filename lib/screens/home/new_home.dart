@@ -12,6 +12,9 @@ import 'package:immo/screens/product/all_products_screen.dart';
 import 'package:immo/cubit/category_cubit.dart';
 import 'package:immo/widgets/shimmer_loading.dart';
 import 'package:immo/cubit/merchant_cubit.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:immo/cubit/order_cubit.dart';
 
 class NewHomeScreen extends StatefulWidget {
   const NewHomeScreen({Key? key}) : super(key: key);
@@ -21,12 +24,60 @@ class NewHomeScreen extends StatefulWidget {
 }
 
 class _NewHomeScreenState extends State<NewHomeScreen> {
+  GoogleMapController? _mapController;
+  Position? _currentPosition;
+  bool _isLoading = false;
+  List<dynamic> _commandes = [];
+
   @override
   void initState() {
     super.initState();
     context.read<FeaturedProductCubit>().fetchFeaturedProducts();
     context.read<CategoryCubit>().fetchCategories();
     context.read<MerchantCubit>().fetchMerchants();
+    _fetchOrdersAndLocation();
+  }
+
+  Future<void> _fetchOrdersAndLocation() async {
+    setState(() { _isLoading = true; });
+    try {
+      // Récupérer les commandes via OrderCubit
+      final orderCubit = context.read<OrderCubit>();
+      await orderCubit.fetchOrders();
+      final commandes = orderCubit.orderListState.commandes;
+      setState(() { _commandes = commandes; });
+      if (commandes.isNotEmpty) {
+        // Si au moins une commande, récupérer la position
+        bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+        if (!serviceEnabled) {
+          setState(() { _isLoading = false; });
+          return;
+        }
+        LocationPermission permission = await Geolocator.checkPermission();
+        if (permission == LocationPermission.denied) {
+          permission = await Geolocator.requestPermission();
+          if (permission == LocationPermission.denied) {
+            setState(() { _isLoading = false; });
+            return;
+          }
+        }
+        if (permission == LocationPermission.deniedForever) {
+          setState(() { _isLoading = false; });
+          return;
+        }
+        Position position = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.high,
+        );
+        setState(() {
+          _currentPosition = position;
+          _isLoading = false;
+        });
+      } else {
+        setState(() { _isLoading = false; });
+      }
+    } catch (e) {
+      setState(() { _isLoading = false; });
+    }
   }
 
   @override
@@ -402,40 +453,76 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
               ),
             ),
 
-            // Map
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+              child: Text('Position du livreur', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black)),
+            ),
+
             Padding(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-              child: Container(
-                height: 150,
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade200,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    // Map background with pattern
-                    CustomPaint(
-                      painter: MapPatternPainter(),
-                      size: Size.infinite,
-                    ),
-                    Icon(Icons.location_on,
-                        color: AppColors.primary.withOpacity(0.7)),
-                    const Positioned(
-                      bottom: 10,
-                      child: Text(
-                        'Pas de livraison pour le moment',
-                        style: TextStyle(
-                            fontWeight: FontWeight.w500,
-                            fontSize: 14,
-                            color: Colors.black),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+              child: _isLoading
+                  ? const SizedBox(
+                      height: 150,
+                      child: Center(child: CircularProgressIndicator()),
+                    )
+                  : _commandes.isNotEmpty
+                      ? Container(
+                          height: 200,
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                            color: Colors.grey[200],
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: _currentPosition == null
+                                ? const Center(child: Text('Impossible d\'obtenir la localisation', style: TextStyle(color: Colors.black54)))
+                                : GoogleMap(
+                                    initialCameraPosition: CameraPosition(
+                                      target: LatLng(
+                                        _currentPosition!.latitude,
+                                        _currentPosition!.longitude,
+                                      ),
+                                      zoom: 15,
+                                    ),
+                                    onMapCreated: (GoogleMapController controller) {
+                                      _mapController = controller;
+                                    },
+                                    myLocationEnabled: true,
+                                    myLocationButtonEnabled: true,
+                                    zoomControlsEnabled: true,
+                                    mapType: MapType.normal,
+                                  ),
+                          ),
+                        )
+                      : Container(
+                          height: 150,
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade200,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              CustomPaint(
+                                painter: MapPatternPainter(),
+                                size: Size.infinite,
+                              ),
+                              Icon(Icons.location_on, color: AppColors.primary.withOpacity(0.7)),
+                              const Positioned(
+                                bottom: 10,
+                                child: Text(
+                                  'Pas de livraison pour le moment',
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.w500,
+                                      fontSize: 14,
+                                      color: Colors.black),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
             ),
           ],
         ),

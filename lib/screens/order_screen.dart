@@ -16,6 +16,7 @@ class OrderScreen extends StatefulWidget {
 class _OrderScreenState extends State<OrderScreen> {
   late AuthState authState;
   late bool isLivreur;
+  bool _hasFetchedOrders = false;
 
   @override
   void didChangeDependencies() {
@@ -24,11 +25,16 @@ class _OrderScreenState extends State<OrderScreen> {
     isLivreur = authState is AuthSuccess && 
         (authState as AuthSuccess).user != null &&
         (authState as AuthSuccess).user!['role'] == 'livreur';
+    if (!_hasFetchedOrders && authState is AuthSuccess) {
+      context.read<OrderCubit>().fetchOrders();
+      _hasFetchedOrders = true;
+    }
   }
+
   @override
   void initState() {
     super.initState();
-    context.read<OrderCubit>().fetchOrders();
+    // Ne rien faire ici pour fetchOrders
   }
 
   Color _statusColor(String status) {
@@ -188,10 +194,11 @@ class _OrderScreenState extends State<OrderScreen> {
                       itemCount: orderListState.commandes.length,
                       itemBuilder: (context, index) {
                         final commande = orderListState.commandes[index];
-                        final product = commande['product'];
-                        final user = commande['commande']['user'];
-                        final status = commande['commande']['status'] ?? '';
+                        final commandeData = commande['commande'];
+                        final user = commandeData != null ? commandeData['user'] : null;
+                        final status = commandeData != null ? (commandeData['status'] ?? '') : '';
                         final date = commande['createdAt']?.toString().substring(0, 10) ?? '';
+                        final product = commande['product'] ?? {};
                         final imageUrl = product['media'] != null && product['media']['mediaUrl'] != null
                             ? 'http://24.144.87.127:3333/${product['media']['mediaUrl']}'
                             : 'https://via.placeholder.com/80';
@@ -275,7 +282,7 @@ class _OrderScreenState extends State<OrderScreen> {
                                                     borderRadius: BorderRadius.circular(8),
                                                   ),
                                                   child: Text(
-                                                    status.toUpperCase(),
+                                                    status.isNotEmpty ? status.toUpperCase() : 'N/A',
                                                     style: TextStyle(
                                                       color: _statusColor(status),
                                                       fontWeight: FontWeight.bold,
@@ -314,16 +321,17 @@ class _OrderScreenState extends State<OrderScreen> {
                                               ],
                                             ),
                                             const SizedBox(height: 4),
-                                            Row(
-                                              children: [
-                                                const Icon(Icons.person, size: 14, color: AppColors.primary),
-                                                const SizedBox(width: 4),
-                                                Text(
-                                                  '${user['firstName']} ${user['lastName']}',
-                                                  style: const TextStyle(fontSize: 13),
-                                                ),
-                                              ],
-                                            ),
+                                            if (user != null)
+                                              Row(
+                                                children: [
+                                                  const Icon(Icons.person, size: 14, color: AppColors.primary),
+                                                  const SizedBox(width: 4),
+                                                  Text(
+                                                    '${user['firstName'] ?? ''} ${user['lastName'] ?? ''}',
+                                                    style: const TextStyle(fontSize: 13),
+                                                  ),
+                                                ],
+                                              ),
                                             const SizedBox(height: 2),
                                             Row(
                                               children: [

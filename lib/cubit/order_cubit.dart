@@ -176,17 +176,31 @@ class OrderCubit extends Cubit<OrderState> {
     emit(state.copyWith());
     try {
       final token = await StorageService().getToken();
+      final userDataStr = await StorageService().getUserData();
+      String role = 'vendeur';
+      if (userDataStr != null) {
+        final userData = jsonDecode(userDataStr);
+        if (userData is Map && userData['role'] != null) {
+          role = userData['role'];
+        }
+      }
       final headers = {
         'Authorization': 'Bearer $token',
       };
-      print(token);
+      final endpoint = role == 'acheteur'
+          ? 'http://24.144.87.127:3333/commandes/acheteur'
+          :
+           'http://24.144.87.127:3333/commandes/vendeur';
+      print('ROLE: $role, ENDPOINT: $endpoint');
       final response = await http.get(
-        Uri.parse('http://24.144.87.127:3333/commandes/vendeur'),
+        Uri.parse(endpoint),
         headers: headers,
       );
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        _orderListState = _orderListState.copyWith(isLoading: false, commandes: data['commandes']);
+        print('DATA: $data');
+        print(token);
+        _orderListState = _orderListState.copyWith(isLoading: false, commandes: data['commandes'], error: null);
       } else {
         _orderListState = _orderListState.copyWith(isLoading: false, error: response.reasonPhrase);
       }

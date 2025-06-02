@@ -61,6 +61,9 @@ dependencies:
   url_launcher: ^6.2.5
   skeletons: ^0.0.3
   flutter_otp_text_field: ^1.5.1+1
+  google_maps_flutter: ^2.5.3
+  geolocator: ^11.0.0
+  permission_handler: ^11.3.0
 
 dev_dependencies:
   flutter_test:

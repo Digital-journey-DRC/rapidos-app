@@ -51,6 +51,10 @@
 	<string>Cette application a besoin d'accéder à votre caméra pour prendre des photos</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Cette application a besoin d'accéder à votre microphone pour les vidéos</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Cette application nécessite l'accès à la localisation pour afficher votre position sur la carte.</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>Cette application nécessite l'accès à la localisation pour afficher votre position sur la carte.</string>
 
 	<!-- 🎯 Configuration des liens profonds -->
 	<key>CFBundleURLTypes</key>
