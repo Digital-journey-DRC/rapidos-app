@@ -11,13 +11,13 @@
             "type": "dart"
         },
         {
-            "name": "ImmGo (profile mode)",
+            "name": "Rapidos (profile mode)",
             "request": "launch",
             "type": "dart",
             "flutterMode": "profile"
         },
         {
-            "name": "ImmGo (release mode)",
+            "name": "Rapidos (release mode)",
             "request": "launch",
             "type": "dart",
             "flutterMode": "release"
