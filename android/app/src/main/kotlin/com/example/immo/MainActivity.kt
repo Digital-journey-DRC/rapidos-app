@@ -1,4 +1,4 @@
-package com.rapidos.app
+package com.rapidosdrc.app
 
 import io.flutter.embedding.android.FlutterActivity
 

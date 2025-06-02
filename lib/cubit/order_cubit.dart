@@ -190,7 +190,9 @@ class OrderCubit extends Cubit<OrderState> {
       final endpoint = role == 'acheteur'
           ? 'http://24.144.87.127:3333/commandes/acheteur'
           :
-           'http://24.144.87.127:3333/commandes/vendeur';
+          role == 'livreur'
+          ? 'http://24.144.87.127:3333/livraison/ma-liste'
+          : 'http://24.144.87.127:3333/commandes/vendeur';
       print('ROLE: $role, ENDPOINT: $endpoint');
       final response = await http.get(
         Uri.parse(endpoint),
@@ -200,7 +202,7 @@ class OrderCubit extends Cubit<OrderState> {
         final data = jsonDecode(response.body);
         print('DATA: $data');
         print(token);
-        _orderListState = _orderListState.copyWith(isLoading: false, commandes: data['commandes'], error: null);
+        _orderListState = _orderListState.copyWith(isLoading: false, commandes: role == 'livreur' ? data['livraison'] : data['commandes'], error: null);
       } else {
         _orderListState = _orderListState.copyWith(isLoading: false, error: response.reasonPhrase);
       }

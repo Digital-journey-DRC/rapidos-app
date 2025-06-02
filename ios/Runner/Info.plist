@@ -64,7 +64,7 @@
 			<string>Editor</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>com.rapidos.app</string>
+				<string>com.rapidosdrc.app</string>
 			</array>
 		</dict>
 	</array>

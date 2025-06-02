@@ -305,13 +305,14 @@ class _OrderScreenState extends State<OrderScreen> {
                                             const SizedBox(height: 8),
                                             Row(
                                               children: [
-                                                Text(
-                                                  'Quantité : ${commande['quantity']}',
-                                                  style: const TextStyle(fontSize: 13),
-                                                ),
+                                                // Text(
+                                                //   // 'Quantité : ${commande['quantity']}',
+                                                //   "Prix: ${commandeData['totalPrice']} FC",
+                                                //   style: const TextStyle(fontSize: 13),
+                                                // ),
                                                 const SizedBox(width: 12),
                                                 Text(
-                                                  '${commande['price']} FC',
+                                                  "Prix: ${commandeData['totalPrice']} FC",
                                                   style: const TextStyle(
                                                     fontWeight: FontWeight.bold,
                                                     fontSize: 15,
