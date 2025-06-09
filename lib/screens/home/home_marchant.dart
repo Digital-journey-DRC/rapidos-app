@@ -17,6 +17,8 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:immo/cubit/order_cubit.dart';
 import 'package:immo/widgets/shimmer_loading.dart';
 import 'package:immo/cubit/category_cubit.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:convert';
 
 class HomeMarchantScreen extends StatefulWidget {
   const HomeMarchantScreen({Key? key}) : super(key: key);
@@ -42,7 +44,24 @@ class _HomeMarchantScreenState extends State<HomeMarchantScreen> {
     context.read<ProductCubit>().fetchProducts();
     context.read<CategoryCubit>().fetchCategories();
     _getCurrentLocation();
+    
   }
+
+  
+
+void saveCommande() async {
+    // Enregistrer la commande
+    DocumentReference commandeRef = await FirebaseFirestore.instance.collection('commandes').add({
+      'client': 'Joël',
+      'adresse': 'Gombe',
+      'timestamp': FieldValue.serverTimestamp(),
+      'status': 'pending',
+    });
+
+    print("✅ Commande enregistrée avec succès: ${commandeRef.id}");
+
+}
+
 
   Future<void> _getCurrentLocation() async {
     try {
@@ -496,6 +515,7 @@ class _HomeMarchantScreenState extends State<HomeMarchantScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
+                ElevatedButton(onPressed: saveCommande, child: const Text('Enregistrer commande')),
                 const Text('Vos Produits',
                     style:
                         TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),

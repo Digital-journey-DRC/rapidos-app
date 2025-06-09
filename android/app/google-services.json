@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "664352144036",
+    "project_id": "rapidos-21203",
+    "storage_bucket": "rapidos-21203.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:664352144036:android:a314bce32e49b8969d8431",
+        "android_client_info": {
+          "package_name": "com.rapidosdrc.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCryeIUxwaD9dCbOxEeIUwEdcPQlMGzkdM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

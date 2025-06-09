@@ -38,13 +38,250 @@ import 'package:immo/cubit/category_cubit.dart';
 import 'package:immo/cubit/cart_cubit.dart';
 import 'package:immo/cubit/order_cubit.dart';
 import 'package:immo/cubit/merchant_cubit.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'firebase_options.dart';
+import 'package:flutter/foundation.dart';
+import 'dart:io';
+
+class FirebaseMessagingService {
+  static final FirebaseMessagingService _instance = FirebaseMessagingService._internal();
+  factory FirebaseMessagingService() => _instance;
+  FirebaseMessagingService._internal();
+
+  Future<void> initialize() async {
+    try {
+      print("🚀 Initializing Firebase Messaging Service...");
+      FirebaseMessaging messaging = FirebaseMessaging.instance;
+      
+      // Request permission first
+      NotificationSettings settings = await messaging.requestPermission(
+        alert: true,
+        badge: true,
+        sound: true,
+        provisional: true,
+      );
+
+      print("📱 Notification settings: ${settings.authorizationStatus}");
+
+      if (settings.authorizationStatus == AuthorizationStatus.authorized ||
+          settings.authorizationStatus == AuthorizationStatus.provisional) {
+        
+        // Set foreground notification presentation options
+        await messaging.setForegroundNotificationPresentationOptions(
+          alert: true,
+          badge: true,
+          sound: true,
+        );
+
+        // iOS specific setup
+        if (Platform.isIOS) {
+          print("📱 Configuring iOS notifications...");
+          
+          // Initialize Firebase first
+          await Firebase.initializeApp(
+            options: DefaultFirebaseOptions.currentPlatform,
+          );
+          
+          // Get FCM token first
+          String? fcmToken = await messaging.getToken();
+          print('📱 FCM Token: $fcmToken');
+          
+          // Try to get APNS token with retry mechanism
+          int retryCount = 0;
+          String? apnsToken;
+          
+          while (apnsToken == null && retryCount < 3) {
+            try {
+              apnsToken = await messaging.getAPNSToken();
+              print('🍎 APNS Token (attempt ${retryCount + 1}): $apnsToken');
+              
+              if (apnsToken == null) {
+                retryCount++;
+                if (retryCount < 3) {
+                  print('⚠️ APNS Token is null, waiting before retry...');
+                  await Future.delayed(const Duration(seconds: 3));
+                }
+              }
+            } catch (e) {
+              print('❌ Error getting APNS token: $e');
+              retryCount++;
+              if (retryCount < 3) {
+                await Future.delayed(const Duration(seconds: 3));
+              }
+            }
+          }
+          
+          if (apnsToken == null) {
+            print('⚠️ Failed to get APNS token after 3 attempts');
+          }
+        }
+
+        // Setup message handlers
+        setupFirebaseMessaging();
+
+        // Handle background messages
+        FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+
+        // Listen for token refresh
+        messaging.onTokenRefresh.listen((String token) {
+          print('🔄 FCM Token Refreshed: $token');
+          _saveTokenToFirestore(token);
+        });
+
+        // Get initial token
+        String? token = await messaging.getToken();
+        if (token != null) {
+          print('✅ Initial FCM Token: $token');
+          await _saveTokenToFirestore(token);
+        } else {
+          print('⚠️ No FCM token received');
+        }
+      } else {
+        print("❌ Notification permissions not granted: ${settings.authorizationStatus}");
+      }
+    } catch (e, stackTrace) {
+      print("❌ Error initializing Firebase Messaging: $e");
+      print("Stack trace: $stackTrace");
+    }
+  }
+
+  void setupFirebaseMessaging() {
+    try {
+      print("🔧 Setting up Firebase Messaging handlers...");
+      
+      FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+        print('📩 Message reçu en foreground: ${message.notification?.title}');
+        print('📩 Message data: ${message.data}');
+
+        if (message.notification != null) {
+          _showNotification(message);
+        }
+      }, onError: (error) {
+        print("❌ Error in onMessage listener: $error");
+      });
+
+      FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+        print('📨 App ouverte via notification: ${message.notification?.title}');
+        print('📨 Message data: ${message.data}');
+        _handleNotificationTap(message);
+      }, onError: (error) {
+        print("❌ Error in onMessageOpenedApp listener: $error");
+      });
+
+      // Check if app was opened from a notification
+      FirebaseMessaging.instance.getInitialMessage().then((RemoteMessage? message) {
+        if (message != null) {
+          print('📨 App ouverte depuis une notification (état terminé)');
+          print('📨 Message data: ${message.data}');
+          _handleNotificationTap(message);
+        }
+      }).catchError((error) {
+        print("❌ Error getting initial message: $error");
+      });
+      
+      print("✅ Firebase Messaging handlers setup completed");
+    } catch (e, stackTrace) {
+      print("❌ Error setting up Firebase Messaging: $e");
+      print("Stack trace: $stackTrace");
+    }
+  }
+
+  void _showNotification(RemoteMessage message) {
+    // Pour iOS, nous utilisons le système de notification natif
+    if (Platform.isIOS) {
+      // Les notifications seront gérées automatiquement par le système iOS
+      return;
+    }
+
+    // Pour Android, nous pouvons personnaliser l'affichage si nécessaire
+    if (Platform.isAndroid) {
+      // Les notifications seront gérées automatiquement par le système Android
+      return;
+    }
+  }
+
+  void _handleNotificationTap(RemoteMessage message) {
+    // Gérer la navigation en fonction du type de notification
+    if (message.data.containsKey('type')) {
+      switch (message.data['type']) {
+        case 'order':
+          String orderId = message.data['orderId'];
+          print('Naviguer vers la commande: $orderId');
+          // TODO: Implémenter la navigation vers la page de commande
+          break;
+        case 'chat':
+          String chatId = message.data['chatId'];
+          print('Naviguer vers le chat: $chatId');
+          // TODO: Implémenter la navigation vers la page de chat
+          break;
+        default:
+          print('Type de notification non géré: ${message.data['type']}');
+      }
+    }
+  }
+
+  Future<void> _saveTokenToFirestore(String token) async {
+    try {
+      final docRef = FirebaseFirestore.instance.collection('tokens').doc(token);
+      await docRef.set({
+        'token': token,
+        'timestamp': FieldValue.serverTimestamp(),
+        'platform': Platform.isIOS ? 'ios' : 'android',
+        'permission_status': (await FirebaseMessaging.instance.getNotificationSettings()).authorizationStatus.toString(),
+      });
+
+      print("✅ Token saved to Firestore successfully");
+    } catch (e) {
+      print("❌ Error saving token to Firestore: $e");
+    }
+  }
+}
+
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  // Ensure Firebase is initialized
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+  
+  print('📩 Message reçu en background: ${message.notification?.title}');
+  print('📩 Message data: ${message.data}');
+  
+  // Handle the background message here
+  if (message.notification != null) {
+    // You can add custom logic here for background notifications
+    print('🔔 Notification en background: ${message.notification?.title}');
+  }
+}
 
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await Hive.initFlutter();
-  await FavoritesRepository.init();
-  await PaymentStorageService.init();
-  runApp(const MyApp());
+  try {
+    print("🚀 Starting app initialization...");
+    WidgetsFlutterBinding.ensureInitialized();
+    
+    print("📦 Initializing Hive...");
+    await Hive.initFlutter();
+    await FavoritesRepository.init();
+    await PaymentStorageService.init();
+    
+    print("🔥 Initializing Firebase...");
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+
+    print("📱 Initializing Firebase Messaging...");
+    await FirebaseMessagingService().initialize();
+
+    print("✅ App initialization completed successfully");
+    runApp(const MyApp());
+  } catch (e, stackTrace) {
+    print("❌ Error during app initialization: $e");
+    print("Stack trace: $stackTrace");
+    // Still run the app even if there's an error
+    runApp(const MyApp());
+  }
 }
 
 class MyApp extends StatefulWidget {
@@ -54,16 +291,29 @@ class MyApp extends StatefulWidget {
   State<MyApp> createState() => _MyAppState();
 }
 
-class _MyAppState extends State<MyApp> {
+class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   final AuthCubit _authCubit = AuthCubit(AuthService());
   final AppLinks _appLinks = AppLinks();
-  
+
   @override
   void initState() {
     super.initState();
-    // Vérifier l'authentification au démarrage de l'application
+    WidgetsBinding.instance.addObserver(this);
     _authCubit.checkAuth();
     _initializeAppLinks();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _initializeFirebaseMessaging();
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
   }
 
   Future<void> _initializeAppLinks() async {
@@ -94,8 +344,111 @@ class _MyAppState extends State<MyApp> {
     if (annonceId != null) {
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (context) => AnnonceScreen(annonceId: annonceId!)),
+        MaterialPageRoute(
+            builder: (context) => AnnonceScreen(annonceId: annonceId!)),
       );
+    }
+  }
+
+  Future<void> _initializeFirebaseMessaging() async {
+    int retryCount = 0;
+    const maxRetries = 3;
+    
+    while (retryCount < maxRetries) {
+      try {
+        print("🚀 Initializing Firebase Messaging (attempt ${retryCount + 1}/$maxRetries)...");
+        FirebaseMessaging messaging = FirebaseMessaging.instance;
+
+        // Request permission first
+        NotificationSettings settings = await messaging.requestPermission(
+          alert: true,
+          badge: true,
+          sound: true,
+          provisional: true,
+        );
+
+        print("📱 Notification settings: ${settings.authorizationStatus}");
+
+        if (settings.authorizationStatus == AuthorizationStatus.authorized ||
+            settings.authorizationStatus == AuthorizationStatus.provisional) {
+
+          // Listen for token refresh
+          messaging.onTokenRefresh.listen((String token) {
+            print('🔄 FCM Token Refreshed: $token');
+            _saveTokenToFirestore(token);
+          });
+
+          if (Platform.isIOS) {
+            // Get APNS token with retry
+            int apnsRetryCount = 0;
+            String? apnsToken;
+            
+            while (apnsToken == null && apnsRetryCount < 3) {
+              try {
+                apnsToken = await messaging.getAPNSToken();
+                if (apnsToken == null) {
+                  print("⏳ Waiting for APNS token... (attempt ${apnsRetryCount + 1})");
+                  await Future.delayed(const Duration(seconds: 2));
+                  apnsRetryCount++;
+                } else {
+                  print("✅ APNS Token received: $apnsToken");
+                }
+              } catch (e) {
+                print("⚠️ Error getting APNS token: $e");
+                await Future.delayed(const Duration(seconds: 2));
+                apnsRetryCount++;
+              }
+            }
+
+            if (apnsToken == null) {
+              print("⚠️ Failed to get APNS token after $apnsRetryCount attempts");
+              // Continue anyway as FCM might still work
+            }
+          }
+
+          // Get FCM token
+          String? token = await messaging.getToken();
+          if (token != null) {
+            print('✅ FCM Token received: $token');
+            await _saveTokenToFirestore(token);
+            return; // Success, exit the retry loop
+          } else {
+            print('⚠️ No FCM token received');
+            throw Exception('No FCM token received');
+          }
+        } else {
+          print("❌ Notification permissions not granted: ${settings.authorizationStatus}");
+          throw Exception('Notification permissions not granted');
+        }
+      } catch (e) {
+        print("❌ Error initializing Firebase Messaging: $e");
+        retryCount++;
+        
+        if (retryCount < maxRetries) {
+          print("⏳ Retrying in 3 seconds...");
+          await Future.delayed(const Duration(seconds: 3));
+        } else {
+          print("❌ Failed to initialize Firebase Messaging after $maxRetries attempts");
+          // Don't throw the error, just log it and continue
+          break;
+        }
+      }
+    }
+  }
+
+  Future<void> _saveTokenToFirestore(String token) async {
+    try {
+      final docRef = FirebaseFirestore.instance.collection('tokens').doc(token);
+      await docRef.set({
+        'token': token,
+        'timestamp': FieldValue.serverTimestamp(),
+        'platform': Platform.isIOS ? 'ios' : 'android',
+        'permission_status': (await FirebaseMessaging.instance.getNotificationSettings()).authorizationStatus.toString(),
+      });
+
+      print("✅ Token saved to Firestore successfully");
+    } catch (e) {
+      print("❌ Error saving token to Firestore: $e");
     }
   }
 
@@ -116,8 +469,10 @@ class _MyAppState extends State<MyApp> {
         BlocProvider(create: (context) => RentbookCubit()),
         BlocProvider(create: (context) => TenantRentbookCubit()),
         BlocProvider(create: (context) => PaymentCubit()),
-        BlocProvider(create: (context) => MaintenanceCubit(MaintenanceService())),
-        BlocProvider(create: (context) => UtilityBillCubit(UtilityBillService())),
+        BlocProvider(
+            create: (context) => MaintenanceCubit(MaintenanceService())),
+        BlocProvider(
+            create: (context) => UtilityBillCubit(UtilityBillService())),
         BlocProvider(create: (context) => ProductCubit()),
         BlocProvider(create: (context) => FeaturedProductCubit()),
         BlocProvider(create: (context) => CategoryCubit()),
@@ -163,8 +518,11 @@ class _MyAppState extends State<MyApp> {
               AppRoutes.profile: (context) => const DashboardScreen(),
               AppRoutes.main: (context) => const MainScreen(),
               AppRoutes.chat: (context) {
-                final Map<dynamic, dynamic> rawArgs = ModalRoute.of(context)!.settings.arguments as Map<dynamic, dynamic>;
-                final Map<String, dynamic> args = Map<String, dynamic>.from(rawArgs);
+                final Map<dynamic, dynamic> rawArgs = ModalRoute.of(context)!
+                    .settings
+                    .arguments as Map<dynamic, dynamic>;
+                final Map<String, dynamic> args =
+                    Map<String, dynamic>.from(rawArgs);
                 return ChatScreen(conversation: args);
               },
             },
@@ -358,7 +716,8 @@ class HomePage extends StatelessWidget {
           Stack(
             children: [
               ClipRRect(
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(16)),
                 child: Image.network(
                   'https://images.unsplash.com/photo-1449158743715-0a90ebb6d2d8?q=80&w=2070',
                   width: double.infinity,
@@ -432,7 +791,7 @@ class HomePage extends StatelessWidget {
       'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?q=80&w=2070',
       'https://images.unsplash.com/photo-1494526585095-c41746248156?q=80&w=2070',
     ];
-    
+
     return SizedBox(
       height: 120,
       child: ListView.builder(
