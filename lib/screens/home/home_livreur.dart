@@ -157,52 +157,6 @@ class _HomeLivreurScreenState extends State<HomeLivreurScreen> {
             ),
             const SizedBox(height: 18),
             // Livraison en cours
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text('Livraison en cours', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                TextButton(
-                  onPressed: () {},
-                  child: Row(
-                    children: const [
-                      Text('Voir tout', style: TextStyle(color: AppColors.primary)),
-                      Icon(Icons.chevron_right, color: AppColors.primary, size: 18),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            Center(
-              child: Container(
-                width: double.infinity,
-                margin: const EdgeInsets.symmetric(vertical: 10),
-                padding: const EdgeInsets.symmetric(vertical: 30),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.grey.shade200),
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: const [
-                    Icon(
-                      Icons.local_shipping_outlined,
-                      size: 50,
-                      color: Colors.grey,
-                    ),
-                    SizedBox(height: 12),
-                    Text(
-                      'Aucune livraison pour vous',
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: Colors.grey,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
             const SizedBox(height: 16),
             // Carte de position livraison
             Container(

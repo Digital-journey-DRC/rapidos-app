@@ -19,10 +19,11 @@ class ProductDetailScreen extends StatefulWidget {
   final String price;
   final String imagePath;
   final void Function()? goToCartTab;
-
+  final String idVendeur;
   const ProductDetailScreen({
     Key? key,
     required this.id,
+    required this.idVendeur,
     required this.stock,
     required this.tag,
     required this.category,
@@ -93,6 +94,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       'imagePath': widget.imagePath,
       'quantity': quantity,
       'stock': widget.stock,
+      'idVendeur': widget.idVendeur,
     };
     final success = await context.read<CartCubit>().addToCart(newItem);
     if (!success) {

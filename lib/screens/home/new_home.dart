@@ -334,6 +334,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                             itemBuilder: (context, index) {
                               final product = products.reversed.toList()[index];
                               return _buildProductCard(
+                                idVendeur: product.vendeurId.toString(),
                                 stock: product.stock,
                                 id: product.id,
                                 tag: 'Nouveau',
@@ -531,6 +532,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
   }
 
   Widget _buildProductCard({
+    required String idVendeur,
     required int id,
     required String tag,
     required String category,
@@ -547,6 +549,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
               context,
               MaterialPageRoute(
                 builder: (context) => ProductDetailScreen(
+                  idVendeur: idVendeur,
                   id: id,
                   tag: tag,
                   category: category,

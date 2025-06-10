@@ -13,12 +13,10 @@ import 'package:flutter/services.dart';
 import 'package:immo/screens/dashboard/setting_screen.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:immo/cubit/order_cubit.dart';
 import 'package:immo/widgets/shimmer_loading.dart';
 import 'package:immo/cubit/category_cubit.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'dart:convert';
 
 class HomeMarchantScreen extends StatefulWidget {
   const HomeMarchantScreen({Key? key}) : super(key: key);
@@ -648,200 +646,10 @@ void saveCommande() async {
             ),
 
             // Livraisons en cours
-            const Text('Livraisons en Cours',
+            const Text('Position du livreur',
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
             const SizedBox(height: 8),
-            BlocBuilder<OrderCubit, OrderState>(
-              builder: (context, state) {
-                final orderListState = context.read<OrderCubit>().orderListState;
-                if (orderListState.isLoading) {
-                  return Column(
-                    children: const [OrderCardShimmer(), SizedBox(height: 10), OrderCardShimmer()],
-                  );
-                }
-                if (orderListState.error != null) {
-                  return Center(child: Text(orderListState.error!, style: TextStyle(color: Colors.red)));
-                }
-                final commandes = orderListState.commandes;
-                if (commandes.isEmpty) {
-                  return const Center(child: Text('Aucune livraison en cours'));
-                }
-                final lastCommandes = commandes.length > 2 ? commandes.sublist(0, 2) : commandes;
-                return Column(
-                  children: lastCommandes.map<Widget>((commande) {
-                    final commandeData = commande['commande'];
-                    final user = commandeData != null ? commandeData['user'] : null;
-                    final status = commandeData != null ? (commandeData['status'] ?? '') : '';
-                    final date = commande['createdAt']?.toString().substring(0, 10) ?? '';
-                    final product = commande['product'] ?? {};
-                    final imageUrl = product['media'] != null && product['media']['mediaUrl'] != null
-                        ? 'http://24.144.87.127:3333/${product['media']['mediaUrl']}'
-                        : 'https://via.placeholder.com/80';
-                    Color _statusColor(String status) {
-                      switch (status) {
-                        case 'en attente':
-                          return AppColors.buttonColor;
-                        case 'livrée':
-                          return Colors.green;
-                        case 'annulée':
-                          return Colors.red;
-                        default:
-                          return Colors.grey;
-                      }
-                    }
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 10),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(18),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.06),
-                            blurRadius: 10,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Timeline
-                          Container(
-                            width: 6,
-                            height: 110,
-                            margin: const EdgeInsets.only(right: 10, top: 10, bottom: 10),
-                            decoration: BoxDecoration(
-                              color: _statusColor(status),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                          // Image produit
-                          Padding(
-                            padding: const EdgeInsets.only(top: 16, left: 0, right: 10),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(14),
-                              child: Image.network(
-                                imageUrl,
-                                width: 70,
-                                height: 70,
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) {
-                                  return Container(
-                                    width: 70,
-                                    height: 70,
-                                    color: Colors.grey.shade200,
-                                    child: const Icon(Icons.image, color: Colors.grey),
-                                  );
-                                },
-                              ),
-                            ),
-                          ),
-                          // Détails commande
-                          Expanded(
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 0),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Flexible(
-                                        child: Text(
-                                          product['name'] ?? '',
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 16,
-                                            color: AppColors.primary,
-                                          ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                        decoration: BoxDecoration(
-                                          color: _statusColor(status).withOpacity(0.15),
-                                          borderRadius: BorderRadius.circular(8),
-                                        ),
-                                        child: Text(
-                                          status.isNotEmpty ? status.toUpperCase() : 'N/A',
-                                          style: TextStyle(
-                                            color: _statusColor(status),
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 12,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    product['description'] ?? '',
-                                    style: TextStyle(
-                                      color: Colors.grey.shade600,
-                                      fontSize: 13,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Row(
-                                    children: [
-                                      Text(
-                                        'Quantité : \t${commande['quantity']}',
-                                        style: const TextStyle(fontSize: 13),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      Text(
-                                        '${commande['price']} FC',
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 15,
-                                          color: AppColors.buttonColor,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 4),
-                                  if (user != null) ...[
-                                    const Icon(Icons.person, size: 14, color: AppColors.primary),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      '${user['firstName'] ?? ''} ${user['lastName'] ?? ''}',
-                                      style: const TextStyle(fontSize: 13),
-                                    ),
-                                  ],
-                                  const SizedBox(height: 2),
-                                  Row(
-                                    children: [
-                                      const Icon(Icons.calendar_today, size: 13, color: Colors.grey),
-                                      const SizedBox(width: 4),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                        decoration: BoxDecoration(
-                                          color: AppColors.buttonColor.withOpacity(0.13),
-                                          borderRadius: BorderRadius.circular(6),
-                                        ),
-                                        child: Text(
-                                          date,
-                                          style: const TextStyle(fontSize: 12, color: AppColors.buttonColor),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  }).toList(),
-                );
-              },
-            ),
-
+        
             // Carte de livraison
             const SizedBox(height: 18),
             // Carte de livraison

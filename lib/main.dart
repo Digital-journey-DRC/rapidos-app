@@ -44,32 +44,92 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'firebase_options.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:io';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
+import 'package:audioplayers/audioplayers.dart';
+
+final AudioPlayer _audioPlayer = AudioPlayer();
 
 class FirebaseMessagingService {
   static final FirebaseMessagingService _instance = FirebaseMessagingService._internal();
   factory FirebaseMessagingService() => _instance;
   FirebaseMessagingService._internal();
 
+  final FirebaseMessaging _firebaseMessaging = FirebaseMessaging.instance;
+
+  static Future<void> saveTokenToFirestore(String token, AuthState authState) async {
+    try {
+      String? userId;
+      String? role;
+
+      if (authState is AuthSuccess && authState.user != null) {
+        print('📱 AuthState user data: ${authState.user}');
+        userId = authState.user!['id']?.toString();
+        role = authState.user!['role'];
+        print('📱 From AuthState - userId: $userId, role: $role');
+      } else {
+        // Si l'état d'authentification n'a pas les données, essayer de les récupérer depuis SharedPreferences
+        final prefs = await SharedPreferences.getInstance();
+        final userDataStr = prefs.getString('user_data');
+        print('📱 SharedPreferences user data: $userDataStr');
+        
+        if (userDataStr != null) {
+          try {
+            final userData = jsonDecode(userDataStr);
+            print('📱 Parsed user data: $userData');
+            userId = userData['id']?.toString();
+            role = userData['role'];
+            print('📱 From SharedPreferences - userId: $userId, role: $role');
+          } catch (e) {
+            print('❌ Error parsing user data from SharedPreferences: $e');
+          }
+        }
+      }
+
+      final docRef = FirebaseFirestore.instance.collection('tokens').doc(token);
+      await docRef.set({
+        'token': token,
+        'timestamp': FieldValue.serverTimestamp(),
+        'platform': Platform.isIOS ? 'ios' : 'android',
+        'role': role ?? 'user',
+        'userId': userId ?? '1',
+        'permission_status': (await FirebaseMessaging.instance.getNotificationSettings()).authorizationStatus.toString(),
+      });
+
+      print("✅ Token saved to Firestore successfully");
+    } catch (e) {
+      print("❌ Error saving token to Firestore: $e");
+    }
+  }
+
   Future<void> initialize() async {
     try {
       print("🚀 Initializing Firebase Messaging Service...");
-      FirebaseMessaging messaging = FirebaseMessaging.instance;
       
-      // Request permission first
-      NotificationSettings settings = await messaging.requestPermission(
+      // Demander la permission pour les notifications
+      NotificationSettings settings = await _firebaseMessaging.requestPermission(
         alert: true,
         badge: true,
         sound: true,
-        provisional: true,
       );
 
-      print("📱 Notification settings: ${settings.authorizationStatus}");
+      print('User granted permission: ${settings.authorizationStatus}');
+
+      // Configurer le gestionnaire de messages en premier plan
+      FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+        print('📩 Message reçu en premier plan: ${message.notification?.title}');
+        _audioPlayer.play(AssetSource('assets/notif.mp3'));
+      });
+
+      // Obtenir le token FCM
+      String? token = await _firebaseMessaging.getToken();
+      print('FCM Token: $token');
 
       if (settings.authorizationStatus == AuthorizationStatus.authorized ||
           settings.authorizationStatus == AuthorizationStatus.provisional) {
         
         // Set foreground notification presentation options
-        await messaging.setForegroundNotificationPresentationOptions(
+        await _firebaseMessaging.setForegroundNotificationPresentationOptions(
           alert: true,
           badge: true,
           sound: true,
@@ -85,7 +145,7 @@ class FirebaseMessagingService {
           );
           
           // Get FCM token first
-          String? fcmToken = await messaging.getToken();
+          String? fcmToken = await _firebaseMessaging.getToken();
           print('📱 FCM Token: $fcmToken');
           
           // Try to get APNS token with retry mechanism
@@ -94,7 +154,7 @@ class FirebaseMessagingService {
           
           while (apnsToken == null && retryCount < 3) {
             try {
-              apnsToken = await messaging.getAPNSToken();
+              apnsToken = await _firebaseMessaging.getAPNSToken();
               print('🍎 APNS Token (attempt ${retryCount + 1}): $apnsToken');
               
               if (apnsToken == null) {
@@ -125,16 +185,16 @@ class FirebaseMessagingService {
         FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
         // Listen for token refresh
-        messaging.onTokenRefresh.listen((String token) {
+        _firebaseMessaging.onTokenRefresh.listen((String token) {
           print('🔄 FCM Token Refreshed: $token');
-          _saveTokenToFirestore(token);
+          saveTokenToFirestore(token, AuthInitial());
         });
 
         // Get initial token
-        String? token = await messaging.getToken();
-        if (token != null) {
-          print('✅ Initial FCM Token: $token');
-          await _saveTokenToFirestore(token);
+        String? initialToken = await _firebaseMessaging.getToken();
+        if (initialToken != null) {
+          print('✅ Initial FCM Token: $initialToken');
+          await saveTokenToFirestore(initialToken, AuthInitial());
         } else {
           print('⚠️ No FCM token received');
         }
@@ -171,7 +231,7 @@ class FirebaseMessagingService {
       });
 
       // Check if app was opened from a notification
-      FirebaseMessaging.instance.getInitialMessage().then((RemoteMessage? message) {
+      _firebaseMessaging.getInitialMessage().then((RemoteMessage? message) {
         if (message != null) {
           print('📨 App ouverte depuis une notification (état terminé)');
           print('📨 Message data: ${message.data}');
@@ -221,39 +281,11 @@ class FirebaseMessagingService {
       }
     }
   }
-
-  Future<void> _saveTokenToFirestore(String token) async {
-    try {
-      final docRef = FirebaseFirestore.instance.collection('tokens').doc(token);
-      await docRef.set({
-        'token': token,
-        'timestamp': FieldValue.serverTimestamp(),
-        'platform': Platform.isIOS ? 'ios' : 'android',
-        'permission_status': (await FirebaseMessaging.instance.getNotificationSettings()).authorizationStatus.toString(),
-      });
-
-      print("✅ Token saved to Firestore successfully");
-    } catch (e) {
-      print("❌ Error saving token to Firestore: $e");
-    }
-  }
 }
 
-@pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  // Ensure Firebase is initialized
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
-  
-  print('📩 Message reçu en background: ${message.notification?.title}');
-  print('📩 Message data: ${message.data}');
-  
-  // Handle the background message here
-  if (message.notification != null) {
-    // You can add custom logic here for background notifications
-    print('🔔 Notification en background: ${message.notification?.title}');
-  }
+  await Firebase.initializeApp();
+  await _audioPlayer.play(AssetSource('assets/notif.mp3'));
 }
 
 void main() async {
@@ -375,7 +407,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
           // Listen for token refresh
           messaging.onTokenRefresh.listen((String token) {
             print('🔄 FCM Token Refreshed: $token');
-            _saveTokenToFirestore(token);
+            FirebaseMessagingService.saveTokenToFirestore(token, _authCubit.state);
           });
 
           if (Platform.isIOS) {
@@ -410,7 +442,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
           String? token = await messaging.getToken();
           if (token != null) {
             print('✅ FCM Token received: $token');
-            await _saveTokenToFirestore(token);
+            await FirebaseMessagingService.saveTokenToFirestore(token, _authCubit.state);
             return; // Success, exit the retry loop
           } else {
             print('⚠️ No FCM token received');
@@ -433,22 +465,6 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
           break;
         }
       }
-    }
-  }
-
-  Future<void> _saveTokenToFirestore(String token) async {
-    try {
-      final docRef = FirebaseFirestore.instance.collection('tokens').doc(token);
-      await docRef.set({
-        'token': token,
-        'timestamp': FieldValue.serverTimestamp(),
-        'platform': Platform.isIOS ? 'ios' : 'android',
-        'permission_status': (await FirebaseMessaging.instance.getNotificationSettings()).authorizationStatus.toString(),
-      });
-
-      print("✅ Token saved to Firestore successfully");
-    } catch (e) {
-      print("❌ Error saving token to Firestore: $e");
     }
   }
 

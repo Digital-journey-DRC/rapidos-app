@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:immo/constants.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -7,10 +8,101 @@ import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:immo/cubit/cart_cubit.dart';
 import 'package:immo/cubit/order_cubit.dart';
+import 'package:immo/cubit/auth_cubit.dart';
 
 class CartScreen extends StatelessWidget {
   final bool backNavigaton;
   const CartScreen({Key? key, this.backNavigaton = true}) : super(key: key);
+
+  void saveCart(BuildContext context, List<Map<String, dynamic>> cartItems, String ville, String commune, String quartier, String avenue, String numero, String pays) async {
+    final authState = context.read<AuthCubit>().state;
+    if (authState is AuthSuccess && authState.user != null) {
+      final user = authState.user!;
+      final userId = user['id']?.toString() ?? '';
+      final userName = '${user['firstName'] ?? ''} ${user['lastName'] ?? ''}'.trim();
+      
+      // Construire l'adresse complète
+      final adresse = '$avenue, $numero, $quartier, $commune, $ville, $pays';
+
+      // Enregistrer la commande
+      DocumentReference commandeRef = await FirebaseFirestore.instance.collection('carts').add({
+        'timestamp': FieldValue.serverTimestamp(),
+        'status': 'pending',
+        'items': cartItems,
+        'client': userName,
+        'adresse': adresse, // ID du vendeur par défaut
+        'idClient': userId,
+        'ville': ville,
+        'commune': commune,
+        'quartier': quartier,
+        'avenue': avenue,
+        'numero': numero,
+        'pays': pays
+      });
+
+      print("✅ Commande enregistrée avec succès: ${commandeRef.id}");
+    } else {
+      print("❌ Utilisateur non connecté");
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Vous devez être connecté pour passer une commande'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  // Liste des villes de la RDC
+  static const List<String> villes = [
+    'Kinshasa',
+    'Lubumbashi',
+    'Mbuji-Mayi',
+    'Kananga',
+    'Kisangani',
+    'Bukavu',
+    'Goma',
+    'Kolwezi',
+    'Likasi',
+    'Matadi',
+    'Kikwit',
+    'Tshikapa',
+    'Uvira',
+    'Bunia',
+    'Kalemie',
+    'Kindu',
+    'Mbandaka',
+    'Mbanza-Ngungu',
+    'Boma',
+    'Kamina',
+  ];
+
+  // Liste des communes de Kinshasa
+  static const List<String> communesKinshasa = [
+    'Bandalungwa',
+    'Barumbu',
+    'Bumbu',
+    'Gombe',
+    'Kalamu',
+    'Kasa-Vubu',
+    'Kimbanseke',
+    'Kinshasa',
+    'Kintambo',
+    'Kisenso',
+    'Lemba',
+    'Limete',
+    'Lingwala',
+    'Makala',
+    'Maluku',
+    'Masina',
+    'Matete',
+    'Mont Ngafula',
+    'Ndjili',
+    'Ngaba',
+    'Ngaliema',
+    'Ngiri-Ngiri',
+    'Nsele',
+    'Selembao',
+  ];
 
   void _showAddressBottomSheet(BuildContext context, List<Map<String, dynamic>> cartItems) {
     final _villeController = TextEditingController();
@@ -19,7 +111,9 @@ class CartScreen extends StatelessWidget {
     final _avenueController = TextEditingController();
     final _codePostaleController = TextEditingController();
     final _numeroController = TextEditingController();
-    final _paysController = TextEditingController(text: 'Congo');
+    final _paysController = TextEditingController(text: 'RDC');
+    String? selectedVille;
+    String? selectedCommune;
 
     showModalBottomSheet(
       context: context,
@@ -28,221 +122,252 @@ class CartScreen extends StatelessWidget {
         borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
       ),
       builder: (context) {
-        return BlocConsumer<OrderCubit, OrderState>(
-          listener: (context, state) {
-            if (state.success) {
-              Navigator.pop(context); // Fermer le bottom sheet
-              context.read<CartCubit>().clearCart(); // Vider le panier
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Commande créée avec succès!'),
-                  backgroundColor: AppColors.success,
-                ),
-              );
-            } else if (state.error != null) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(state.error!),
-                  backgroundColor: Colors.red,
-                ),
-              );
-            }
-          },
-          builder: (context, state) {
-            return Padding(
-              padding: EdgeInsets.only(
-                left: 24,
-                right: 24,
-                top: 32,
-                bottom: MediaQuery.of(context).viewInsets.bottom + 24,
-              ),
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Center(
-                      child: Container(
-                        width: 40,
-                        height: 4,
-                        margin: const EdgeInsets.only(bottom: 16),
-                        decoration: BoxDecoration(
-                          color: Colors.grey[300],
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return BlocConsumer<OrderCubit, OrderState>(
+              listener: (context, state) {
+                if (state.success) {
+                  Navigator.pop(context); // Fermer le bottom sheet
+                  context.read<CartCubit>().clearCart(); // Vider le panier
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Commande créée avec succès!'),
+                      backgroundColor: AppColors.success,
                     ),
-                    const Text(
-                      'Adresse de livraison',
-                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  );
+                } else if (state.error != null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(state.error!),
+                      backgroundColor: Colors.red,
                     ),
-                    const SizedBox(height: 20),
-                    TextFormField(
-                      controller: _villeController,
-                      decoration: InputDecoration(
-                        labelText: 'Ville',
-                        prefixIcon: const Icon(Icons.location_city),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        filled: true,
-                        fillColor: Colors.white,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _communeController,
-                      decoration: InputDecoration(
-                        labelText: 'Commune',
-                        prefixIcon: const Icon(Icons.location_on),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        filled: true,
-                        fillColor: Colors.white,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _quartierController,
-                      decoration: InputDecoration(
-                        labelText: 'Quartier',
-                        prefixIcon: const Icon(Icons.map),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        filled: true,
-                        fillColor: Colors.white,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _avenueController,
-                      decoration: InputDecoration(
-                        labelText: 'Avenue',
-                        prefixIcon: const Icon(Icons.streetview),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        filled: true,
-                        fillColor: Colors.white,
-                      ),
-                    ),
-                    // const SizedBox(height: 16),
-                    // TextFormField(
-                    //   controller: _codePostaleController,
-                    //   decoration: InputDecoration(
-                    //     labelText: 'Code Postal',
-                    //     prefixIcon: const Icon(Icons.numbers),
-                    //     border: OutlineInputBorder(
-                    //       borderRadius: BorderRadius.circular(12),
-                    //     ),
-                    //     filled: true,
-                    //     fillColor: Colors.white,
-                    //   ),
-                    // ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _numeroController,
-                      decoration: InputDecoration(
-                        labelText: 'Numéro',
-                        prefixIcon: const Icon(Icons.home),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        filled: true,
-                        fillColor: Colors.white,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _paysController,
-                      enabled: false,
-                      decoration: InputDecoration(
-                        labelText: 'Pays',
-                        prefixIcon: const Icon(Icons.public),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        filled: true,
-                        fillColor: Colors.grey[100],
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 50,
-                      child: ElevatedButton(
-                        onPressed: state.isLoading
-                            ? null
-                            : () {
-                                if (_villeController.text.isEmpty ||
-                                    _communeController.text.isEmpty ||
-                                    _quartierController.text.isEmpty ||
-                                    _avenueController.text.isEmpty ||
-                                
-                                    _numeroController.text.isEmpty) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text('Veuillez remplir tous les champs'),
-                                      backgroundColor: Colors.red,
-                                    ),
-                                  );
-                                  return;
-                                }
-
-                                // Vérification de la présence de l'id sur chaque produit
-                                if (cartItems.any((item) => item['id'] == null)) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text('Un produit du panier est invalide (id manquant). Veuillez le retirer.'),
-                                      backgroundColor: Colors.red,
-                                    ),
-                                  );
-                                  return;
-                                }
-
-                                // Convertir les items du panier au format attendu par l'API
-                                final produits = cartItems.map((item) {
-                                  return {
-                                    "id": int.parse(item['id'].toString()),
-                                    "quantity": item['quantity'],
-                                  };
-                                }).toList();
-
-                                // Utilise la méthode http classique
-                                context.read<OrderCubit>().createOrder(
-                                      produits: produits,
-                                      ville: _villeController.text,
-                                      commune: _communeController.text,
-                                      quartier: _quartierController.text,
-                                      avenue: _avenueController.text,
-                                      codePostale: _codePostaleController.text,
-                                      numero: _numeroController.text,
-                                      pays: _paysController.text,
-                                    );
-                              },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                  );
+                }
+              },
+              builder: (context, state) {
+                return Padding(
+                  padding: EdgeInsets.only(
+                    left: 24,
+                    right: 24,
+                    top: 32,
+                    bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+                  ),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Center(
+                          child: Container(
+                            width: 40,
+                            height: 4,
+                            margin: const EdgeInsets.only(bottom: 16),
+                            decoration: BoxDecoration(
+                              color: Colors.grey[300],
+                              borderRadius: BorderRadius.circular(2),
+                            ),
                           ),
                         ),
-                        child: state.isLoading
-                            ? const CircularProgressIndicator(color: Colors.white)
-                            : const Text(
-                                'CONFIRMER LA COMMANDE',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
-                                ),
+                        const Text(
+                          'Adresse de livraison',
+                          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 20),
+                        DropdownButtonFormField<String>(
+                          value: selectedVille,
+                          decoration: InputDecoration(
+                            labelText: 'Ville',
+                            prefixIcon: const Icon(Icons.location_city),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            filled: true,
+                            fillColor: Colors.white,
+                          ),
+                          items: villes.map((String ville) {
+                            return DropdownMenuItem<String>(
+                              value: ville,
+                              child: Text(ville),
+                            );
+                          }).toList(),
+                          onChanged: (String? newValue) {
+                            setState(() {
+                              selectedVille = newValue;
+                              _villeController.text = newValue ?? '';
+                              // Réinitialiser la commune si la ville change
+                              selectedCommune = null;
+                              _communeController.text = '';
+                            });
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                        DropdownButtonFormField<String>(
+                          value: selectedCommune,
+                          decoration: InputDecoration(
+                            labelText: 'Commune',
+                            prefixIcon: const Icon(Icons.location_on),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            filled: true,
+                            fillColor: Colors.white,
+                          ),
+                          items: selectedVille == 'Kinshasa' 
+                              ? communesKinshasa.map((String commune) {
+                                  return DropdownMenuItem<String>(
+                                    value: commune,
+                                    child: Text(commune),
+                                  );
+                                }).toList()
+                              : [], // Liste vide pour les autres villes
+                          onChanged: (String? newValue) {
+                            setState(() {
+                              selectedCommune = newValue;
+                              _communeController.text = newValue ?? '';
+                            });
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          controller: _quartierController,
+                          decoration: InputDecoration(
+                            labelText: 'Quartier',
+                            prefixIcon: const Icon(Icons.map),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            filled: true,
+                            fillColor: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          controller: _avenueController,
+                          decoration: InputDecoration(
+                            labelText: 'Avenue',
+                            prefixIcon: const Icon(Icons.streetview),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            filled: true,
+                            fillColor: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          controller: _numeroController,
+                          decoration: InputDecoration(
+                            labelText: 'Numéro',
+                            prefixIcon: const Icon(Icons.home),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            filled: true,
+                            fillColor: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          controller: _paysController,
+                          enabled: false,
+                          decoration: InputDecoration(
+                            labelText: 'Pays',
+                            prefixIcon: const Icon(Icons.public),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            filled: true,
+                            fillColor: Colors.grey[100],
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 50,
+                          child: ElevatedButton(
+                            onPressed: state.isLoading
+                                ? null
+                                : () {
+                                    if (_villeController.text.isEmpty ||
+                                        _communeController.text.isEmpty ||
+                                        _quartierController.text.isEmpty ||
+                                        _avenueController.text.isEmpty ||
+                                        _numeroController.text.isEmpty) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text('Veuillez remplir tous les champs'),
+                                          backgroundColor: Colors.red,
+                                        ),
+                                      );
+                                      return;
+                                    }
+
+                                    // Vérification de la présence de l'id sur chaque produit
+                                    if (cartItems.any((item) => item['id'] == null)) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text('Un produit du panier est invalide (id manquant). Veuillez le retirer.'),
+                                          backgroundColor: Colors.red,
+                                        ),
+                                      );
+                                      return;
+                                    }
+
+                                    // Convertir les items du panier au format attendu par l'API
+                                    final produits = cartItems.map((item) {
+                                      return {
+                                        "id": int.parse(item['id'].toString()),
+                                        "quantity": item['quantity'],
+                                      };
+                                    }).toList();
+
+                                    // Utilise la méthode http classique
+                                    context.read<OrderCubit>().createOrder(
+                                          produits: produits,
+                                          ville: _villeController.text,
+                                          commune: _communeController.text,
+                                          quartier: _quartierController.text,
+                                          avenue: _avenueController.text,
+                                          codePostale: _codePostaleController.text,
+                                          numero: _numeroController.text,
+                                          pays: _paysController.text,
+                                        );
+                                        
+                                    // Enregistrer dans Firebase
+                                    saveCart(
+                                      context,
+                                      cartItems,
+                                      _villeController.text,
+                                      _communeController.text,
+                                      _quartierController.text,
+                                      _avenueController.text,
+                                      _numeroController.text,
+                                      _paysController.text
+                                    );
+                                  },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primary,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
                               ),
-                      ),
+                            ),
+                            child: state.isLoading
+                                ? const CircularProgressIndicator(color: Colors.white)
+                                : const Text(
+                                    'CONFIRMER LA COMMANDE',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-              ),
+                  ),
+                );
+              },
             );
           },
         );

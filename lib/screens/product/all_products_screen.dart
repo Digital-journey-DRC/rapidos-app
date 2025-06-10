@@ -80,6 +80,7 @@ class _TwitterStyleProductCard extends StatelessWidget {
           context,
           MaterialPageRoute(
             builder: (context) => ProductDetailScreen(
+              idVendeur: product.vendeurId.toString(),
               id: product.id,
               tag: 'Nouveau',
               stock: product.stock,

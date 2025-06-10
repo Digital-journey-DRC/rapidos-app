@@ -53,6 +53,7 @@ class FavorisScreen extends StatelessWidget {
                       context,
                       MaterialPageRoute(
                         builder: (context) => ProductDetailScreen(
+                          idVendeur: product['vendeurId'],
                           id: product['id'],
                           tag: 'Favori',
                           stock: product['stock'],

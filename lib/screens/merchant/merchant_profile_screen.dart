@@ -347,6 +347,7 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> with Sing
       itemBuilder: (context, index) {
         final product = products[index];
         return _buildProductItem(
+          idVendeur: product['vendeurId'] ?? '',
           stock: product['stock'] ?? 0,
           id: product['id'] ?? index,
           name: product['name'] ?? '',
@@ -362,6 +363,7 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> with Sing
   }
 
   Widget _buildProductItem({
+    required String idVendeur,
     required int id,
     required String name,
     required String price,
@@ -376,6 +378,7 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> with Sing
           context,
           MaterialPageRoute(
             builder: (context) => ProductDetailScreen(
+              idVendeur: idVendeur,
               stock: stock,
               id: id,
               tag: tag,
