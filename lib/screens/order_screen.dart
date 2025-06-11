@@ -6,6 +6,7 @@ import 'package:immo/cubit/order_cubit.dart';
 import 'package:immo/widgets/shimmer_loading.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import 'package:immo/screens/order_details_screen.dart';
 
 class OrderScreen extends StatefulWidget {
   const OrderScreen({Key? key}) : super(key: key);
@@ -176,6 +177,8 @@ class _OrderScreenState extends State<OrderScreen> {
           padding: const EdgeInsets.all(16),
           separatorBuilder: (_, __) => const SizedBox(height: 10),
           itemCount: sortedDocs.length,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
           itemBuilder: (context, index) {
             try {
               final doc = sortedDocs[index];
@@ -204,7 +207,15 @@ class _OrderScreenState extends State<OrderScreen> {
               return InkWell(
                 borderRadius: BorderRadius.circular(18),
                 onTap: () {
-                  // TODO: Ajouter la navigation vers les détails de la commande
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => OrderDetailsScreen(
+                        orderData: data,
+                        orderId: doc.id,
+                      ),
+                    ),
+                  );
                 },
                 child: Stack(
                   children: [
@@ -413,71 +424,9 @@ class _OrderScreenState extends State<OrderScreen> {
                                                 await FirebaseFirestore.instance
                                                     .collection('carts')
                                                     .doc(doc.id)
-                                                    .update({'status': 'en route pour livraison'});
+                                                    .update({'status': 'a la recherche du livreur'});
                                                 if (mounted) {
                                                   setState(() {}); // Force refresh
-                                                  ScaffoldMessenger.of(context).showSnackBar(
-                                                    const SnackBar(
-                                                      content: Text('Commande marquée comme prête pour livraison'),
-                                                      backgroundColor: Colors.green,
-                                                    ),
-                                                  );
-                                                }
-                                              } catch (e) {
-                                                if (mounted) {
-                                                  ScaffoldMessenger.of(context).showSnackBar(
-                                                    SnackBar(
-                                                      content: Text('Erreur: $e'),
-                                                      backgroundColor: Colors.red,
-                                                    ),
-                                                  );
-                                                }
-                                              }
-                                            },
-                                            style: ElevatedButton.styleFrom(
-                                              backgroundColor: AppColors.buttonColor2,
-                                              foregroundColor: Colors.white,
-                                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                              shape: RoundedRectangleBorder(
-                                                borderRadius: BorderRadius.circular(8),
-                                              ),
-                                              elevation: 2,
-                                            ),
-                                            child: const Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                Icon(Icons.local_shipping_outlined, size: 16, color: Colors.white),
-                                                SizedBox(width: 4),
-                                                Text(
-                                                  'Prêt pour livraison',
-                                                  style: TextStyle(
-                                                    fontSize: 12,
-                                                    fontWeight: FontWeight.bold,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        ),
-                                      if (status.toLowerCase() == 'pending')
-                                        Container(
-                                          margin: const EdgeInsets.only(right: 16),
-                                          child: ElevatedButton(
-                                            onPressed: () async {
-                                              try {
-                                                // Mettre à jour le statut dans Firestore
-                                                await FirebaseFirestore.instance
-                                                    .collection('carts')
-                                                    .doc(doc.id)
-                                                    .update({'status': 'a la recherche du livreur'});
-                                                
-                                                if (mounted) {
-                                                  // Forcer le rafraîchissement de l'interface
-                                                  setState(() {
-                                                    // Mettre à jour le statut localement
-                                                    data['status'] = 'a la recherche du livreur';
-                                                  });
-                                                  
                                                   ScaffoldMessenger.of(context).showSnackBar(
                                                     const SnackBar(
                                                       content: Text('Commande en attente de livreur'),
@@ -894,6 +843,8 @@ class _OrderScreenState extends State<OrderScreen> {
           padding: const EdgeInsets.all(16),
           separatorBuilder: (_, __) => const SizedBox(height: 10),
           itemCount: filteredDocs.length,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
           itemBuilder: (context, index) {
             try {
               final doc = filteredDocs[index];
@@ -924,7 +875,15 @@ class _OrderScreenState extends State<OrderScreen> {
               return InkWell(
                 borderRadius: BorderRadius.circular(18),
                 onTap: () {
-                  // TODO: Ajouter la navigation vers les détails de la commande
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => OrderDetailsScreen(
+                        orderData: data,
+                        orderId: doc.id,
+                      ),
+                    ),
+                  );
                 },
                 child: Stack(
                   children: [
@@ -1053,6 +1012,81 @@ class _OrderScreenState extends State<OrderScreen> {
                                         Container(
                                           margin: const EdgeInsets.only(right: 16),
                                           child: ElevatedButton(
+                                            onPressed: () {
+                                              showDialog(
+                                                context: context,
+                                                builder: (context) => AlertDialog(
+                                                  title: const Text('Annuler la commande'),
+                                                  content: const Text('Êtes-vous sûr de vouloir annuler cette commande ?'),
+                                                  actions: [
+                                                    TextButton(
+                                                      onPressed: () => Navigator.pop(context),
+                                                      child: const Text('NON'),
+                                                    ),
+                                                    TextButton(
+                                                      onPressed: () async {
+                                                        try {
+                                                          await FirebaseFirestore.instance
+                                                              .collection('carts')
+                                                              .doc(doc.id)
+                                                              .update({'status': 'cancelled'});
+                                                          if (mounted) {
+                                                            Navigator.pop(context);
+                                                            setState(() {}); // Force refresh
+                                                            ScaffoldMessenger.of(context).showSnackBar(
+                                                              const SnackBar(
+                                                                content: Text('Commande annulée avec succès'),
+                                                                backgroundColor: Colors.green,
+                                                              ),
+                                                            );
+                                                          }
+                                                        } catch (e) {
+                                                          if (mounted) {
+                                                            Navigator.pop(context);
+                                                            ScaffoldMessenger.of(context).showSnackBar(
+                                                              SnackBar(
+                                                                content: Text('Erreur lors de l\'annulation: $e'),
+                                                                backgroundColor: Colors.red,
+                                                              ),
+                                                            );
+                                                          }
+                                                        }
+                                                      },
+                                                      child: const Text('OUI'),
+                                                    ),
+                                                  ],
+                                                ),
+                                              );
+                                            },
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: Colors.red,
+                                              foregroundColor: Colors.white,
+                                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius: BorderRadius.circular(8),
+                                              ),
+                                              elevation: 2,
+                                            ),
+                                            child: const Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(Icons.cancel_outlined, size: 16, color: Colors.white),
+                                                SizedBox(width: 4),
+                                                Text(
+                                                  'Annuler',
+                                                  style: TextStyle(
+                                                    fontSize: 12,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      if (authState.user!['role'] == 'vendeur' && status.toLowerCase() == 'pending')
+                                        Container(
+                                          margin: const EdgeInsets.only(right: 16),
+                                          child: ElevatedButton(
                                             onPressed: () async {
                                               try {
                                                 await FirebaseFirestore.instance
@@ -1080,7 +1114,7 @@ class _OrderScreenState extends State<OrderScreen> {
                                               }
                                             },
                                             style: ElevatedButton.styleFrom(
-                                              backgroundColor: Colors.orange,
+                                              backgroundColor: AppColors.buttonColor2,
                                               foregroundColor: Colors.white,
                                               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                                               shape: RoundedRectangleBorder(

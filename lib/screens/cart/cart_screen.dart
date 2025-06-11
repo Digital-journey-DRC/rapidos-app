@@ -28,6 +28,7 @@ class CartScreen extends StatelessWidget {
       DocumentReference commandeRef = await FirebaseFirestore.instance.collection('carts').add({
         'timestamp': FieldValue.serverTimestamp(),
         'status': 'pending',
+        'phone': user['phone'] ?? '',
         'items': cartItems,
         'client': userName,
         'adresse': adresse, // ID du vendeur par défaut

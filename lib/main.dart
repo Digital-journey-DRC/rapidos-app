@@ -29,6 +29,7 @@ import 'package:immo/services/listing_service.dart';
 import 'package:immo/services/maintenance_service.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:immo/services/utility_bill_service.dart';
+import 'package:just_audio/just_audio.dart';
 import 'repository/favorites_repository.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'services/payment_storage_service.dart';
@@ -46,9 +47,8 @@ import 'package:flutter/foundation.dart';
 import 'dart:io';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
-import 'package:audioplayers/audioplayers.dart';
 
-final AudioPlayer _audioPlayer = AudioPlayer();
+AudioPlayer player = AudioPlayer();
 
 class FirebaseMessagingService {
   static final FirebaseMessagingService _instance = FirebaseMessagingService._internal();
@@ -118,7 +118,7 @@ class FirebaseMessagingService {
       // Configurer le gestionnaire de messages en premier plan
       FirebaseMessaging.onMessage.listen((RemoteMessage message) {
         print('📩 Message reçu en premier plan: ${message.notification?.title}');
-        _audioPlayer.play(AssetSource('assets/notif.mp3'));
+        
       });
 
       // Obtenir le token FCM
@@ -285,7 +285,6 @@ class FirebaseMessagingService {
 
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
-  await _audioPlayer.play(AssetSource('assets/notif.mp3'));
 }
 
 void main() async {
