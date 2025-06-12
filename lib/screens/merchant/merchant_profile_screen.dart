@@ -347,16 +347,16 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> with Sing
       itemBuilder: (context, index) {
         final product = products[index];
         return _buildProductItem(
-          idVendeur: product['vendeurId'] ?? '',
-          stock: product['stock'] ?? 0,
-          id: product['id'] ?? index,
-          name: product['name'] ?? '',
+          idVendeur: product['vendeurId']?.toString() ?? '',
+          stock: int.tryParse(product['stock']?.toString() ?? '0') ?? 0,
+          id: int.tryParse(product['id']?.toString() ?? index.toString()) ?? index,
+          name: product['name']?.toString() ?? '',
           price: product['price'] != null ? '${product['price']} FC' : '',
           imagePath: product['media'] != null && product['media']['mediaUrl'] != null
-              ? 'http://24.144.87.127:3333/${product['media']['mediaUrl']}'
+              ? product['media']['mediaUrl']
               : 'https://via.placeholder.com/150',
           tag: 'Produit',
-          category: product['description'] ?? '',
+          category: product['description']?.toString() ?? '',
         );
       },
     );

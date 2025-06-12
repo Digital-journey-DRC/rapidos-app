@@ -158,28 +158,37 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                       border: Border.all(color: Colors.grey.shade300),
                       borderRadius: BorderRadius.circular(4),
                     ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            decoration: InputDecoration(
-                              hintText: 'Recherche',
-                              contentPadding:
-                                  const EdgeInsets.symmetric(horizontal: 16),
-                              border: InputBorder.none,
-                              hintStyle: TextStyle(
-                                  color: Colors.grey.shade500, fontSize: 14),
+                    child: GestureDetector(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const AllMerchantsScreen(),
+                          ),
+                        );
+                      },
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 16),
+                              child: Text(
+                                'Recherche',
+                                style: TextStyle(
+                                  color: Colors.grey.shade500,
+                                  fontSize: 14,
+                                ),
+                              ),
                             ),
                           ),
-                        ),
-                        Container(
-                          color: AppColors.primary,
-                          height: 40,
-                          width: 40,
-                          child: const Icon(Icons.search,
-                              color: Colors.white, size: 20),
-                        ),
-                      ],
+                          Container(
+                            color: AppColors.primary,
+                            height: 40,
+                            width: 40,
+                            child: const Icon(Icons.search, color: Colors.white, size: 20),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                   const SizedBox(height: 20),
