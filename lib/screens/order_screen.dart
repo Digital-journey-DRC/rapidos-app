@@ -7,6 +7,7 @@ import 'package:immo/widgets/shimmer_loading.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:immo/screens/order_details_screen.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class OrderScreen extends StatefulWidget {
   final bool backNavigation;
@@ -56,8 +57,12 @@ class _OrderScreenState extends State<OrderScreen> {
         return Colors.red;
       case 'en route pour livraison':
         return Colors.green;
-      case 'a la recherche du livreur':
+      case 'prêt a expédié':
         return Colors.blue;
+      case 'colis en cours de préparation':
+        return Colors.orange;
+      case 'rejected':
+        return Colors.red;
       default:
         return Colors.grey;
     }
@@ -79,11 +84,182 @@ class _OrderScreenState extends State<OrderScreen> {
         return 'ANNULÉ';
       case 'en route pour livraison':
         return 'EN ROUTE';
-      case 'a la recherche du livreur':
-        return 'RECHERCHE LIVREUR';
+      case 'prêt a expédié':
+        return 'PRÊT À EXPÉDIER';
+      case 'colis en cours de préparation':
+        return 'EN PRÉPARATION';
       default:
         return status.toUpperCase();
     }
+  }
+
+  void _showExpeditionDialog(BuildContext context, String docId) {
+    bool isChecked = false;
+    String? photoPath;
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setState) => Dialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Container(
+              width: MediaQuery.of(context).size.width * 0.9,
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Confirmation d\'expédition',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Row(
+                    children: [
+                      Checkbox(
+                        value: isChecked,
+                        onChanged: (value) {
+                          setState(() {
+                            isChecked = value ?? false;
+                          });
+                        },
+                      ),
+                      const Expanded(
+                        child: Text(
+                          'J\'ai inscrit le numéro de la commande, le nom et l\'adresse de livraison dans le colis',
+                          style: TextStyle(fontSize: 14),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  const Text(
+                    'Photo du colis',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Container(
+                    width: double.infinity,
+                    height: 200,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.grey.shade300),
+                    ),
+                    child: photoPath == null
+                        ? Center(
+                            child: IconButton(
+                              icon: const Icon(Icons.camera_alt, size: 40, color: Colors.grey),
+                              onPressed: () async {
+                                // TODO: Implémenter la capture de photo
+                                // Pour l'instant, on simule avec un chemin
+                                setState(() {
+                                  photoPath = 'temp_path';
+                                });
+                              },
+                            ),
+                          )
+                        : Stack(
+                            children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: Image.network(
+                                  photoPath!,
+                                  width: double.infinity,
+                                  height: 200,
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
+                              Positioned(
+                                top: 8,
+                                right: 8,
+                                child: IconButton(
+                                  icon: const Icon(Icons.close, color: Colors.white),
+                                  onPressed: () {
+                                    setState(() {
+                                      photoPath = null;
+                                    });
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+                  ),
+                  const SizedBox(height: 24),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text(
+                          'ANNULER',
+                          style: TextStyle(color: Colors.grey),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      ElevatedButton(
+                        onPressed: isChecked && photoPath != null
+                            ? () async {
+                                try {
+                                  await FirebaseFirestore.instance
+                                      .collection('carts')
+                                      .doc(docId)
+                                      .update({
+                                    'status': 'prêt a expédié',
+                                    'timestamp': FieldValue.serverTimestamp(),
+                                    'packagePhoto': photoPath,
+                                  });
+
+                                  if (mounted) {
+                                    Navigator.pop(context);
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Commande expédiée avec succès'),
+                                        backgroundColor: Colors.green,
+                                      ),
+                                    );
+                                  }
+                                } catch (e) {
+                                  if (mounted) {
+                                    Navigator.pop(context);
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text('Erreur: $e'),
+                                        backgroundColor: Colors.red,
+                                      ),
+                                    );
+                                  }
+                                }
+                              }
+                            : null,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        child: const Text('Rapidos'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -531,7 +707,7 @@ class _OrderScreenState extends State<OrderScreen> {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance.collection('carts').where('status',
           whereIn: [
-            'a la recherche du livreur',
+            'prêt a expédié',
             'en route pour livraison'
           ]).snapshots(),
       builder: (context, snapshot) {
@@ -747,43 +923,11 @@ class _OrderScreenState extends State<OrderScreen> {
                     Padding(
                       padding: const EdgeInsets.all(8.0),
                       child: ElevatedButton(
-                        onPressed: status == 'a la recherche du livreur'
-                            ? () async {
-                                try {
-                                  await FirebaseFirestore.instance
-                                      .collection('carts')
-                                      .doc(doc.id)
-                                      .update({
-                                    'status': 'en route pour livraison',
-                                    'livreurId': authState.user!['id'],
-                                    'livreurName': authState.user!['name'],
-                                    'timestamp': FieldValue.serverTimestamp(),
-                                  });
-
-                                  if (mounted) {
-                                    setState(() {});
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text(
-                                            'Commande acceptée avec succès'),
-                                        backgroundColor: Colors.green,
-                                      ),
-                                    );
-                                  }
-                                } catch (e) {
-                                  if (mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text('Erreur: $e'),
-                                        backgroundColor: Colors.red,
-                                      ),
-                                    );
-                                  }
-                                }
-                              }
+                        onPressed: status == 'prêt a expédié'
+                            ? () => _showExpeditionDialog(context, doc.id)
                             : null,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: status == 'a la recherche du livreur'
+                          backgroundColor: status == 'prêt a expédié'
                               ? AppColors.primary
                               : Colors.grey,
                           shape: RoundedRectangleBorder(
@@ -792,7 +936,7 @@ class _OrderScreenState extends State<OrderScreen> {
                           minimumSize: const Size(double.infinity, 40),
                         ),
                         child: Text(
-                          status == 'a la recherche du livreur'
+                          status == 'prêt a expédié'
                               ? 'Accepter la livraison'
                               : 'En cours de livraison',
                           style: const TextStyle(color: Colors.white),
@@ -1097,196 +1241,349 @@ class _OrderScreenState extends State<OrderScreen> {
                                     ],
                                   ),
                                   const SizedBox(height: 8),
-                                  if (status.toLowerCase() == 'pending')
+                                  if (items.isNotEmpty && firstItem != null) ...[
                                     Row(
-                                      mainAxisAlignment: MainAxisAlignment.end,
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                       children: [
-                                        if (authState.user!['role'] ==
-                                            'vendeur')
-                                          Container(
-                                            margin:
-                                                const EdgeInsets.only(right: 8),
-                                            child: ElevatedButton(
-                                              onPressed: () async {
-                                                try {
-                                                  await FirebaseFirestore
-                                                      .instance
-                                                      .collection('carts')
-                                                      .doc(doc.id)
-                                                      .update({
-                                                    'status':
-                                                        'a la recherche du livreur'
-                                                  });
-
-                                                  saveCommande();
-                                                  if (mounted) {
-                                                    setState(
-                                                        () {}); // Force refresh
-                                                    ScaffoldMessenger.of(
-                                                            context)
-                                                        .showSnackBar(
-                                                      const SnackBar(
-                                                        content: Text(
-                                                            'Commande en attente de livreur'),
-                                                        backgroundColor:
-                                                            Colors.green,
-                                                      ),
-                                                    );
-                                                  }
-                                                } catch (e) {
-                                                  if (mounted) {
-                                                    ScaffoldMessenger.of(
-                                                            context)
-                                                        .showSnackBar(
-                                                      SnackBar(
-                                                        content:
-                                                            Text('Erreur: $e'),
-                                                        backgroundColor:
-                                                            Colors.red,
-                                                      ),
-                                                    );
-                                                  }
-                                                }
-                                              },
-                                              style: ElevatedButton.styleFrom(
-                                                backgroundColor:
-                                                    AppColors.buttonColor2,
-                                                foregroundColor: Colors.white,
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                        horizontal: 12,
-                                                        vertical: 8),
-                                                shape: RoundedRectangleBorder(
-                                                  borderRadius:
-                                                      BorderRadius.circular(8),
-                                                ),
-                                                elevation: 2,
-                                              ),
-                                              child: const Row(
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: [
-                                                  Icon(
-                                                      Icons
-                                                          .local_shipping_outlined,
-                                                      size: 16,
-                                                      color: Colors.white),
-                                                  SizedBox(width: 4),
-                                                  Text(
-                                                    'Prêt pour livraison',
-                                                    style: TextStyle(
-                                                      fontSize: 12,
-                                                      fontWeight:
-                                                          FontWeight.bold,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                          ),
-                                        Container(
-                                          constraints: const BoxConstraints(
-                                              maxWidth: 100),
-                                          child: ElevatedButton(
-                                            onPressed: () {
-                                              showDialog(
-                                                context: context,
-                                                builder: (context) =>
-                                                    AlertDialog(
-                                                  title: const Text(
-                                                      'Annuler la commande'),
-                                                  content: const Text(
-                                                      'Êtes-vous sûr de vouloir annuler cette commande ?'),
-                                                  actions: [
-                                                    TextButton(
-                                                      onPressed: () =>
-                                                          Navigator.pop(
-                                                              context),
-                                                      child: const Text('NON'),
-                                                    ),
-                                                    TextButton(
-                                                      onPressed: () async {
-                                                        try {
-                                                          await FirebaseFirestore
-                                                              .instance
-                                                              .collection(
-                                                                  'carts')
-                                                              .doc(doc.id)
-                                                              .update({
-                                                            'status':
-                                                                'cancelled'
-                                                          });
-                                                          if (mounted) {
-                                                            Navigator.pop(
-                                                                context);
-                                                            setState(
-                                                                () {}); // Force refresh
-                                                            ScaffoldMessenger
-                                                                    .of(context)
-                                                                .showSnackBar(
-                                                              const SnackBar(
-                                                                content: Text(
-                                                                    'Commande annulée avec succès'),
-                                                                backgroundColor:
-                                                                    Colors
-                                                                        .green,
-                                                              ),
-                                                            );
-                                                          }
-                                                        } catch (e) {
-                                                          if (mounted) {
-                                                            Navigator.pop(
-                                                                context);
-                                                            ScaffoldMessenger
-                                                                    .of(context)
-                                                                .showSnackBar(
-                                                              SnackBar(
-                                                                content: Text(
-                                                                    'Erreur lors de l\'annulation: $e'),
-                                                                backgroundColor:
-                                                                    Colors.red,
-                                                              ),
-                                                            );
-                                                          }
-                                                        }
-                                                      },
-                                                      child: const Text('OUI'),
-                                                    ),
-                                                  ],
-                                                ),
-                                              );
-                                            },
-                                            style: ElevatedButton.styleFrom(
-                                              backgroundColor: Colors.red,
-                                              foregroundColor: Colors.white,
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                      horizontal: 8,
-                                                      vertical: 8),
-                                              shape: RoundedRectangleBorder(
-                                                borderRadius:
-                                                    BorderRadius.circular(8),
-                                              ),
-                                              elevation: 2,
-                                            ),
-                                            child: const Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                Icon(Icons.cancel_outlined,
-                                                    size: 16,
-                                                    color: Colors.white),
-                                                SizedBox(width: 4),
-                                                Text(
-                                                  'Annuler',
-                                                  style: TextStyle(
-                                                    fontSize: 12,
-                                                    fontWeight: FontWeight.bold,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
+                                        Text(
+                                          'Quantité: ${firstItem['quantity'] ?? 1}',
+                                          style: const TextStyle(fontSize: 13),
+                                        ),
+                                        Text(
+                                          '${firstItem['price'] ?? 0} FC',
+                                          style: const TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.bold,
+                                            color: AppColors.primary,
                                           ),
                                         ),
                                       ],
+                                    ),
+                                  ],
+                                  // Boutons d'action pour le vendeur
+                                  if (authState.user!['role'] == 'vendeur')
+                                    Padding(
+                                      padding: const EdgeInsets.only(right: 16),
+                                      child: Column(
+                                        children: [
+                                          if (status == 'pending') ...[
+                                            SizedBox(
+                                              width: double.infinity,
+                                              child: ElevatedButton(
+                                                onPressed: () async {
+                                                  try {
+                                                    await FirebaseFirestore.instance
+                                                        .collection('carts')
+                                                        .doc(doc.id)
+                                                        .update({
+                                                      'status': 'colis en cours de préparation',
+                                                      'timestamp': FieldValue.serverTimestamp(),
+                                                    });
+
+                                                    if (mounted) {
+                                                      setState(() {});
+                                                      ScaffoldMessenger.of(context).showSnackBar(
+                                                        const SnackBar(
+                                                          content: Text('Commande acceptée et en cours de préparation'),
+                                                          backgroundColor: Colors.green,
+                                                        ),
+                                                      );
+                                                    }
+                                                  } catch (e) {
+                                                    if (mounted) {
+                                                      ScaffoldMessenger.of(context).showSnackBar(
+                                                        SnackBar(
+                                                          content: Text('Erreur: $e'),
+                                                          backgroundColor: Colors.red,
+                                                        ),
+                                                      );
+                                                    }
+                                                  }
+                                                },
+                                                style: ElevatedButton.styleFrom(
+                                                  backgroundColor: Colors.green,
+                                                  foregroundColor: Colors.white,
+                                                  padding: const EdgeInsets.symmetric(vertical: 8),
+                                                  shape: RoundedRectangleBorder(
+                                                    borderRadius: BorderRadius.circular(8),
+                                                  ),
+                                                ),
+                                                child: const Text('Accepter'),
+                                              ),
+                                            ),
+                                            const SizedBox(height: 8),
+                                            SizedBox(
+                                              width: double.infinity,
+                                              child: ElevatedButton(
+                                                onPressed: () {
+                                                  showDialog(
+                                                    context: context,
+                                                    builder: (context) {
+                                                      final TextEditingController reasonController = TextEditingController();
+                                                      return Dialog(
+                                                        shape: RoundedRectangleBorder(
+                                                          borderRadius: BorderRadius.circular(16),
+                                                        ),
+                                                        child: Container(
+                                                          width: MediaQuery.of(context).size.width * 0.9,
+                                                          padding: const EdgeInsets.all(20),
+                                                          child: Column(
+                                                            mainAxisSize: MainAxisSize.min,
+                                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                                            children: [
+                                                              const Text(
+                                                                'Rejeter la commande',
+                                                                style: TextStyle(
+                                                                  fontSize: 18,
+                                                                  fontWeight: FontWeight.bold,
+                                                                ),
+                                                              ),
+                                                              const SizedBox(height: 20),
+                                                              const Text(
+                                                                'Veuillez expliquer la raison du rejet :',
+                                                                style: TextStyle(fontSize: 14),
+                                                              ),
+                                                              const SizedBox(height: 16),
+                                                              TextField(
+                                                                controller: reasonController,
+                                                                maxLines: 3,
+                                                                decoration: InputDecoration(
+                                                                  hintText: 'Entrez la raison du rejet...',
+                                                                  border: OutlineInputBorder(
+                                                                    borderRadius: BorderRadius.circular(8),
+                                                                  ),
+                                                                  filled: true,
+                                                                  fillColor: Colors.grey.shade50,
+                                                                ),
+                                                              ),
+                                                              const SizedBox(height: 24),
+                                                              Row(
+                                                                mainAxisAlignment: MainAxisAlignment.end,
+                                                                children: [
+                                                                  TextButton(
+                                                                    onPressed: () => Navigator.pop(context),
+                                                                    child: const Text(
+                                                                      'ANNULER',
+                                                                      style: TextStyle(color: Colors.grey),
+                                                                    ),
+                                                                  ),
+                                                                  const SizedBox(width: 16),
+                                                                  ElevatedButton(
+                                                                    onPressed: () async {
+                                                                      if (reasonController.text.trim().isEmpty) {
+                                                                        ScaffoldMessenger.of(context).showSnackBar(
+                                                                          const SnackBar(
+                                                                            content: Text('Veuillez entrer une raison'),
+                                                                            backgroundColor: Colors.red,
+                                                                          ),
+                                                                        );
+                                                                        return;
+                                                                      }
+                                                                      
+                                                                      try {
+                                                                        await FirebaseFirestore.instance
+                                                                            .collection('carts')
+                                                                            .doc(doc.id)
+                                                                            .update({
+                                                                          'status': 'rejected',
+                                                                          'message_rejet': reasonController.text.trim(),
+                                                                          'timestamp': FieldValue.serverTimestamp(),
+                                                                        });
+
+                                                                        if (mounted) {
+                                                                          Navigator.pop(context);
+                                                                          ScaffoldMessenger.of(context).showSnackBar(
+                                                                            const SnackBar(
+                                                                              content: Text('Commande rejetée avec succès'),
+                                                                              backgroundColor: Colors.green,
+                                                                            ),
+                                                                          );
+                                                                        }
+                                                                      } catch (e) {
+                                                                        if (mounted) {
+                                                                          Navigator.pop(context);
+                                                                          ScaffoldMessenger.of(context).showSnackBar(
+                                                                            SnackBar(
+                                                                              content: Text('Erreur: $e'),
+                                                                              backgroundColor: Colors.red,
+                                                                            ),
+                                                                          );
+                                                                        }
+                                                                      }
+                                                                    },
+                                                                    style: ElevatedButton.styleFrom(
+                                                                      backgroundColor: Colors.red,
+                                                                      foregroundColor: Colors.white,
+                                                                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                                                                      shape: RoundedRectangleBorder(
+                                                                        borderRadius: BorderRadius.circular(8),
+                                                                      ),
+                                                                    ),
+                                                                    child: const Text('REJETER'),
+                                                                  ),
+                                                                ],
+                                                              ),
+                                                            ],
+                                                          ),
+                                                        ),
+                                                      );
+                                                    },
+                                                  );
+                                                },
+                                                style: ElevatedButton.styleFrom(
+                                                  backgroundColor: Colors.red,
+                                                  foregroundColor: Colors.white,
+                                                  padding: const EdgeInsets.symmetric(vertical: 8),
+                                                  shape: RoundedRectangleBorder(
+                                                    borderRadius: BorderRadius.circular(8),
+                                                  ),
+                                                ),
+                                                child: const Text('Rejeter'),
+                                              ),
+                                            ),
+                                            const SizedBox(height: 8),
+                                            SizedBox(
+                                              width: double.infinity,
+                                              child: ElevatedButton(
+                                                onPressed: () {
+                                                  // Récupérer le numéro du client
+                                                  final clientPhone = data['phone']?.toString() ?? '';
+                                                  final clientName = data['client']?.toString() ?? 'Client';
+                                                  if (clientPhone.isEmpty) {
+                                                    ScaffoldMessenger.of(context).showSnackBar(
+                                                      const SnackBar(
+                                                        content: Text('Numéro du client non disponible'),
+                                                        backgroundColor: Colors.red,
+                                                      ),
+                                                    );
+                                                    return;
+                                                  }
+
+                                                  showDialog(
+                                                    context: context,
+                                                    builder: (context) => Dialog(
+                                                      shape: RoundedRectangleBorder(
+                                                        borderRadius: BorderRadius.circular(16),
+                                                      ),
+                                                      child: Container(
+                                                        width: MediaQuery.of(context).size.width * 0.9,
+                                                        padding: const EdgeInsets.all(20),
+                                                        child: Column(
+                                                          mainAxisSize: MainAxisSize.min,
+                                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                                          children: [
+                                                            const Text(
+                                                              'Contacter le client',
+                                                              style: TextStyle(
+                                                                fontSize: 18,
+                                                                fontWeight: FontWeight.bold,
+                                                              ),
+                                                            ),
+                                                            const SizedBox(height: 20),
+                                                            Row(
+                                                              children: [
+                                                                const Icon(Icons.person, color: AppColors.primary),
+                                                                const SizedBox(width: 8),
+                                                                Text(
+                                                                  clientName,
+                                                                  style: const TextStyle(
+                                                                    fontSize: 16,
+                                                                    fontWeight: FontWeight.bold,
+                                                                  ),
+                                                                ),
+                                                              ],
+                                                            ),
+                                                            const SizedBox(height: 12),
+                                                            Row(
+                                                              children: [
+                                                                const Icon(Icons.phone, color: AppColors.primary),
+                                                                const SizedBox(width: 8),
+                                                                Text(
+                                                                  clientPhone,
+                                                                  style: const TextStyle(fontSize: 16),
+                                                                ),
+                                                              ],
+                                                            ),
+                                                            const SizedBox(height: 24),
+                                                            Row(
+                                                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                                              children: [
+                                                                ElevatedButton.icon(
+                                                                  onPressed: () {
+                                                                    final Uri phoneUri = Uri(
+                                                                      scheme: 'tel',
+                                                                      path: clientPhone,
+                                                                    );
+                                                                    launchUrl(phoneUri);
+                                                                  },
+                                                                  icon: const Icon(Icons.phone, size: 16, color: Colors.white),
+                                                                  label: const Text('Appeler'),
+                                                                  style: ElevatedButton.styleFrom(
+                                                                    backgroundColor: Colors.green,
+                                                                    foregroundColor: Colors.white,
+                                                                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                                                                  ),
+                                                                ),
+                                                                ElevatedButton.icon(
+                                                                  onPressed: () {
+                                                                    final Uri whatsappUri = Uri.parse(
+                                                                      'https://wa.me/${clientPhone.replaceAll(RegExp(r'[^0-9]'), '')}',
+                                                                    );
+                                                                    launchUrl(whatsappUri);
+                                                                  },
+                                                                  icon: const Icon(Icons.message, color: Colors.white),
+                                                                  label: const Text('WhatsApp'),
+                                                                  style: ElevatedButton.styleFrom(
+                                                                    backgroundColor: Colors.green,
+                                                                    foregroundColor: Colors.white,
+                                                                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                                                                  ),
+                                                                ),
+                                                              ],
+                                                            ),
+                                                            const SizedBox(height: 16),
+                                                            Center(
+                                                              child: TextButton(
+                                                                onPressed: () => Navigator.pop(context),
+                                                                child: const Text('FERMER'),
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  );
+                                                },
+                                                style: ElevatedButton.styleFrom(
+                                                  backgroundColor: AppColors.primary,
+                                                  foregroundColor: Colors.white,
+                                                  padding: const EdgeInsets.symmetric(vertical: 8),
+                                                  shape: RoundedRectangleBorder(
+                                                    borderRadius: BorderRadius.circular(8),
+                                                  ),
+                                                ),
+                                                child: const Text('Contacter'),
+                                              ),
+                                            ),
+                                          ] else if (status == 'colis en cours de préparation') ...[
+                                            SizedBox(
+                                              width: double.infinity,
+                                              child: ElevatedButton(
+                                                onPressed: () => _showExpeditionDialog(context, doc.id),
+                                                style: ElevatedButton.styleFrom(
+                                                  backgroundColor: AppColors.primary,
+                                                  foregroundColor: Colors.white,
+                                                  padding: const EdgeInsets.symmetric(vertical: 8),
+                                                  shape: RoundedRectangleBorder(
+                                                    borderRadius: BorderRadius.circular(8),
+                                                  ),
+                                                ),
+                                                child: const Text('Expédier'),
+                                              ),
+                                            ),
+                                          ],
+                                        ],
+                                      ),
                                     ),
                                 ],
                               ),
@@ -1501,22 +1798,6 @@ class OrderCardShimmer extends StatelessWidget {
                       ShimmerLoading(
                         width: 50,
                         height: 14,
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      ShimmerLoading(
-                        width: 80,
-                        height: 12,
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      const SizedBox(width: 8),
-                      ShimmerLoading(
-                        width: 60,
-                        height: 12,
                         borderRadius: BorderRadius.circular(6),
                       ),
                     ],

@@ -72,7 +72,7 @@ class OrderDetailsScreen extends StatelessWidget {
     final timestamp = orderData['timestamp'];
     final adresse = orderData['adresse']?.toString() ?? 'Adresse non spécifiée';
     final phone = orderData['phone']?.toString() ?? '';
-    final clientName = orderData['clientName']?.toString() ?? 'Client';
+    final clientName = orderData['client']?.toString() ?? 'Client';
 
     return Scaffold(
       backgroundColor: const Color(0xFFF7F8FA),
@@ -105,7 +105,7 @@ class OrderDetailsScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Commande #${orderId.substring(0, 8)}',
+                    'Rapid#${orderId.substring(0, 8)}',
                     style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
