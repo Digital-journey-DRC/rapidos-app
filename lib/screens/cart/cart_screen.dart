@@ -107,7 +107,8 @@ class _CartScreenState extends State<CartScreen> {
         'quartier': quartier,
         'avenue': avenue,
         'numero': numero,
-        'pays': pays
+        'pays': pays,
+        'total': cartItems.fold(0.0, (sum, item) => sum + ((item['price'] ?? 0.0) * (item['quantity'] ?? 1))), // Calculate total from cart items
       });
 
       print("✅ Commande enregistrée avec succès: ${commandeRef.id}");

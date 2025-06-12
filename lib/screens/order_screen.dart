@@ -158,7 +158,8 @@ class _OrderScreenState extends State<OrderScreen> {
                     child: photoPath == null
                         ? Center(
                             child: IconButton(
-                              icon: const Icon(Icons.camera_alt, size: 40, color: Colors.grey),
+                              icon: const Icon(Icons.camera_alt,
+                                  size: 40, color: Colors.grey),
                               onPressed: () async {
                                 // TODO: Implémenter la capture de photo
                                 // Pour l'instant, on simule avec un chemin
@@ -183,7 +184,8 @@ class _OrderScreenState extends State<OrderScreen> {
                                 top: 8,
                                 right: 8,
                                 child: IconButton(
-                                  icon: const Icon(Icons.close, color: Colors.white),
+                                  icon: const Icon(Icons.close,
+                                      color: Colors.white),
                                   onPressed: () {
                                     setState(() {
                                       photoPath = null;
@@ -223,7 +225,8 @@ class _OrderScreenState extends State<OrderScreen> {
                                     Navigator.pop(context);
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       const SnackBar(
-                                        content: Text('Commande expédiée avec succès'),
+                                        content: Text(
+                                            'Commande expédiée avec succès'),
                                         backgroundColor: Colors.green,
                                       ),
                                     );
@@ -244,7 +247,8 @@ class _OrderScreenState extends State<OrderScreen> {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.primary,
                           foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 24, vertical: 12),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(8),
                           ),
@@ -706,10 +710,7 @@ class _OrderScreenState extends State<OrderScreen> {
 
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance.collection('carts').where('status',
-          whereIn: [
-            'prêt a expédié',
-            'en route pour livraison'
-          ]).snapshots(),
+          whereIn: ['prêt a expédié', 'en route pour livraison']).snapshots(),
       builder: (context, snapshot) {
         if (snapshot.hasError) {
           return Center(child: Text('Erreur: ${snapshot.error}'));
@@ -1089,6 +1090,7 @@ class _OrderScreenState extends State<OrderScreen> {
               final timestamp = data['timestamp'] as Timestamp?;
               final adresse =
                   data['adresse']?.toString() ?? 'Adresse non spécifiée';
+              final total = data['total']?.toString() ?? '0';
 
               return InkWell(
                 borderRadius: BorderRadius.circular(18),
@@ -1241,24 +1243,31 @@ class _OrderScreenState extends State<OrderScreen> {
                                     ],
                                   ),
                                   const SizedBox(height: 8),
-                                  if (items.isNotEmpty && firstItem != null) ...[
+                                  if (items.isNotEmpty &&
+                                      firstItem != null) ...[
                                     Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
                                       children: [
                                         Text(
                                           'Quantité: ${firstItem['quantity'] ?? 1}',
                                           style: const TextStyle(fontSize: 13),
                                         ),
-                                        Text(
-                                          '${firstItem['price'] ?? 0} FC',
-                                          style: const TextStyle(
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.bold,
-                                            color: AppColors.primary,
-                                          ),
-                                        ),
+                                        Padding(
+                                            child: Text(
+                                              '${total} FC',
+                                              style: const TextStyle(
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.bold,
+                                                color: AppColors.primary,
+                                              ),
+                                            ),
+                                            padding: EdgeInsets.only(right: 20))
                                       ],
                                     ),
+                                    const SizedBox(
+                                      height: 20,
+                                    )
                                   ],
                                   // Boutons d'action pour le vendeur
                                   if (authState.user!['role'] == 'vendeur')
@@ -1272,29 +1281,40 @@ class _OrderScreenState extends State<OrderScreen> {
                                               child: ElevatedButton(
                                                 onPressed: () async {
                                                   try {
-                                                    await FirebaseFirestore.instance
+                                                    await FirebaseFirestore
+                                                        .instance
                                                         .collection('carts')
                                                         .doc(doc.id)
                                                         .update({
-                                                      'status': 'colis en cours de préparation',
-                                                      'timestamp': FieldValue.serverTimestamp(),
+                                                      'status':
+                                                          'colis en cours de préparation',
+                                                      'timestamp': FieldValue
+                                                          .serverTimestamp(),
                                                     });
 
                                                     if (mounted) {
                                                       setState(() {});
-                                                      ScaffoldMessenger.of(context).showSnackBar(
+                                                      ScaffoldMessenger.of(
+                                                              context)
+                                                          .showSnackBar(
                                                         const SnackBar(
-                                                          content: Text('Commande acceptée et en cours de préparation'),
-                                                          backgroundColor: Colors.green,
+                                                          content: Text(
+                                                              'Commande acceptée et en cours de préparation'),
+                                                          backgroundColor:
+                                                              Colors.green,
                                                         ),
                                                       );
                                                     }
                                                   } catch (e) {
                                                     if (mounted) {
-                                                      ScaffoldMessenger.of(context).showSnackBar(
+                                                      ScaffoldMessenger.of(
+                                                              context)
+                                                          .showSnackBar(
                                                         SnackBar(
-                                                          content: Text('Erreur: $e'),
-                                                          backgroundColor: Colors.red,
+                                                          content: Text(
+                                                              'Erreur: $e'),
+                                                          backgroundColor:
+                                                              Colors.red,
                                                         ),
                                                       );
                                                     }
@@ -1303,9 +1323,12 @@ class _OrderScreenState extends State<OrderScreen> {
                                                 style: ElevatedButton.styleFrom(
                                                   backgroundColor: Colors.green,
                                                   foregroundColor: Colors.white,
-                                                  padding: const EdgeInsets.symmetric(vertical: 8),
+                                                  padding: const EdgeInsets
+                                                      .symmetric(vertical: 8),
                                                   shape: RoundedRectangleBorder(
-                                                    borderRadius: BorderRadius.circular(8),
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            8),
                                                   ),
                                                 ),
                                                 child: const Text('Accepter'),
@@ -1319,80 +1342,134 @@ class _OrderScreenState extends State<OrderScreen> {
                                                   showDialog(
                                                     context: context,
                                                     builder: (context) {
-                                                      final TextEditingController reasonController = TextEditingController();
+                                                      final TextEditingController
+                                                          reasonController =
+                                                          TextEditingController();
                                                       return Dialog(
-                                                        shape: RoundedRectangleBorder(
-                                                          borderRadius: BorderRadius.circular(16),
+                                                        shape:
+                                                            RoundedRectangleBorder(
+                                                          borderRadius:
+                                                              BorderRadius
+                                                                  .circular(16),
                                                         ),
                                                         child: Container(
-                                                          width: MediaQuery.of(context).size.width * 0.9,
-                                                          padding: const EdgeInsets.all(20),
+                                                          width: MediaQuery.of(
+                                                                      context)
+                                                                  .size
+                                                                  .width *
+                                                              0.9,
+                                                          padding:
+                                                              const EdgeInsets
+                                                                  .all(20),
                                                           child: Column(
-                                                            mainAxisSize: MainAxisSize.min,
-                                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                                            mainAxisSize:
+                                                                MainAxisSize
+                                                                    .min,
+                                                            crossAxisAlignment:
+                                                                CrossAxisAlignment
+                                                                    .start,
                                                             children: [
                                                               const Text(
                                                                 'Rejeter la commande',
-                                                                style: TextStyle(
+                                                                style:
+                                                                    TextStyle(
                                                                   fontSize: 18,
-                                                                  fontWeight: FontWeight.bold,
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .bold,
                                                                 ),
                                                               ),
-                                                              const SizedBox(height: 20),
+                                                              const SizedBox(
+                                                                  height: 20),
                                                               const Text(
                                                                 'Veuillez expliquer la raison du rejet :',
-                                                                style: TextStyle(fontSize: 14),
+                                                                style: TextStyle(
+                                                                    fontSize:
+                                                                        14),
                                                               ),
-                                                              const SizedBox(height: 16),
+                                                              const SizedBox(
+                                                                  height: 16),
                                                               TextField(
-                                                                controller: reasonController,
+                                                                controller:
+                                                                    reasonController,
                                                                 maxLines: 3,
-                                                                decoration: InputDecoration(
-                                                                  hintText: 'Entrez la raison du rejet...',
-                                                                  border: OutlineInputBorder(
-                                                                    borderRadius: BorderRadius.circular(8),
+                                                                decoration:
+                                                                    InputDecoration(
+                                                                  hintText:
+                                                                      'Entrez la raison du rejet...',
+                                                                  border:
+                                                                      OutlineInputBorder(
+                                                                    borderRadius:
+                                                                        BorderRadius
+                                                                            .circular(8),
                                                                   ),
                                                                   filled: true,
-                                                                  fillColor: Colors.grey.shade50,
+                                                                  fillColor: Colors
+                                                                      .grey
+                                                                      .shade50,
                                                                 ),
                                                               ),
-                                                              const SizedBox(height: 24),
+                                                              const SizedBox(
+                                                                  height: 24),
                                                               Row(
-                                                                mainAxisAlignment: MainAxisAlignment.end,
+                                                                mainAxisAlignment:
+                                                                    MainAxisAlignment
+                                                                        .end,
                                                                 children: [
                                                                   TextButton(
-                                                                    onPressed: () => Navigator.pop(context),
-                                                                    child: const Text(
+                                                                    onPressed: () =>
+                                                                        Navigator.pop(
+                                                                            context),
+                                                                    child:
+                                                                        const Text(
                                                                       'ANNULER',
-                                                                      style: TextStyle(color: Colors.grey),
+                                                                      style: TextStyle(
+                                                                          color:
+                                                                              Colors.grey),
                                                                     ),
                                                                   ),
-                                                                  const SizedBox(width: 16),
+                                                                  const SizedBox(
+                                                                      width:
+                                                                          16),
                                                                   ElevatedButton(
-                                                                    onPressed: () async {
-                                                                      if (reasonController.text.trim().isEmpty) {
-                                                                        ScaffoldMessenger.of(context).showSnackBar(
+                                                                    onPressed:
+                                                                        () async {
+                                                                      if (reasonController
+                                                                          .text
+                                                                          .trim()
+                                                                          .isEmpty) {
+                                                                        ScaffoldMessenger.of(context)
+                                                                            .showSnackBar(
                                                                           const SnackBar(
-                                                                            content: Text('Veuillez entrer une raison'),
-                                                                            backgroundColor: Colors.red,
+                                                                            content:
+                                                                                Text('Veuillez entrer une raison'),
+                                                                            backgroundColor:
+                                                                                Colors.red,
                                                                           ),
                                                                         );
                                                                         return;
                                                                       }
-                                                                      
+
                                                                       try {
-                                                                        await FirebaseFirestore.instance
+                                                                        await FirebaseFirestore
+                                                                            .instance
                                                                             .collection('carts')
                                                                             .doc(doc.id)
                                                                             .update({
-                                                                          'status': 'rejected',
-                                                                          'message_rejet': reasonController.text.trim(),
-                                                                          'timestamp': FieldValue.serverTimestamp(),
+                                                                          'status':
+                                                                              'rejected',
+                                                                          'message_rejet': reasonController
+                                                                              .text
+                                                                              .trim(),
+                                                                          'timestamp':
+                                                                              FieldValue.serverTimestamp(),
                                                                         });
 
                                                                         if (mounted) {
-                                                                          Navigator.pop(context);
-                                                                          ScaffoldMessenger.of(context).showSnackBar(
+                                                                          Navigator.pop(
+                                                                              context);
+                                                                          ScaffoldMessenger.of(context)
+                                                                              .showSnackBar(
                                                                             const SnackBar(
                                                                               content: Text('Commande rejetée avec succès'),
                                                                               backgroundColor: Colors.green,
@@ -1401,8 +1478,10 @@ class _OrderScreenState extends State<OrderScreen> {
                                                                         }
                                                                       } catch (e) {
                                                                         if (mounted) {
-                                                                          Navigator.pop(context);
-                                                                          ScaffoldMessenger.of(context).showSnackBar(
+                                                                          Navigator.pop(
+                                                                              context);
+                                                                          ScaffoldMessenger.of(context)
+                                                                              .showSnackBar(
                                                                             SnackBar(
                                                                               content: Text('Erreur: $e'),
                                                                               backgroundColor: Colors.red,
@@ -1411,15 +1490,28 @@ class _OrderScreenState extends State<OrderScreen> {
                                                                         }
                                                                       }
                                                                     },
-                                                                    style: ElevatedButton.styleFrom(
-                                                                      backgroundColor: Colors.red,
-                                                                      foregroundColor: Colors.white,
-                                                                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                                                                      shape: RoundedRectangleBorder(
-                                                                        borderRadius: BorderRadius.circular(8),
+                                                                    style: ElevatedButton
+                                                                        .styleFrom(
+                                                                      backgroundColor:
+                                                                          Colors
+                                                                              .red,
+                                                                      foregroundColor:
+                                                                          Colors
+                                                                              .white,
+                                                                      padding: const EdgeInsets
+                                                                          .symmetric(
+                                                                          horizontal:
+                                                                              24,
+                                                                          vertical:
+                                                                              12),
+                                                                      shape:
+                                                                          RoundedRectangleBorder(
+                                                                        borderRadius:
+                                                                            BorderRadius.circular(8),
                                                                       ),
                                                                     ),
-                                                                    child: const Text('REJETER'),
+                                                                    child: const Text(
+                                                                        'REJETER'),
                                                                   ),
                                                                 ],
                                                               ),
@@ -1433,9 +1525,12 @@ class _OrderScreenState extends State<OrderScreen> {
                                                 style: ElevatedButton.styleFrom(
                                                   backgroundColor: Colors.red,
                                                   foregroundColor: Colors.white,
-                                                  padding: const EdgeInsets.symmetric(vertical: 8),
+                                                  padding: const EdgeInsets
+                                                      .symmetric(vertical: 8),
                                                   shape: RoundedRectangleBorder(
-                                                    borderRadius: BorderRadius.circular(8),
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            8),
                                                   ),
                                                 ),
                                                 child: const Text('Rejeter'),
@@ -1447,13 +1542,23 @@ class _OrderScreenState extends State<OrderScreen> {
                                               child: ElevatedButton(
                                                 onPressed: () {
                                                   // Récupérer le numéro du client
-                                                  final clientPhone = data['phone']?.toString() ?? '';
-                                                  final clientName = data['client']?.toString() ?? 'Client';
+                                                  final clientPhone =
+                                                      data['phone']
+                                                              ?.toString() ??
+                                                          '';
+                                                  final clientName =
+                                                      data['client']
+                                                              ?.toString() ??
+                                                          'Client';
                                                   if (clientPhone.isEmpty) {
-                                                    ScaffoldMessenger.of(context).showSnackBar(
+                                                    ScaffoldMessenger.of(
+                                                            context)
+                                                        .showSnackBar(
                                                       const SnackBar(
-                                                        content: Text('Numéro du client non disponible'),
-                                                        backgroundColor: Colors.red,
+                                                        content: Text(
+                                                            'Numéro du client non disponible'),
+                                                        backgroundColor:
+                                                            Colors.red,
                                                       ),
                                                     );
                                                     return;
@@ -1461,91 +1566,173 @@ class _OrderScreenState extends State<OrderScreen> {
 
                                                   showDialog(
                                                     context: context,
-                                                    builder: (context) => Dialog(
-                                                      shape: RoundedRectangleBorder(
-                                                        borderRadius: BorderRadius.circular(16),
+                                                    builder: (context) =>
+                                                        Dialog(
+                                                      shape:
+                                                          RoundedRectangleBorder(
+                                                        borderRadius:
+                                                            BorderRadius
+                                                                .circular(16),
                                                       ),
                                                       child: Container(
-                                                        width: MediaQuery.of(context).size.width * 0.9,
-                                                        padding: const EdgeInsets.all(20),
+                                                        width: MediaQuery.of(
+                                                                    context)
+                                                                .size
+                                                                .width *
+                                                            0.9,
+                                                        padding:
+                                                            const EdgeInsets
+                                                                .all(20),
                                                         child: Column(
-                                                          mainAxisSize: MainAxisSize.min,
-                                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                                          mainAxisSize:
+                                                              MainAxisSize.min,
+                                                          crossAxisAlignment:
+                                                              CrossAxisAlignment
+                                                                  .start,
                                                           children: [
                                                             const Text(
                                                               'Contacter le client',
                                                               style: TextStyle(
                                                                 fontSize: 18,
-                                                                fontWeight: FontWeight.bold,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .bold,
                                                               ),
                                                             ),
-                                                            const SizedBox(height: 20),
+                                                            const SizedBox(
+                                                                height: 20),
                                                             Row(
                                                               children: [
-                                                                const Icon(Icons.person, color: AppColors.primary),
-                                                                const SizedBox(width: 8),
+                                                                const Icon(
+                                                                    Icons
+                                                                        .person,
+                                                                    color: AppColors
+                                                                        .primary),
+                                                                const SizedBox(
+                                                                    width: 8),
                                                                 Text(
                                                                   clientName,
-                                                                  style: const TextStyle(
-                                                                    fontSize: 16,
-                                                                    fontWeight: FontWeight.bold,
+                                                                  style:
+                                                                      const TextStyle(
+                                                                    fontSize:
+                                                                        16,
+                                                                    fontWeight:
+                                                                        FontWeight
+                                                                            .bold,
                                                                   ),
                                                                 ),
                                                               ],
                                                             ),
-                                                            const SizedBox(height: 12),
+                                                            const SizedBox(
+                                                                height: 12),
                                                             Row(
                                                               children: [
-                                                                const Icon(Icons.phone, color: AppColors.primary),
-                                                                const SizedBox(width: 8),
+                                                                const Icon(
+                                                                    Icons.phone,
+                                                                    color: AppColors
+                                                                        .primary),
+                                                                const SizedBox(
+                                                                    width: 8),
                                                                 Text(
                                                                   clientPhone,
-                                                                  style: const TextStyle(fontSize: 16),
+                                                                  style: const TextStyle(
+                                                                      fontSize:
+                                                                          16),
                                                                 ),
                                                               ],
                                                             ),
-                                                            const SizedBox(height: 24),
+                                                            const SizedBox(
+                                                                height: 24),
                                                             Row(
-                                                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                                              mainAxisAlignment:
+                                                                  MainAxisAlignment
+                                                                      .spaceEvenly,
                                                               children: [
-                                                                ElevatedButton.icon(
-                                                                  onPressed: () {
-                                                                    final Uri phoneUri = Uri(
-                                                                      scheme: 'tel',
-                                                                      path: clientPhone,
+                                                                ElevatedButton
+                                                                    .icon(
+                                                                  onPressed:
+                                                                      () {
+                                                                    final Uri
+                                                                        phoneUri =
+                                                                        Uri(
+                                                                      scheme:
+                                                                          'tel',
+                                                                      path:
+                                                                          clientPhone,
                                                                     );
-                                                                    launchUrl(phoneUri);
+                                                                    launchUrl(
+                                                                        phoneUri);
                                                                   },
-                                                                  icon: const Icon(Icons.phone, size: 16, color: Colors.white),
-                                                                  label: const Text('Appeler'),
-                                                                  style: ElevatedButton.styleFrom(
-                                                                    backgroundColor: Colors.green,
-                                                                    foregroundColor: Colors.white,
-                                                                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                                                                  icon: const Icon(
+                                                                      Icons
+                                                                          .phone,
+                                                                      size: 16,
+                                                                      color: Colors
+                                                                          .white),
+                                                                  label: const Text(
+                                                                      'Appeler'),
+                                                                  style: ElevatedButton
+                                                                      .styleFrom(
+                                                                    backgroundColor:
+                                                                        Colors
+                                                                            .green,
+                                                                    foregroundColor:
+                                                                        Colors
+                                                                            .white,
+                                                                    padding: const EdgeInsets
+                                                                        .symmetric(
+                                                                        horizontal:
+                                                                            24,
+                                                                        vertical:
+                                                                            12),
                                                                   ),
                                                                 ),
-                                                                ElevatedButton.icon(
-                                                                  onPressed: () {
-                                                                    final Uri whatsappUri = Uri.parse(
+                                                                ElevatedButton
+                                                                    .icon(
+                                                                  onPressed:
+                                                                      () {
+                                                                    final Uri
+                                                                        whatsappUri =
+                                                                        Uri.parse(
                                                                       'https://wa.me/${clientPhone.replaceAll(RegExp(r'[^0-9]'), '')}',
                                                                     );
-                                                                    launchUrl(whatsappUri);
+                                                                    launchUrl(
+                                                                        whatsappUri);
                                                                   },
-                                                                  icon: const Icon(Icons.message, color: Colors.white),
-                                                                  label: const Text('WhatsApp'),
-                                                                  style: ElevatedButton.styleFrom(
-                                                                    backgroundColor: Colors.green,
-                                                                    foregroundColor: Colors.white,
-                                                                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                                                                  icon: const Icon(
+                                                                      Icons
+                                                                          .message,
+                                                                      color: Colors
+                                                                          .white),
+                                                                  label: const Text(
+                                                                      'WhatsApp'),
+                                                                  style: ElevatedButton
+                                                                      .styleFrom(
+                                                                    backgroundColor:
+                                                                        Colors
+                                                                            .green,
+                                                                    foregroundColor:
+                                                                        Colors
+                                                                            .white,
+                                                                    padding: const EdgeInsets
+                                                                        .symmetric(
+                                                                        horizontal:
+                                                                            24,
+                                                                        vertical:
+                                                                            12),
                                                                   ),
                                                                 ),
                                                               ],
                                                             ),
-                                                            const SizedBox(height: 16),
+                                                            const SizedBox(
+                                                                height: 16),
                                                             Center(
                                                               child: TextButton(
-                                                                onPressed: () => Navigator.pop(context),
-                                                                child: const Text('FERMER'),
+                                                                onPressed: () =>
+                                                                    Navigator.pop(
+                                                                        context),
+                                                                child: const Text(
+                                                                    'FERMER'),
                                                               ),
                                                             ),
                                                           ],
@@ -1555,27 +1742,38 @@ class _OrderScreenState extends State<OrderScreen> {
                                                   );
                                                 },
                                                 style: ElevatedButton.styleFrom(
-                                                  backgroundColor: AppColors.primary,
+                                                  backgroundColor:
+                                                      AppColors.primary,
                                                   foregroundColor: Colors.white,
-                                                  padding: const EdgeInsets.symmetric(vertical: 8),
+                                                  padding: const EdgeInsets
+                                                      .symmetric(vertical: 8),
                                                   shape: RoundedRectangleBorder(
-                                                    borderRadius: BorderRadius.circular(8),
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            8),
                                                   ),
                                                 ),
                                                 child: const Text('Contacter'),
                                               ),
                                             ),
-                                          ] else if (status == 'colis en cours de préparation') ...[
+                                          ] else if (status ==
+                                              'colis en cours de préparation') ...[
                                             SizedBox(
                                               width: double.infinity,
                                               child: ElevatedButton(
-                                                onPressed: () => _showExpeditionDialog(context, doc.id),
+                                                onPressed: () =>
+                                                    _showExpeditionDialog(
+                                                        context, doc.id),
                                                 style: ElevatedButton.styleFrom(
-                                                  backgroundColor: AppColors.primary,
+                                                  backgroundColor:
+                                                      AppColors.primary,
                                                   foregroundColor: Colors.white,
-                                                  padding: const EdgeInsets.symmetric(vertical: 8),
+                                                  padding: const EdgeInsets
+                                                      .symmetric(vertical: 8),
                                                   shape: RoundedRectangleBorder(
-                                                    borderRadius: BorderRadius.circular(8),
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            8),
                                                   ),
                                                 ),
                                                 child: const Text('Expédier'),

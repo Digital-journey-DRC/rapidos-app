@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:immo/constants.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:intl/intl.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:immo/cubit/auth_cubit.dart';
 
 class OrderDetailsScreen extends StatelessWidget {
   final Map<String, dynamic> orderData;
@@ -67,12 +69,15 @@ class OrderDetailsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final authState = context.read<AuthCubit>().state;
+    final String? userRole = (authState is AuthSuccess) ? authState.user != null ? authState.user!['role'] : null : null;
     final items = orderData['items'] as List? ?? [];
     final status = orderData['status']?.toString() ?? 'pending';
     final timestamp = orderData['timestamp'];
     final adresse = orderData['adresse']?.toString() ?? 'Adresse non spécifiée';
     final phone = orderData['phone']?.toString() ?? '';
     final clientName = orderData['client']?.toString() ?? 'Client';
+    final total = orderData['total']?.toString() ?? '0';
 
     return Scaffold(
       backgroundColor: const Color(0xFFF7F8FA),
@@ -181,6 +186,7 @@ class OrderDetailsScreen extends StatelessWidget {
                       const SizedBox(width: 8),
                       Text(phone),
                       const Spacer(),
+                      if(userRole != null && userRole != 'acheteur')
                       ElevatedButton.icon(
                         onPressed: () => _makePhoneCall(phone),
                         icon: const Icon(Icons.phone, size: 16, color: Colors.white),
@@ -283,7 +289,7 @@ class OrderDetailsScreen extends StatelessWidget {
                             ),
                           ),
                           Text(
-                            '${item['price'] ?? 0}',
+                            '${total ?? 0} FC',
                             style: const TextStyle(
                               fontWeight: FontWeight.bold,
                               color: AppColors.primary,
