@@ -10,22 +10,91 @@ import 'package:immo/cubit/cart_cubit.dart';
 import 'package:immo/cubit/order_cubit.dart';
 import 'package:immo/cubit/auth_cubit.dart';
 
-class CartScreen extends StatelessWidget {
+class CartScreen extends StatefulWidget {
   final bool backNavigaton;
   const CartScreen({Key? key, this.backNavigaton = true}) : super(key: key);
 
-  void saveCart(BuildContext context, List<Map<String, dynamic>> cartItems, String ville, String commune, String quartier, String avenue, String numero, String pays) async {
+  @override
+  State<CartScreen> createState() => _CartScreenState();
+}
+
+class _CartScreenState extends State<CartScreen> {
+  List<Map<String, dynamic>> savedAddresses = [];
+  final ValueNotifier<bool> useNewAddress = ValueNotifier<bool>(false);
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSavedAddresses();
+  }
+
+  @override
+  void dispose() {
+    useNewAddress.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadSavedAddresses() async {
+    setState(() {
+      useNewAddress.value = false;
+    });
     final authState = context.read<AuthCubit>().state;
     if (authState is AuthSuccess && authState.user != null) {
       final user = authState.user!;
       final userId = user['id']?.toString() ?? '';
-      final userName = '${user['firstName'] ?? ''} ${user['lastName'] ?? ''}'.trim();
-      
+
+      print(
+          'Chargement des adresses pour l\'utilisateur: $userId'); // Debug log
+
+      try {
+        final snapshot = await FirebaseFirestore.instance
+            .collection('delivery_addresses')
+            .where('userId', isEqualTo: userId)
+            .orderBy('timestamp', descending: true)
+            .get();
+
+        print(
+            'Nombre d\'adresses trouvées: ${snapshot.docs.length}'); // Debug log
+
+        if (snapshot.docs.isNotEmpty) {
+          setState(() {
+            savedAddresses = snapshot.docs.map((doc) => doc.data()).toList();
+          });
+          print('Adresses chargées: $savedAddresses'); // Debug log
+        } else {
+          print(
+              'Aucune adresse trouvée pour l\'utilisateur $userId'); // Debug log
+        }
+      } catch (e) {
+        print('Erreur lors du chargement des adresses: $e');
+      }
+    } else {
+      print('Utilisateur non connecté ou état invalide'); // Debug log
+    }
+  }
+
+  void saveCart(
+      BuildContext context,
+      List<Map<String, dynamic>> cartItems,
+      String ville,
+      String commune,
+      String quartier,
+      String avenue,
+      String numero,
+      String pays) async {
+    final authState = context.read<AuthCubit>().state;
+    if (authState is AuthSuccess && authState.user != null) {
+      final user = authState.user!;
+      final userId = user['id']?.toString() ?? '';
+      final userName =
+          '${user['firstName'] ?? ''} ${user['lastName'] ?? ''}'.trim();
+
       // Construire l'adresse complète
       final adresse = '$avenue, $numero, $quartier, $commune, $ville, $pays';
 
       // Enregistrer la commande
-      DocumentReference commandeRef = await FirebaseFirestore.instance.collection('carts').add({
+      DocumentReference commandeRef =
+          await FirebaseFirestore.instance.collection('carts').add({
         'timestamp': FieldValue.serverTimestamp(),
         'status': 'pending',
         'phone': user['phone'] ?? '',
@@ -105,7 +174,8 @@ class CartScreen extends StatelessWidget {
     'Selembao',
   ];
 
-  void _showAddressBottomSheet(BuildContext context, List<Map<String, dynamic>> cartItems) {
+  void _showAddressBottomSheet(
+      BuildContext context, List<Map<String, dynamic>> cartItems) {
     final _villeController = TextEditingController();
     final _communeController = TextEditingController();
     final _quartierController = TextEditingController();
@@ -115,6 +185,7 @@ class CartScreen extends StatelessWidget {
     final _paysController = TextEditingController(text: 'RDC');
     String? selectedVille;
     String? selectedCommune;
+    bool saveAddress = false;
 
     showModalBottomSheet(
       context: context,
@@ -128,8 +199,8 @@ class CartScreen extends StatelessWidget {
             return BlocConsumer<OrderCubit, OrderState>(
               listener: (context, state) {
                 if (state.success) {
-                  Navigator.pop(context); // Fermer le bottom sheet
-                  context.read<CartCubit>().clearCart(); // Vider le panier
+                  Navigator.pop(context);
+                  context.read<CartCubit>().clearCart();
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text('Commande créée avec succès!'),
@@ -153,219 +224,279 @@ class CartScreen extends StatelessWidget {
                     top: 32,
                     bottom: MediaQuery.of(context).viewInsets.bottom + 24,
                   ),
-                  child: SingleChildScrollView(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Center(
-                          child: Container(
-                            width: 40,
-                            height: 4,
-                            margin: const EdgeInsets.only(bottom: 16),
-                            decoration: BoxDecoration(
-                              color: Colors.grey[300],
-                              borderRadius: BorderRadius.circular(2),
-                            ),
-                          ),
-                        ),
-                        const Text(
-                          'Adresse de livraison',
-                          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(height: 20),
-                        DropdownButtonFormField<String>(
-                          value: selectedVille,
-                          decoration: InputDecoration(
-                            labelText: 'Ville',
-                            prefixIcon: const Icon(Icons.location_city),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            filled: true,
-                            fillColor: Colors.white,
-                          ),
-                          items: villes.map((String ville) {
-                            return DropdownMenuItem<String>(
-                              value: ville,
-                              child: Text(ville),
-                            );
-                          }).toList(),
-                          onChanged: (String? newValue) {
-                            setState(() {
-                              selectedVille = newValue;
-                              _villeController.text = newValue ?? '';
-                              // Réinitialiser la commune si la ville change
-                              selectedCommune = null;
-                              _communeController.text = '';
-                            });
-                          },
-                        ),
-                        const SizedBox(height: 16),
-                        DropdownButtonFormField<String>(
-                          value: selectedCommune,
-                          decoration: InputDecoration(
-                            labelText: 'Commune',
-                            prefixIcon: const Icon(Icons.location_on),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            filled: true,
-                            fillColor: Colors.white,
-                          ),
-                          items: selectedVille == 'Kinshasa' 
-                              ? communesKinshasa.map((String commune) {
-                                  return DropdownMenuItem<String>(
-                                    value: commune,
-                                    child: Text(commune),
-                                  );
-                                }).toList()
-                              : [], // Liste vide pour les autres villes
-                          onChanged: (String? newValue) {
-                            setState(() {
-                              selectedCommune = newValue;
-                              _communeController.text = newValue ?? '';
-                            });
-                          },
-                        ),
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          controller: _quartierController,
-                          decoration: InputDecoration(
-                            labelText: 'Quartier',
-                            prefixIcon: const Icon(Icons.map),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            filled: true,
-                            fillColor: Colors.white,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          controller: _avenueController,
-                          decoration: InputDecoration(
-                            labelText: 'Avenue',
-                            prefixIcon: const Icon(Icons.streetview),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            filled: true,
-                            fillColor: Colors.white,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          controller: _numeroController,
-                          decoration: InputDecoration(
-                            labelText: 'Numéro',
-                            prefixIcon: const Icon(Icons.home),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            filled: true,
-                            fillColor: Colors.white,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          controller: _paysController,
-                          enabled: false,
-                          decoration: InputDecoration(
-                            labelText: 'Pays',
-                            prefixIcon: const Icon(Icons.public),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            filled: true,
-                            fillColor: Colors.grey[100],
-                          ),
-                        ),
-                        const SizedBox(height: 24),
-                        SizedBox(
-                          width: double.infinity,
-                          height: 50,
-                          child: ElevatedButton(
-                            onPressed: state.isLoading
-                                ? null
-                                : () {
-                                    if (_villeController.text.isEmpty ||
-                                        _communeController.text.isEmpty ||
-                                        _quartierController.text.isEmpty ||
-                                        _avenueController.text.isEmpty ||
-                                        _numeroController.text.isEmpty) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(
-                                          content: Text('Veuillez remplir tous les champs'),
-                                          backgroundColor: Colors.red,
-                                        ),
-                                      );
-                                      return;
-                                    }
-
-                                    // Vérification de la présence de l'id sur chaque produit
-                                    if (cartItems.any((item) => item['id'] == null)) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(
-                                          content: Text('Un produit du panier est invalide (id manquant). Veuillez le retirer.'),
-                                          backgroundColor: Colors.red,
-                                        ),
-                                      );
-                                      return;
-                                    }
-
-                                    // Convertir les items du panier au format attendu par l'API
-                                    final produits = cartItems.map((item) {
-                                      return {
-                                        "id": int.parse(item['id'].toString()),
-                                        "quantity": item['quantity'],
-                                      };
-                                    }).toList();
-
-                                    // Utilise la méthode http classique
-                                    context.read<OrderCubit>().createOrder(
-                                          produits: produits,
-                                          ville: _villeController.text,
-                                          commune: _communeController.text,
-                                          quartier: _quartierController.text,
-                                          avenue: _avenueController.text,
-                                          codePostale: _codePostaleController.text,
-                                          numero: _numeroController.text,
-                                          pays: _paysController.text,
-                                        );
-                                        
-                                    // Enregistrer dans Firebase
-                                    saveCart(
-                                      context,
-                                      cartItems,
-                                      _villeController.text,
-                                      _communeController.text,
-                                      _quartierController.text,
-                                      _avenueController.text,
-                                      _numeroController.text,
-                                      _paysController.text
-                                    );
-                                  },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.primary,
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
+                  child: DraggableScrollableSheet(
+                    initialChildSize: 0.9,
+                    minChildSize: 0.5,
+                    maxChildSize: 0.95,
+                    expand: false,
+                    builder: (context, scrollController) {
+                      return SingleChildScrollView(
+                        controller: scrollController,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Center(
+                              child: Container(
+                                width: 40,
+                                height: 4,
+                                margin: const EdgeInsets.only(bottom: 16),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey[300],
+                                  borderRadius: BorderRadius.circular(2),
+                                ),
                               ),
                             ),
-                            child: state.isLoading
-                                ? const CircularProgressIndicator(color: Colors.white)
-                                : const Text(
-                                    'CONFIRMER LA COMMANDE',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 16,
+                            const Text(
+                              'Adresse de livraison',
+                              style: TextStyle(
+                                  fontSize: 20, fontWeight: FontWeight.bold),
+                            ),
+                            const SizedBox(height: 20),
+                            StreamBuilder<QuerySnapshot>(
+                              stream: () {
+                                final authState =
+                                    context.read<AuthCubit>().state;
+                                final userId = authState is AuthSuccess &&
+                                        authState.user != null
+                                    ? authState.user!['id']?.toString() ?? ''
+                                    : '';
+                                return FirebaseFirestore.instance
+                                    .collection('delivery_addresses')
+                                    .where('userId', isEqualTo: userId)
+                                    .snapshots();
+                              }(),
+                              builder: (context, snapshot) {
+                                if (snapshot.hasError) {
+                                  return Text('Erreur: ${snapshot.error}');
+                                }
+
+                                if (snapshot.connectionState ==
+                                    ConnectionState.waiting) {
+                                  return const Center(
+                                      child: CircularProgressIndicator());
+                                }
+
+                                if (!snapshot.hasData ||
+                                    snapshot.data!.docs.isEmpty) {
+                                  return Column(
+                                    children: [
+                                      Text(
+                                        'Aucune adresse enregistrée',
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          color: Colors.grey[600],
+                                        ),
+                                      ),
+                                      const SizedBox(height: 16),
+                                      TextButton.icon(
+                                        onPressed: () {
+                                          setState(() {
+                                            useNewAddress.value = true;
+                                          });
+                                        },
+                                        icon:
+                                            const Icon(Icons.add_location_alt),
+                                        label: const Text(
+                                            'Ajouter une nouvelle adresse'),
+                                      ),
+                                      if (useNewAddress.value) ...[
+                                        const SizedBox(height: 16),
+                                        _buildAddressForm(
+                                          context,
+                                          state,
+                                          cartItems,
+                                          _villeController,
+                                          _communeController,
+                                          _quartierController,
+                                          _avenueController,
+                                          _numeroController,
+                                          _paysController,
+                                          selectedVille,
+                                          selectedCommune,
+                                          saveAddress,
+                                          setState,
+                                        ),
+                                      ],
+                                    ],
+                                  );
+                                }
+
+                                if (useNewAddress.value) {
+                                  return Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          IconButton(
+                                            icon: const Icon(Icons.arrow_back),
+                                            onPressed: () {
+                                              setState(() {
+                                                useNewAddress.value = false;
+                                              });
+                                            },
+                                          ),
+                                          const Text(
+                                            'Mes adresses',
+                                            style: TextStyle(
+                                              fontSize: 20,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 16),
+                                      _buildAddressForm(
+                                        context,
+                                        state,
+                                        cartItems,
+                                        _villeController,
+                                        _communeController,
+                                        _quartierController,
+                                        _avenueController,
+                                        _numeroController,
+                                        _paysController,
+                                        selectedVille,
+                                        selectedCommune,
+                                        saveAddress,
+                                        setState,
+                                      ),
+                                    ],
+                                  );
+                                }
+
+                                return Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Vos adresses enregistrées :',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.grey[700],
+                                      ),
                                     ),
-                                  ),
-                          ),
+                                    const SizedBox(height: 8),
+                                    ...snapshot.data!.docs.map((doc) {
+                                      final address =
+                                          doc.data() as Map<String, dynamic>;
+                                      return Card(
+                                        color: Colors.white,
+                                        margin:
+                                            const EdgeInsets.only(bottom: 12),
+                                        child: Padding(
+                                          padding: const EdgeInsets.all(16),
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                  '${address['avenue']}, ${address['numero']}'),
+                                              Text(
+                                                  '${address['quartier']}, ${address['commune']}'),
+                                              Text(
+                                                  '${address['ville']}, ${address['pays']}'),
+                                              const SizedBox(height: 8),
+                                              SizedBox(
+                                                width: double.infinity,
+                                                child: ElevatedButton(
+                                                  onPressed: state.isLoading
+                                                      ? null
+                                                      : () {
+                                                          context
+                                                              .read<
+                                                                  OrderCubit>()
+                                                              .createOrder(
+                                                                produits:
+                                                                    cartItems.map(
+                                                                        (item) {
+                                                                  return {
+                                                                    "id": int.parse(
+                                                                        item['id']
+                                                                            .toString()),
+                                                                    "quantity":
+                                                                        item[
+                                                                            'quantity'],
+                                                                  };
+                                                                }).toList(),
+                                                                ville: address[
+                                                                    'ville'],
+                                                                commune: address[
+                                                                    'commune'],
+                                                                quartier: address[
+                                                                    'quartier'],
+                                                                avenue: address[
+                                                                    'avenue'],
+                                                                codePostale: '',
+                                                                numero: address[
+                                                                    'numero'],
+                                                                pays: address[
+                                                                    'pays'],
+                                                              );
+
+                                                          saveCart(
+                                                              context,
+                                                              cartItems,
+                                                              address['ville'],
+                                                              address[
+                                                                  'commune'],
+                                                              address[
+                                                                  'quartier'],
+                                                              address['avenue'],
+                                                              address['numero'],
+                                                              address['pays']);
+                                                        },
+                                                  style:
+                                                      ElevatedButton.styleFrom(
+                                                    backgroundColor:
+                                                        AppColors.primary,
+                                                    foregroundColor:
+                                                        Colors.white,
+                                                    shape:
+                                                        RoundedRectangleBorder(
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                              12),
+                                                    ),
+                                                  ),
+                                                  child: state.isLoading
+                                                      ? const CircularProgressIndicator(
+                                                          color: Colors.white)
+                                                      : const Text(
+                                                          'UTILISER CETTE ADRESSE',
+                                                          style: TextStyle(
+                                                            fontWeight:
+                                                                FontWeight.bold,
+                                                            fontSize: 14,
+                                                          ),
+                                                        ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      );
+                                    }).toList(),
+                                    const SizedBox(height: 16),
+                                    TextButton.icon(
+                                      onPressed: () {
+                                        setState(() {
+                                          useNewAddress.value = true;
+                                        });
+                                      },
+                                      icon: const Icon(Icons.add_location_alt),
+                                      label: const Text(
+                                          'Ajouter une nouvelle adresse'),
+                                    ),
+                                  ],
+                                );
+                              },
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
+                      );
+                    },
                   ),
                 );
               },
@@ -376,13 +507,310 @@ class CartScreen extends StatelessWidget {
     );
   }
 
+  Widget _buildAddressForm(
+    BuildContext context,
+    OrderState state,
+    List<Map<String, dynamic>> cartItems,
+    TextEditingController _villeController,
+    TextEditingController _communeController,
+    TextEditingController _quartierController,
+    TextEditingController _avenueController,
+    TextEditingController _numeroController,
+    TextEditingController _paysController,
+    String? selectedVille,
+    String? selectedCommune,
+    bool saveAddress,
+    StateSetter setState,
+  ) {
+    return StatefulBuilder(
+      builder: (context, formSetState) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Nouvelle adresse',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 16),
+            DropdownButtonFormField<String>(
+              value:
+                  _villeController.text.isEmpty ? null : _villeController.text,
+              decoration: InputDecoration(
+                labelText: 'Ville',
+                prefixIcon: const Icon(Icons.location_city),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                filled: true,
+                fillColor: Colors.white,
+              ),
+              items: villes.map((String ville) {
+                return DropdownMenuItem<String>(
+                  value: ville,
+                  child: Text(ville),
+                );
+              }).toList(),
+              onChanged: (String? newValue) {
+                formSetState(() {
+                  _villeController.text = newValue ?? '';
+                  _communeController.text = '';
+                });
+              },
+            ),
+            const SizedBox(height: 16),
+            DropdownButtonFormField<String>(
+              value: _communeController.text.isEmpty
+                  ? null
+                  : _communeController.text,
+              decoration: InputDecoration(
+                labelText: 'Commune',
+                prefixIcon: const Icon(Icons.location_on),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                filled: true,
+                fillColor: Colors.white,
+              ),
+              items: _villeController.text == 'Kinshasa'
+                  ? communesKinshasa.map((String commune) {
+                      return DropdownMenuItem<String>(
+                        value: commune,
+                        child: Text(commune),
+                      );
+                    }).toList()
+                  : [],
+              onChanged: (String? newValue) {
+                formSetState(() {
+                  _communeController.text = newValue ?? '';
+                });
+              },
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _quartierController,
+              enabled: true,
+              decoration: InputDecoration(
+                labelText: 'Quartier',
+                prefixIcon: const Icon(Icons.map),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                filled: true,
+                fillColor: Colors.white,
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _avenueController,
+              enabled: true,
+              decoration: InputDecoration(
+                labelText: 'Avenue',
+                prefixIcon: const Icon(Icons.streetview),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                filled: true,
+                fillColor: Colors.white,
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _numeroController,
+              enabled: true,
+              decoration: InputDecoration(
+                labelText: 'Numéro',
+                prefixIcon: const Icon(Icons.home),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                filled: true,
+                fillColor: Colors.white,
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _paysController,
+              enabled: false,
+              decoration: InputDecoration(
+                labelText: 'Pays',
+                prefixIcon: const Icon(Icons.public),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                filled: true,
+                fillColor: Colors.grey[100],
+              ),
+            ),
+            const SizedBox(height: 16),
+            StatefulBuilder(
+              builder: (context, checkboxSetState) {
+                return CheckboxListTile(
+                  value: saveAddress,
+                  onChanged: (bool? value) {
+                    checkboxSetState(() {
+                      saveAddress = value ?? false;
+                    });
+                  },
+                  title: const Text(
+                    'Enregistrer cette adresse pour mes futures commandes',
+                    style: TextStyle(fontSize: 14),
+                  ),
+                  controlAffinity: ListTileControlAffinity.leading,
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                );
+              },
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton(
+                onPressed: state.isLoading
+                    ? null
+                    : () {
+                        if (_villeController.text.isEmpty ||
+                            _communeController.text.isEmpty ||
+                            _quartierController.text.isEmpty ||
+                            _avenueController.text.isEmpty ||
+                            _numeroController.text.isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Veuillez remplir tous les champs'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                          return;
+                        }
+
+                        context.read<OrderCubit>().createOrder(
+                              produits: cartItems.map((item) {
+                                return {
+                                  "id": int.parse(item['id'].toString()),
+                                  "quantity": item['quantity'],
+                                };
+                              }).toList(),
+                              ville: _villeController.text,
+                              commune: _communeController.text,
+                              quartier: _quartierController.text,
+                              avenue: _avenueController.text,
+                              codePostale: '',
+                              numero: _numeroController.text,
+                              pays: _paysController.text,
+                            );
+
+                        saveCart(
+                            context,
+                            cartItems,
+                            _villeController.text,
+                            _communeController.text,
+                            _quartierController.text,
+                            _avenueController.text,
+                            _numeroController.text,
+                            _paysController.text);
+
+                        if (saveAddress) {
+                          _saveDeliveryAddress(
+                            context,
+                            _villeController.text,
+                            _communeController.text,
+                            _quartierController.text,
+                            _avenueController.text,
+                            _numeroController.text,
+                            _paysController.text,
+                          );
+                        }
+                      },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: state.isLoading
+                    ? const CircularProgressIndicator(color: Colors.white)
+                    : const Text(
+                        'CONFIRMER LA COMMANDE',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // Méthode pour sauvegarder l'adresse de livraison
+  Future<void> _saveDeliveryAddress(
+    BuildContext context,
+    String ville,
+    String commune,
+    String quartier,
+    String avenue,
+    String numero,
+    String pays,
+  ) async {
+    final authState = context.read<AuthCubit>().state;
+    if (authState is AuthSuccess && authState.user != null) {
+      final user = authState.user!;
+      final userId = user['id']?.toString() ?? '';
+      final userName =
+          '${user['firstName'] ?? ''} ${user['lastName'] ?? ''}'.trim();
+
+      try {
+        await FirebaseFirestore.instance.collection('delivery_addresses').add({
+          'timestamp': FieldValue.serverTimestamp(),
+          'userId': userId,
+          'userName': userName,
+          'ville': ville,
+          'commune': commune,
+          'quartier': quartier,
+          'avenue': avenue,
+          'numero': numero,
+          'pays': pays,
+          'phone': user['phone'] ?? '',
+        });
+
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Adresse de livraison enregistrée avec succès'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } catch (e) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content:
+                  Text('Erreur lors de l\'enregistrement de l\'adresse: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<CartCubit, CartState>(
       builder: (context, state) {
         final cartItems = state.items;
         final total = cartItems.fold<double>(0, (sum, item) {
-          final price = double.tryParse(item['price'].toString().replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0;
+          final price = double.tryParse(item['price']
+                  .toString()
+                  .replaceAll(RegExp(r'[^0-9.]'), '')) ??
+              0;
           return sum + (price * (item['quantity'] as int));
         });
         return Scaffold(
@@ -397,10 +825,13 @@ class CartScreen extends StatelessWidget {
             ),
             backgroundColor: Colors.white,
             elevation: 0,
-            leading: backNavigaton ? IconButton(
-              icon: const Icon(Icons.arrow_back, color: AppColors.primary),
-              onPressed: () => Navigator.pop(context),
-            ) : null,
+            leading: widget.backNavigaton
+                ? IconButton(
+                    icon:
+                        const Icon(Icons.arrow_back, color: AppColors.primary),
+                    onPressed: () => Navigator.pop(context),
+                  )
+                : null,
           ),
           body: cartItems.isEmpty
               ? Center(
@@ -454,12 +885,14 @@ class CartScreen extends StatelessWidget {
                                       width: 80,
                                       height: 80,
                                       fit: BoxFit.cover,
-                                      errorBuilder: (context, error, stackTrace) {
+                                      errorBuilder:
+                                          (context, error, stackTrace) {
                                         return Container(
                                           width: 80,
                                           height: 80,
                                           color: Colors.grey.shade200,
-                                          child: Icon(Icons.image, color: Colors.grey.shade400),
+                                          child: Icon(Icons.image,
+                                              color: Colors.grey.shade400),
                                         );
                                       },
                                     ),
@@ -468,7 +901,8 @@ class CartScreen extends StatelessWidget {
                                   // Détails du produit
                                   Expanded(
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
                                         Text(
                                           item['name'],
@@ -501,13 +935,19 @@ class CartScreen extends StatelessWidget {
                                   Column(
                                     children: [
                                       IconButton(
-                                        icon: const Icon(Icons.delete_outline, color: Colors.red),
+                                        icon: const Icon(Icons.delete_outline,
+                                            color: Colors.red),
                                         onPressed: () {
-                                          context.read<CartCubit>().removeFromCart(item['name']);
-                                          ScaffoldMessenger.of(context).showSnackBar(
+                                          context
+                                              .read<CartCubit>()
+                                              .removeFromCart(item['name']);
+                                          ScaffoldMessenger.of(context)
+                                              .showSnackBar(
                                             const SnackBar(
-                                              content: Text('Article retiré du panier'),
-                                              backgroundColor: AppColors.primary,
+                                              content: Text(
+                                                  'Article retiré du panier'),
+                                              backgroundColor:
+                                                  AppColors.primary,
                                               duration: Duration(seconds: 2),
                                             ),
                                           );
@@ -515,17 +955,25 @@ class CartScreen extends StatelessWidget {
                                       ),
                                       Container(
                                         decoration: BoxDecoration(
-                                          border: Border.all(color: Colors.grey.shade300),
-                                          borderRadius: BorderRadius.circular(4),
+                                          border: Border.all(
+                                              color: Colors.grey.shade300),
+                                          borderRadius:
+                                              BorderRadius.circular(4),
                                         ),
                                         child: Row(
                                           children: [
                                             IconButton(
-                                              icon: const Icon(Icons.remove, size: 16),
+                                              icon: const Icon(Icons.remove,
+                                                  size: 16),
                                               onPressed: () {
-                                                final newQty = (item['quantity'] as int) - 1;
+                                                final newQty =
+                                                    (item['quantity'] as int) -
+                                                        1;
                                                 if (newQty > 0) {
-                                                  context.read<CartCubit>().updateQuantity(item['name'], newQty);
+                                                  context
+                                                      .read<CartCubit>()
+                                                      .updateQuantity(
+                                                          item['name'], newQty);
                                                 }
                                               },
                                             ),
@@ -536,25 +984,38 @@ class CartScreen extends StatelessWidget {
                                               ),
                                             ),
                                             IconButton(
-                                              icon: const Icon(Icons.add, size: 16),
+                                              icon: const Icon(Icons.add,
+                                                  size: 16),
                                               onPressed: () async {
-                                                final newQty = (item['quantity'] as int) + 1;
-                                                final stock = item['stock'] ?? 1;
+                                                final newQty =
+                                                    (item['quantity'] as int) +
+                                                        1;
+                                                final stock =
+                                                    item['stock'] ?? 1;
                                                 if (newQty > stock) {
-                                                  ScaffoldMessenger.of(context).showSnackBar(
+                                                  ScaffoldMessenger.of(context)
+                                                      .showSnackBar(
                                                     SnackBar(
-                                                      content: Text('Stock insuffisant : il ne reste que $stock en stock.'),
-                                                      backgroundColor: Colors.red,
+                                                      content: Text(
+                                                          'Stock insuffisant : il ne reste que $stock en stock.'),
+                                                      backgroundColor:
+                                                          Colors.red,
                                                     ),
                                                   );
                                                   return;
                                                 }
-                                                final success = await context.read<CartCubit>().updateQuantity(item['name'], newQty);
+                                                final success = await context
+                                                    .read<CartCubit>()
+                                                    .updateQuantity(
+                                                        item['name'], newQty);
                                                 if (!success) {
-                                                  ScaffoldMessenger.of(context).showSnackBar(
+                                                  ScaffoldMessenger.of(context)
+                                                      .showSnackBar(
                                                     SnackBar(
-                                                      content: Text('Stock insuffisant : il ne reste que $stock en stock.'),
-                                                      backgroundColor: Colors.red,
+                                                      content: Text(
+                                                          'Stock insuffisant : il ne reste que $stock en stock.'),
+                                                      backgroundColor:
+                                                          Colors.red,
                                                     ),
                                                   );
                                                 }
@@ -640,4 +1101,4 @@ class CartScreen extends StatelessWidget {
       },
     );
   }
-} 
+}

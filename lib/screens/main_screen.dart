@@ -32,7 +32,7 @@ class _MainScreenState extends State<MainScreen> {
     const CartScreen(backNavigaton: false),
     const FavorisScreen(),
     const HomeMarchantScreen(),
-    const OrderScreen(),
+    const OrderScreen(backNavigation: false),
     const HomeLivreurScreen()
   ];
 
@@ -89,7 +89,7 @@ class _MainScreenState extends State<MainScreen> {
         label: 'Favoris',
       ),
       const BottomNavigationBarItem(
-        icon: Icon(Icons.message_outlined),
+        icon: Icon(Icons.shopping_bag_outlined),
         label: 'Commandes',
       ),
     ];

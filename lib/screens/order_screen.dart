@@ -9,7 +9,8 @@ import 'package:intl/intl.dart';
 import 'package:immo/screens/order_details_screen.dart';
 
 class OrderScreen extends StatefulWidget {
-  const OrderScreen({Key? key}) : super(key: key);
+  final bool backNavigation;
+  const OrderScreen({Key? key, required this.backNavigation}) : super(key: key);
 
   @override
   State<OrderScreen> createState() => _OrderScreenState();
@@ -24,12 +25,25 @@ class _OrderScreenState extends State<OrderScreen> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     authState = context.watch<AuthCubit>().state;
-    isLivreur = authState is AuthSuccess && 
+    isLivreur = authState is AuthSuccess &&
         (authState as AuthSuccess).user != null &&
         (authState as AuthSuccess).user!['role'] == 'livreur';
     if (!_hasFetchedOrders && authState is AuthSuccess && !isLivreur) {
       _hasFetchedOrders = true;
     }
+  }
+
+  void saveCommande() async {
+    // Enregistrer la commande
+    DocumentReference commandeRef =
+        await FirebaseFirestore.instance.collection('commandes').add({
+      'client': 'Joël',
+      'adresse': 'Gombe',
+      'timestamp': FieldValue.serverTimestamp(),
+      'status': 'pending',
+    });
+
+    print("✅ Commande enregistrée avec succès: ${commandeRef.id}");
   }
 
   Color _statusColor(String status) {
@@ -82,6 +96,12 @@ class _OrderScreenState extends State<OrderScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF7F8FA),
       appBar: AppBar(
+        leading: widget.backNavigation
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () => Navigator.pushNamed(context, AppRoutes.main),
+              )
+            : null,
         backgroundColor: Colors.white,
         elevation: 0,
         title: const Text('Commandes'),
@@ -147,11 +167,15 @@ class _OrderScreenState extends State<OrderScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.inbox, size: 80, color: AppColors.buttonColor.withOpacity(0.3)),
+                Icon(Icons.inbox,
+                    size: 80, color: AppColors.buttonColor.withOpacity(0.3)),
                 const SizedBox(height: 18),
                 const Text(
                   'Aucune commande trouvée',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.primary),
+                  style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.primary),
                 ),
               ],
             ),
@@ -165,17 +189,17 @@ class _OrderScreenState extends State<OrderScreen> {
             final bData = b.data() as Map<String, dynamic>;
             final aTimestamp = aData['timestamp'] as Timestamp?;
             final bTimestamp = bData['timestamp'] as Timestamp?;
-            
+
             if (aTimestamp == null && bTimestamp == null) return 0;
             if (aTimestamp == null) return 1;
             if (bTimestamp == null) return -1;
-            
+
             return bTimestamp.compareTo(aTimestamp); // Tri décroissant
           });
 
         return ListView.separated(
-          padding: const EdgeInsets.all(16),
-          separatorBuilder: (_, __) => const SizedBox(height: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+          separatorBuilder: (_, __) => const SizedBox(height: 8),
           itemCount: sortedDocs.length,
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
@@ -183,7 +207,7 @@ class _OrderScreenState extends State<OrderScreen> {
             try {
               final doc = sortedDocs[index];
               final data = doc.data() as Map<String, dynamic>;
-              
+
               // Vérification et conversion sécurisée des items
               List<Map<String, dynamic>> items = [];
               if (data['items'] != null) {
@@ -198,12 +222,13 @@ class _OrderScreenState extends State<OrderScreen> {
                   );
                 }
               }
-              
+
               final firstItem = items.isNotEmpty ? items[0] : null;
               final status = data['status']?.toString() ?? 'pending';
               final timestamp = data['timestamp'] as Timestamp?;
-              final adresse = data['adresse']?.toString() ?? 'Adresse non spécifiée';
-              
+              final adresse =
+                  data['adresse']?.toString() ?? 'Adresse non spécifiée';
+
               return InkWell(
                 borderRadius: BorderRadius.circular(18),
                 onTap: () {
@@ -238,7 +263,8 @@ class _OrderScreenState extends State<OrderScreen> {
                           Container(
                             width: 6,
                             height: 110,
-                            margin: const EdgeInsets.only(right: 10, top: 10, bottom: 10),
+                            margin: const EdgeInsets.only(
+                                right: 10, top: 10, bottom: 10),
                             decoration: BoxDecoration(
                               color: _statusColor(status),
                               borderRadius: BorderRadius.circular(8),
@@ -246,22 +272,27 @@ class _OrderScreenState extends State<OrderScreen> {
                           ),
                           // Image produit
                           Padding(
-                            padding: const EdgeInsets.only(top: 16, left: 0, right: 10),
+                            padding: const EdgeInsets.only(
+                                top: 16, left: 0, right: 10),
                             child: ClipRRect(
                               borderRadius: BorderRadius.circular(14),
-                              child: firstItem != null && firstItem['imagePath'] != null
+                              child: firstItem != null &&
+                                      firstItem['imagePath'] != null
                                   ? Image.network(
                                       firstItem['imagePath'],
                                       width: 70,
                                       height: 70,
                                       fit: BoxFit.cover,
-                                      errorBuilder: (context, error, stackTrace) {
-                                        print('Erreur de chargement image: $error');
+                                      errorBuilder:
+                                          (context, error, stackTrace) {
+                                        print(
+                                            'Erreur de chargement image: $error');
                                         return Container(
                                           width: 70,
                                           height: 70,
                                           color: Colors.grey.shade200,
-                                          child: const Icon(Icons.image, color: Colors.grey),
+                                          child: const Icon(Icons.image,
+                                              color: Colors.grey),
                                         );
                                       },
                                     )
@@ -269,14 +300,16 @@ class _OrderScreenState extends State<OrderScreen> {
                                       width: 70,
                                       height: 70,
                                       color: Colors.grey.shade200,
-                                      child: const Icon(Icons.image, color: Colors.grey),
+                                      child: const Icon(Icons.image,
+                                          color: Colors.grey),
                                     ),
                             ),
                           ),
                           // Détails commande
                           Expanded(
                             child: Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 0),
+                              padding: const EdgeInsets.symmetric(
+                                  vertical: 16, horizontal: 0),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
@@ -295,11 +328,14 @@ class _OrderScreenState extends State<OrderScreen> {
                                       ),
                                       const SizedBox(width: 8),
                                       Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 12, vertical: 4),
                                         margin: const EdgeInsets.only(right: 8),
                                         decoration: BoxDecoration(
-                                          color: _statusColor(status).withOpacity(0.1),
-                                          borderRadius: BorderRadius.circular(8),
+                                          color: _statusColor(status)
+                                              .withOpacity(0.1),
+                                          borderRadius:
+                                              BorderRadius.circular(8),
                                         ),
                                         child: Text(
                                           _translateStatus(status),
@@ -326,59 +362,91 @@ class _OrderScreenState extends State<OrderScreen> {
                                   const SizedBox(height: 12),
                                   Row(
                                     children: [
-                                      const Icon(Icons.calendar_today, size: 14, color: AppColors.primary),
+                                      const Icon(Icons.calendar_today,
+                                          size: 14, color: AppColors.primary),
                                       const SizedBox(width: 4),
                                       Text(
                                         _formatDate(timestamp),
                                         style: const TextStyle(fontSize: 13),
                                       ),
                                       const SizedBox(width: 12),
-                                      const Icon(Icons.shopping_cart, size: 14, color: AppColors.primary),
+                                      const Icon(Icons.shopping_cart,
+                                          size: 14, color: AppColors.primary),
                                       const SizedBox(width: 4),
                                       Text(
                                         '${items.length} article${items.length > 1 ? 's' : ''}',
                                         style: const TextStyle(fontSize: 13),
                                       ),
-                                      const Spacer(),
-                                      if (status.toLowerCase() == 'pending')
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
+                                  if (status.toLowerCase() == 'pending')
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.end,
+                                      children: [
                                         Container(
-                                          margin: const EdgeInsets.only(right: 16),
+                                          margin:
+                                              const EdgeInsets.only(right: 16),
+                                          constraints: const BoxConstraints(
+                                              maxWidth: 100),
                                           child: ElevatedButton(
                                             onPressed: () {
                                               showDialog(
                                                 context: context,
-                                                builder: (context) => AlertDialog(
-                                                  title: const Text('Annuler la commande'),
-                                                  content: const Text('Êtes-vous sûr de vouloir annuler cette commande ?'),
+                                                builder: (context) =>
+                                                    AlertDialog(
+                                                  title: const Text(
+                                                      'Annuler la commande'),
+                                                  content: const Text(
+                                                      'Êtes-vous sûr de vouloir annuler cette commande ?'),
                                                   actions: [
                                                     TextButton(
-                                                      onPressed: () => Navigator.pop(context),
+                                                      onPressed: () =>
+                                                          Navigator.pop(
+                                                              context),
                                                       child: const Text('NON'),
                                                     ),
                                                     TextButton(
                                                       onPressed: () async {
                                                         try {
-                                                          await FirebaseFirestore.instance
-                                                              .collection('carts')
+                                                          await FirebaseFirestore
+                                                              .instance
+                                                              .collection(
+                                                                  'carts')
                                                               .doc(doc.id)
-                                                              .update({'status': 'cancelled'});
+                                                              .update({
+                                                            'status':
+                                                                'cancelled'
+                                                          });
                                                           if (mounted) {
-                                                            Navigator.pop(context);
-                                                            setState(() {}); // Force refresh
-                                                            ScaffoldMessenger.of(context).showSnackBar(
+                                                            Navigator.pop(
+                                                                context);
+                                                            setState(
+                                                                () {}); // Force refresh
+                                                            ScaffoldMessenger
+                                                                    .of(context)
+                                                                .showSnackBar(
                                                               const SnackBar(
-                                                                content: Text('Commande annulée avec succès'),
-                                                                backgroundColor: Colors.green,
+                                                                content: Text(
+                                                                    'Commande annulée avec succès'),
+                                                                backgroundColor:
+                                                                    Colors
+                                                                        .green,
                                                               ),
                                                             );
                                                           }
                                                         } catch (e) {
                                                           if (mounted) {
-                                                            Navigator.pop(context);
-                                                            ScaffoldMessenger.of(context).showSnackBar(
+                                                            Navigator.pop(
+                                                                context);
+                                                            ScaffoldMessenger
+                                                                    .of(context)
+                                                                .showSnackBar(
                                                               SnackBar(
-                                                                content: Text('Erreur lors de l\'annulation: $e'),
-                                                                backgroundColor: Colors.red,
+                                                                content: Text(
+                                                                    'Erreur lors de l\'annulation: $e'),
+                                                                backgroundColor:
+                                                                    Colors.red,
                                                               ),
                                                             );
                                                           }
@@ -393,16 +461,22 @@ class _OrderScreenState extends State<OrderScreen> {
                                             style: ElevatedButton.styleFrom(
                                               backgroundColor: Colors.red,
                                               foregroundColor: Colors.white,
-                                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      horizontal: 8,
+                                                      vertical: 8),
                                               shape: RoundedRectangleBorder(
-                                                borderRadius: BorderRadius.circular(8),
+                                                borderRadius:
+                                                    BorderRadius.circular(8),
                                               ),
                                               elevation: 2,
                                             ),
                                             child: const Row(
                                               mainAxisSize: MainAxisSize.min,
                                               children: [
-                                                Icon(Icons.cancel_outlined, size: 16, color: Colors.white),
+                                                Icon(Icons.cancel_outlined,
+                                                    size: 16,
+                                                    color: Colors.white),
                                                 SizedBox(width: 4),
                                                 Text(
                                                   'Annuler',
@@ -415,63 +489,8 @@ class _OrderScreenState extends State<OrderScreen> {
                                             ),
                                           ),
                                         ),
-                                      if (authState.user!['role'] == 'vendeur' && status.toLowerCase() == 'pending')
-                                        Container(
-                                          margin: const EdgeInsets.only(right: 16),
-                                          child: ElevatedButton(
-                                            onPressed: () async {
-                                              try {
-                                                await FirebaseFirestore.instance
-                                                    .collection('carts')
-                                                    .doc(doc.id)
-                                                    .update({'status': 'a la recherche du livreur'});
-                                                if (mounted) {
-                                                  setState(() {}); // Force refresh
-                                                  ScaffoldMessenger.of(context).showSnackBar(
-                                                    const SnackBar(
-                                                      content: Text('Commande en attente de livreur'),
-                                                      backgroundColor: Colors.green,
-                                                    ),
-                                                  );
-                                                }
-                                              } catch (e) {
-                                                if (mounted) {
-                                                  ScaffoldMessenger.of(context).showSnackBar(
-                                                    SnackBar(
-                                                      content: Text('Erreur: $e'),
-                                                      backgroundColor: Colors.red,
-                                                    ),
-                                                  );
-                                                }
-                                              }
-                                            },
-                                            style: ElevatedButton.styleFrom(
-                                              backgroundColor: AppColors.buttonColor2,
-                                              foregroundColor: Colors.white,
-                                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                              shape: RoundedRectangleBorder(
-                                                borderRadius: BorderRadius.circular(8),
-                                              ),
-                                              elevation: 2,
-                                            ),
-                                            child: const Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                Icon(Icons.local_shipping_outlined, size: 16, color: Colors.white),
-                                                SizedBox(width: 4),
-                                                Text(
-                                                  'Prêt pour livraison',
-                                                  style: TextStyle(
-                                                    fontSize: 12,
-                                                    fontWeight: FontWeight.bold,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        ),
-                                    ],
-                                  ),
+                                      ],
+                                    ),
                                 ],
                               ),
                             ),
@@ -510,11 +529,11 @@ class _OrderScreenState extends State<OrderScreen> {
     }
 
     return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('carts')
-          .where('status', whereIn: ['a la recherche du livreur', 'en route pour livraison'])
-          .where('livreurId', isEqualTo: authState.user!['id'])
-          .snapshots(),
+      stream: FirebaseFirestore.instance.collection('carts').where('status',
+          whereIn: [
+            'a la recherche du livreur',
+            'en route pour livraison'
+          ]).snapshots(),
       builder: (context, snapshot) {
         if (snapshot.hasError) {
           return Center(child: Text('Erreur: ${snapshot.error}'));
@@ -533,7 +552,23 @@ class _OrderScreenState extends State<OrderScreen> {
         final orders = snapshot.data!.docs;
 
         if (orders.isEmpty) {
-          return const Center(child: Text('Aucune commande en attente de livreur'));
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.local_shipping_outlined,
+                    size: 80, color: AppColors.buttonColor.withOpacity(0.3)),
+                const SizedBox(height: 18),
+                const Text(
+                  'Aucune commande en attente',
+                  style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.primary),
+                ),
+              ],
+            ),
+          );
         }
 
         return Column(
@@ -543,7 +578,8 @@ class _OrderScreenState extends State<OrderScreen> {
             final status = data['status']?.toString() ?? 'pending';
             final timestamp = data['timestamp'] as Timestamp?;
             final date = timestamp?.toDate().toString().substring(0, 10) ?? '';
-            final address = data['address']?.toString() ?? 'Adresse non spécifiée';
+            final address =
+                data['address']?.toString() ?? 'Adresse non spécifiée';
 
             return Container(
               margin: const EdgeInsets.only(bottom: 10),
@@ -558,182 +594,213 @@ class _OrderScreenState extends State<OrderScreen> {
                   ),
                 ],
               ),
-              child: Column(
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Timeline
-                      Container(
-                        width: 6,
-                        height: 110,
-                        margin: const EdgeInsets.only(right: 10, top: 10, bottom: 10),
-                        decoration: BoxDecoration(
-                          color: _statusColor(status),
-                          borderRadius: BorderRadius.circular(8),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(18),
+                onTap: () {
+                  if (authState.user!['role'] == 'acheteur') {
+                    print('acheteur');
+                  } else {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => OrderDetailsScreen(
+                          orderData: data,
+                          orderId: doc.id,
                         ),
                       ),
-                      // Image produit
-                      Padding(
-                        padding: const EdgeInsets.only(top: 16, left: 0, right: 10),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(14),
-                          child: Image.network(
-                            items.isNotEmpty ? (items[0]['imagePath'] ?? 'https://via.placeholder.com/80') : 'https://via.placeholder.com/80',
-                            width: 70,
-                            height: 70,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) {
-                              return Container(
-                                width: 70,
-                                height: 70,
-                                color: Colors.grey.shade200,
-                                child: const Icon(Icons.image, color: Colors.grey),
-                              );
-                            },
+                    );
+                  }
+                },
+                child: Column(
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Timeline
+                        Container(
+                          width: 6,
+                          height: 110,
+                          margin: const EdgeInsets.only(
+                              right: 10, top: 10, bottom: 10),
+                          decoration: BoxDecoration(
+                            color: _statusColor(status),
+                            borderRadius: BorderRadius.circular(8),
                           ),
                         ),
-                      ),
-                      // Détails commande
-                      Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 0),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Flexible(
-                                    child: Text(
-                                      items.isNotEmpty ? (items[0]['name'] ?? 'Produit') : 'Produit',
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 16,
-                                        color: AppColors.primary,
+                        // Image produit
+                        Padding(
+                          padding: const EdgeInsets.only(
+                              top: 16, left: 0, right: 10),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(14),
+                            child: Image.network(
+                              items.isNotEmpty
+                                  ? (items[0]['imagePath'] ??
+                                      'https://via.placeholder.com/80')
+                                  : 'https://via.placeholder.com/80',
+                              width: 70,
+                              height: 70,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) {
+                                return Container(
+                                  width: 70,
+                                  height: 70,
+                                  color: Colors.grey.shade200,
+                                  child: const Icon(Icons.image,
+                                      color: Colors.grey),
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                        // Détails commande
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                                vertical: 16, horizontal: 0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Flexible(
+                                      child: Text(
+                                        items.isNotEmpty
+                                            ? (items[0]['name'] ?? 'Produit')
+                                            : 'Produit',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 16,
+                                          color: AppColors.primary,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
                                       ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
                                     ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: _statusColor(status).withOpacity(0.15),
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: Text(
-                                      _translateStatus(status),
-                                      style: TextStyle(
-                                        color: _statusColor(status),
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 12,
+                                    const SizedBox(width: 8),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 10, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: _statusColor(status)
+                                            .withOpacity(0.15),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Text(
+                                        _translateStatus(status),
+                                        style: TextStyle(
+                                          color: _statusColor(status),
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 12,
+                                        ),
                                       ),
                                     ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                '${items.length} article${items.length > 1 ? 's' : ''}',
-                                style: TextStyle(
-                                  color: Colors.grey.shade600,
-                                  fontSize: 13,
+                                  ],
                                 ),
-                              ),
-                              const SizedBox(height: 8),
-                              Row(
-                                children: [
-                                  const Icon(Icons.location_on, size: 13, color: Colors.grey),
-                                  const SizedBox(width: 4),
-                                  Expanded(
-                                    child: Text(
-                                      address,
-                                      style: const TextStyle(fontSize: 12, color: Colors.grey),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
+                                const SizedBox(height: 8),
+                                Row(
+                                  children: [
+                                    const Icon(Icons.location_on,
+                                        size: 14, color: AppColors.primary),
+                                    const SizedBox(width: 4),
+                                    Expanded(
+                                      child: Text(
+                                        data['adresse'] ??
+                                            'Adresse non spécifiée',
+                                        style: const TextStyle(
+                                          fontSize: 13,
+                                          color: Colors.black87,
+                                        ),
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
                                     ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 4),
-                              Row(
-                                children: [
-                                  const Icon(Icons.calendar_today, size: 13, color: Colors.grey),
-                                  const SizedBox(width: 4),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: AppColors.buttonColor.withOpacity(0.13),
-                                      borderRadius: BorderRadius.circular(6),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                Row(
+                                  children: [
+                                    const Icon(Icons.shopping_cart,
+                                        size: 14, color: AppColors.primary),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      '${items.length} article${items.length > 1 ? 's' : ''}',
+                                      style: const TextStyle(fontSize: 13),
                                     ),
-                                    child: Text(
-                                      date,
-                                      style: const TextStyle(fontSize: 12, color: AppColors.buttonColor),
+                                    const SizedBox(width: 12),
+                                    const Icon(Icons.calendar_today,
+                                        size: 14, color: AppColors.primary),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      _formatDate(timestamp),
+                                      style: const TextStyle(fontSize: 13),
                                     ),
-                                  ),
-                                ],
-                              ),
-                            ],
+                                  ],
+                                ),
+                              ],
+                            ),
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                  // Bouton pour accepter la livraison
-                  Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: ElevatedButton(
-                      onPressed: status == 'a la recherche du livreur' ? () async {
-                        try {
-                          await FirebaseFirestore.instance
-                              .collection('carts')
-                              .doc(doc.id)
-                              .update({
-                            'status': 'en route pour livraison',
-                            'livreurId': authState.user!['id'],
-                            'livreurName': authState.user!['name'],
-                            'timestamp': FieldValue.serverTimestamp(),
-                          });
-                          
-                          if (mounted) {
-                            setState(() {});
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Commande acceptée avec succès'),
-                                backgroundColor: Colors.green,
-                              ),
-                            );
-                          }
-                        } catch (e) {
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Erreur: $e'),
-                                backgroundColor: Colors.red,
-                              ),
-                            );
-                          }
-                        }
-                      } : null,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: status == 'a la recherche du livreur' 
-                            ? AppColors.primary 
-                            : Colors.grey,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
+                      ],
+                    ),
+                    // Bouton pour accepter la livraison
+                    Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: ElevatedButton(
+                        onPressed: status == 'a la recherche du livreur'
+                            ? () async {
+                                try {
+                                  await FirebaseFirestore.instance
+                                      .collection('carts')
+                                      .doc(doc.id)
+                                      .update({
+                                    'status': 'en route pour livraison',
+                                    'livreurId': authState.user!['id'],
+                                    'livreurName': authState.user!['name'],
+                                    'timestamp': FieldValue.serverTimestamp(),
+                                  });
+
+                                  if (mounted) {
+                                    setState(() {});
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                            'Commande acceptée avec succès'),
+                                        backgroundColor: Colors.green,
+                                      ),
+                                    );
+                                  }
+                                } catch (e) {
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text('Erreur: $e'),
+                                        backgroundColor: Colors.red,
+                                      ),
+                                    );
+                                  }
+                                }
+                              }
+                            : null,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: status == 'a la recherche du livreur'
+                              ? AppColors.primary
+                              : Colors.grey,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          minimumSize: const Size(double.infinity, 40),
                         ),
-                        minimumSize: const Size(double.infinity, 40),
-                      ),
-                      child: Text(
-                        status == 'a la recherche du livreur' 
-                            ? 'Accepter la livraison'
-                            : 'En cours de livraison',
-                        style: const TextStyle(color: Colors.white),
+                        child: Text(
+                          status == 'a la recherche du livreur'
+                              ? 'Accepter la livraison'
+                              : 'En cours de livraison',
+                          style: const TextStyle(color: Colors.white),
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             );
           }).toList(),
@@ -753,9 +820,7 @@ class _OrderScreenState extends State<OrderScreen> {
     final userId = authState.user!['id']?.toString() ?? '';
 
     return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('carts')
-          .snapshots(),
+      stream: FirebaseFirestore.instance.collection('carts').snapshots(),
       builder: (context, snapshot) {
         if (snapshot.hasError) {
           print('Erreur Firestore: ${snapshot.error}');
@@ -784,11 +849,15 @@ class _OrderScreenState extends State<OrderScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.inbox, size: 80, color: AppColors.buttonColor.withOpacity(0.3)),
+                Icon(Icons.inbox,
+                    size: 80, color: AppColors.buttonColor.withOpacity(0.3)),
                 const SizedBox(height: 18),
                 const Text(
                   'Aucune commande reçue',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.primary),
+                  style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.primary),
                 ),
               ],
             ),
@@ -799,7 +868,7 @@ class _OrderScreenState extends State<OrderScreen> {
         final filteredDocs = snapshot.data!.docs.where((doc) {
           final data = doc.data() as Map<String, dynamic>;
           if (data['items'] == null) return false;
-          
+
           final items = data['items'] as List;
           return items.any((item) {
             if (item is Map) {
@@ -814,11 +883,15 @@ class _OrderScreenState extends State<OrderScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.inbox, size: 80, color: AppColors.buttonColor.withOpacity(0.3)),
+                Icon(Icons.inbox,
+                    size: 80, color: AppColors.buttonColor.withOpacity(0.3)),
                 const SizedBox(height: 18),
                 const Text(
                   'Aucune commande reçue',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.primary),
+                  style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.primary),
                 ),
               ],
             ),
@@ -831,17 +904,17 @@ class _OrderScreenState extends State<OrderScreen> {
           final bData = b.data() as Map<String, dynamic>;
           final aTimestamp = aData['timestamp'] as Timestamp?;
           final bTimestamp = bData['timestamp'] as Timestamp?;
-          
+
           if (aTimestamp == null && bTimestamp == null) return 0;
           if (aTimestamp == null) return 1;
           if (bTimestamp == null) return -1;
-          
+
           return bTimestamp.compareTo(aTimestamp); // Tri décroissant
         });
 
         return ListView.separated(
-          padding: const EdgeInsets.all(16),
-          separatorBuilder: (_, __) => const SizedBox(height: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+          separatorBuilder: (_, __) => const SizedBox(height: 8),
           itemCount: filteredDocs.length,
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
@@ -849,7 +922,7 @@ class _OrderScreenState extends State<OrderScreen> {
             try {
               final doc = filteredDocs[index];
               final data = doc.data() as Map<String, dynamic>;
-              
+
               // Filtrer les items pour ne montrer que ceux du vendeur
               List<Map<String, dynamic>> items = [];
               if (data['items'] != null) {
@@ -864,14 +937,15 @@ class _OrderScreenState extends State<OrderScreen> {
                   );
                 }
               }
-              
+
               if (items.isEmpty) return const SizedBox.shrink();
-              
+
               final firstItem = items.isNotEmpty ? items[0] : null;
               final status = data['status']?.toString() ?? 'pending';
               final timestamp = data['timestamp'] as Timestamp?;
-              final adresse = data['adresse']?.toString() ?? 'Adresse non spécifiée';
-              
+              final adresse =
+                  data['adresse']?.toString() ?? 'Adresse non spécifiée';
+
               return InkWell(
                 borderRadius: BorderRadius.circular(18),
                 onTap: () {
@@ -906,7 +980,8 @@ class _OrderScreenState extends State<OrderScreen> {
                           Container(
                             width: 6,
                             height: 110,
-                            margin: const EdgeInsets.only(right: 10, top: 10, bottom: 10),
+                            margin: const EdgeInsets.only(
+                                right: 10, top: 10, bottom: 10),
                             decoration: BoxDecoration(
                               color: _statusColor(status),
                               borderRadius: BorderRadius.circular(8),
@@ -914,22 +989,27 @@ class _OrderScreenState extends State<OrderScreen> {
                           ),
                           // Image produit
                           Padding(
-                            padding: const EdgeInsets.only(top: 16, left: 0, right: 10),
+                            padding: const EdgeInsets.only(
+                                top: 16, left: 0, right: 10),
                             child: ClipRRect(
                               borderRadius: BorderRadius.circular(14),
-                              child: firstItem != null && firstItem['imagePath'] != null
+                              child: firstItem != null &&
+                                      firstItem['imagePath'] != null
                                   ? Image.network(
                                       firstItem['imagePath'],
                                       width: 70,
                                       height: 70,
                                       fit: BoxFit.cover,
-                                      errorBuilder: (context, error, stackTrace) {
-                                        print('Erreur de chargement image: $error');
+                                      errorBuilder:
+                                          (context, error, stackTrace) {
+                                        print(
+                                            'Erreur de chargement image: $error');
                                         return Container(
                                           width: 70,
                                           height: 70,
                                           color: Colors.grey.shade200,
-                                          child: const Icon(Icons.image, color: Colors.grey),
+                                          child: const Icon(Icons.image,
+                                              color: Colors.grey),
                                         );
                                       },
                                     )
@@ -937,14 +1017,16 @@ class _OrderScreenState extends State<OrderScreen> {
                                       width: 70,
                                       height: 70,
                                       color: Colors.grey.shade200,
-                                      child: const Icon(Icons.image, color: Colors.grey),
+                                      child: const Icon(Icons.image,
+                                          color: Colors.grey),
                                     ),
                             ),
                           ),
                           // Détails commande
                           Expanded(
                             child: Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 0),
+                              padding: const EdgeInsets.symmetric(
+                                  vertical: 16, horizontal: 0),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
@@ -963,11 +1045,14 @@ class _OrderScreenState extends State<OrderScreen> {
                                       ),
                                       const SizedBox(width: 8),
                                       Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 12, vertical: 4),
                                         margin: const EdgeInsets.only(right: 8),
                                         decoration: BoxDecoration(
-                                          color: _statusColor(status).withOpacity(0.1),
-                                          borderRadius: BorderRadius.circular(8),
+                                          color: _statusColor(status)
+                                              .withOpacity(0.1),
+                                          borderRadius:
+                                              BorderRadius.circular(8),
                                         ),
                                         child: Text(
                                           _translateStatus(status),
@@ -994,59 +1079,171 @@ class _OrderScreenState extends State<OrderScreen> {
                                   const SizedBox(height: 12),
                                   Row(
                                     children: [
-                                      const Icon(Icons.calendar_today, size: 14, color: AppColors.primary),
+                                      const Icon(Icons.calendar_today,
+                                          size: 14, color: AppColors.primary),
                                       const SizedBox(width: 4),
                                       Text(
                                         _formatDate(timestamp),
                                         style: const TextStyle(fontSize: 13),
                                       ),
                                       const SizedBox(width: 12),
-                                      const Icon(Icons.shopping_cart, size: 14, color: AppColors.primary),
+                                      const Icon(Icons.shopping_cart,
+                                          size: 14, color: AppColors.primary),
                                       const SizedBox(width: 4),
                                       Text(
                                         '${items.length} article${items.length > 1 ? 's' : ''}',
                                         style: const TextStyle(fontSize: 13),
                                       ),
-                                      const Spacer(),
-                                      if (status.toLowerCase() == 'pending')
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
+                                  if (status.toLowerCase() == 'pending')
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.end,
+                                      children: [
+                                        if (authState.user!['role'] ==
+                                            'vendeur')
+                                          Container(
+                                            margin:
+                                                const EdgeInsets.only(right: 8),
+                                            child: ElevatedButton(
+                                              onPressed: () async {
+                                                try {
+                                                  await FirebaseFirestore
+                                                      .instance
+                                                      .collection('carts')
+                                                      .doc(doc.id)
+                                                      .update({
+                                                    'status':
+                                                        'a la recherche du livreur'
+                                                  });
+
+                                                  saveCommande();
+                                                  if (mounted) {
+                                                    setState(
+                                                        () {}); // Force refresh
+                                                    ScaffoldMessenger.of(
+                                                            context)
+                                                        .showSnackBar(
+                                                      const SnackBar(
+                                                        content: Text(
+                                                            'Commande en attente de livreur'),
+                                                        backgroundColor:
+                                                            Colors.green,
+                                                      ),
+                                                    );
+                                                  }
+                                                } catch (e) {
+                                                  if (mounted) {
+                                                    ScaffoldMessenger.of(
+                                                            context)
+                                                        .showSnackBar(
+                                                      SnackBar(
+                                                        content:
+                                                            Text('Erreur: $e'),
+                                                        backgroundColor:
+                                                            Colors.red,
+                                                      ),
+                                                    );
+                                                  }
+                                                }
+                                              },
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor:
+                                                    AppColors.buttonColor2,
+                                                foregroundColor: Colors.white,
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                        horizontal: 12,
+                                                        vertical: 8),
+                                                shape: RoundedRectangleBorder(
+                                                  borderRadius:
+                                                      BorderRadius.circular(8),
+                                                ),
+                                                elevation: 2,
+                                              ),
+                                              child: const Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Icon(
+                                                      Icons
+                                                          .local_shipping_outlined,
+                                                      size: 16,
+                                                      color: Colors.white),
+                                                  SizedBox(width: 4),
+                                                  Text(
+                                                    'Prêt pour livraison',
+                                                    style: TextStyle(
+                                                      fontSize: 12,
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
                                         Container(
-                                          margin: const EdgeInsets.only(right: 16),
+                                          constraints: const BoxConstraints(
+                                              maxWidth: 100),
                                           child: ElevatedButton(
                                             onPressed: () {
                                               showDialog(
                                                 context: context,
-                                                builder: (context) => AlertDialog(
-                                                  title: const Text('Annuler la commande'),
-                                                  content: const Text('Êtes-vous sûr de vouloir annuler cette commande ?'),
+                                                builder: (context) =>
+                                                    AlertDialog(
+                                                  title: const Text(
+                                                      'Annuler la commande'),
+                                                  content: const Text(
+                                                      'Êtes-vous sûr de vouloir annuler cette commande ?'),
                                                   actions: [
                                                     TextButton(
-                                                      onPressed: () => Navigator.pop(context),
+                                                      onPressed: () =>
+                                                          Navigator.pop(
+                                                              context),
                                                       child: const Text('NON'),
                                                     ),
                                                     TextButton(
                                                       onPressed: () async {
                                                         try {
-                                                          await FirebaseFirestore.instance
-                                                              .collection('carts')
+                                                          await FirebaseFirestore
+                                                              .instance
+                                                              .collection(
+                                                                  'carts')
                                                               .doc(doc.id)
-                                                              .update({'status': 'cancelled'});
+                                                              .update({
+                                                            'status':
+                                                                'cancelled'
+                                                          });
                                                           if (mounted) {
-                                                            Navigator.pop(context);
-                                                            setState(() {}); // Force refresh
-                                                            ScaffoldMessenger.of(context).showSnackBar(
+                                                            Navigator.pop(
+                                                                context);
+                                                            setState(
+                                                                () {}); // Force refresh
+                                                            ScaffoldMessenger
+                                                                    .of(context)
+                                                                .showSnackBar(
                                                               const SnackBar(
-                                                                content: Text('Commande annulée avec succès'),
-                                                                backgroundColor: Colors.green,
+                                                                content: Text(
+                                                                    'Commande annulée avec succès'),
+                                                                backgroundColor:
+                                                                    Colors
+                                                                        .green,
                                                               ),
                                                             );
                                                           }
                                                         } catch (e) {
                                                           if (mounted) {
-                                                            Navigator.pop(context);
-                                                            ScaffoldMessenger.of(context).showSnackBar(
+                                                            Navigator.pop(
+                                                                context);
+                                                            ScaffoldMessenger
+                                                                    .of(context)
+                                                                .showSnackBar(
                                                               SnackBar(
-                                                                content: Text('Erreur lors de l\'annulation: $e'),
-                                                                backgroundColor: Colors.red,
+                                                                content: Text(
+                                                                    'Erreur lors de l\'annulation: $e'),
+                                                                backgroundColor:
+                                                                    Colors.red,
                                                               ),
                                                             );
                                                           }
@@ -1061,16 +1258,22 @@ class _OrderScreenState extends State<OrderScreen> {
                                             style: ElevatedButton.styleFrom(
                                               backgroundColor: Colors.red,
                                               foregroundColor: Colors.white,
-                                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      horizontal: 8,
+                                                      vertical: 8),
                                               shape: RoundedRectangleBorder(
-                                                borderRadius: BorderRadius.circular(8),
+                                                borderRadius:
+                                                    BorderRadius.circular(8),
                                               ),
                                               elevation: 2,
                                             ),
                                             child: const Row(
                                               mainAxisSize: MainAxisSize.min,
                                               children: [
-                                                Icon(Icons.cancel_outlined, size: 16, color: Colors.white),
+                                                Icon(Icons.cancel_outlined,
+                                                    size: 16,
+                                                    color: Colors.white),
                                                 SizedBox(width: 4),
                                                 Text(
                                                   'Annuler',
@@ -1083,63 +1286,8 @@ class _OrderScreenState extends State<OrderScreen> {
                                             ),
                                           ),
                                         ),
-                                      if (authState.user!['role'] == 'vendeur' && status.toLowerCase() == 'pending')
-                                        Container(
-                                          margin: const EdgeInsets.only(right: 16),
-                                          child: ElevatedButton(
-                                            onPressed: () async {
-                                              try {
-                                                await FirebaseFirestore.instance
-                                                    .collection('carts')
-                                                    .doc(doc.id)
-                                                    .update({'status': 'a la recherche du livreur'});
-                                                if (mounted) {
-                                                  setState(() {}); // Force refresh
-                                                  ScaffoldMessenger.of(context).showSnackBar(
-                                                    const SnackBar(
-                                                      content: Text('Commande en attente de livreur'),
-                                                      backgroundColor: Colors.green,
-                                                    ),
-                                                  );
-                                                }
-                                              } catch (e) {
-                                                if (mounted) {
-                                                  ScaffoldMessenger.of(context).showSnackBar(
-                                                    SnackBar(
-                                                      content: Text('Erreur: $e'),
-                                                      backgroundColor: Colors.red,
-                                                    ),
-                                                  );
-                                                }
-                                              }
-                                            },
-                                            style: ElevatedButton.styleFrom(
-                                              backgroundColor: AppColors.buttonColor2,
-                                              foregroundColor: Colors.white,
-                                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                              shape: RoundedRectangleBorder(
-                                                borderRadius: BorderRadius.circular(8),
-                                              ),
-                                              elevation: 2,
-                                            ),
-                                            child: const Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                Icon(Icons.local_shipping_outlined, size: 16, color: Colors.white),
-                                                SizedBox(width: 4),
-                                                Text(
-                                                  'Prêt pour livraison',
-                                                  style: TextStyle(
-                                                    fontSize: 12,
-                                                    fontWeight: FontWeight.bold,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        ),
-                                    ],
-                                  ),
+                                      ],
+                                    ),
                                 ],
                               ),
                             ),
@@ -1198,7 +1346,8 @@ class _OrderScreenState extends State<OrderScreen> {
                   Container(
                     width: 6,
                     height: 110,
-                    margin: const EdgeInsets.only(right: 10, top: 10, bottom: 10),
+                    margin:
+                        const EdgeInsets.only(right: 10, top: 10, bottom: 10),
                     decoration: BoxDecoration(
                       color: AppColors.buttonColor.withOpacity(0.3),
                       borderRadius: BorderRadius.circular(8),
@@ -1216,7 +1365,8 @@ class _OrderScreenState extends State<OrderScreen> {
                   // Détails shimmer
                   Expanded(
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 0),
+                      padding: const EdgeInsets.symmetric(
+                          vertical: 16, horizontal: 0),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [

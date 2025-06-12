@@ -513,7 +513,7 @@ void saveCommande() async {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                ElevatedButton(onPressed: saveCommande, child: const Text('Enregistrer commande')),
+                // ElevatedButton(onPressed: saveCommande, child: const Text('Enregistrer commande')),
                 const Text('Vos Produits',
                     style:
                         TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),

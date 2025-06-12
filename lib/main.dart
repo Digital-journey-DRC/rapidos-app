@@ -22,6 +22,8 @@ import 'package:immo/screens/dashboard/Annonce_screen.dart';
 import 'package:immo/screens/dashboard/dashboard_screen.dart';
 import 'package:immo/screens/main_screen.dart';
 import 'package:immo/screens/messages_screen.dart';
+import 'package:immo/screens/order_details_screen.dart';
+import 'package:immo/screens/order_screen.dart';
 import 'package:immo/services/auth_service.dart';
 import 'package:immo/services/building_service.dart';
 import 'package:immo/services/apartment_service.dart';
@@ -47,8 +49,37 @@ import 'package:flutter/foundation.dart';
 import 'dart:io';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
+import 'package:flutter/services.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
-AudioPlayer player = AudioPlayer();
+final AudioPlayer player = AudioPlayer();
+
+// Clé globale pour accéder au contexte de navigation
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
+Future<void> _playNotificationSound() async {
+  try {
+    print('🎵 Tentative de lecture du son...');
+    if (Platform.isAndroid) {
+      // Pour Android, utiliser le son depuis le dossier raw
+      await player.setAsset('res/raw/notif.mp3');
+    } else {
+      // Pour iOS, utiliser le son depuis le dossier Runner
+      await player.setAsset('ios/Runner/notif.caf');
+    }
+    print('✅ Son chargé avec succès');
+    await player.play();
+    print('✅ Son joué avec succès');
+  } catch (e) {
+    print('❌ Erreur lors de la lecture du son: $e');
+  }
+}
+
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp();
+  await _playNotificationSound();
+}
 
 class FirebaseMessagingService {
   static final FirebaseMessagingService _instance = FirebaseMessagingService._internal();
@@ -111,15 +142,48 @@ class FirebaseMessagingService {
         alert: true,
         badge: true,
         sound: true,
+        provisional: true,
       );
 
       print('User granted permission: ${settings.authorizationStatus}');
 
+      // Configurer le canal de notification pour Android
+      if (Platform.isAndroid) {
+        const AndroidNotificationChannel channel = AndroidNotificationChannel(
+          'order_notifications', // id
+          'Order Notifications', // title
+          description: 'This channel is used for order notifications.', // description
+          importance: Importance.high,
+          playSound: true,
+          sound: RawResourceAndroidNotificationSound('notif'), // Nom du fichier sans extension
+        );
+
+        final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
+            FlutterLocalNotificationsPlugin();
+
+        await flutterLocalNotificationsPlugin
+            .resolvePlatformSpecificImplementation<
+                AndroidFlutterLocalNotificationsPlugin>()
+            ?.createNotificationChannel(channel);
+      }
+
+      // Configuration spécifique pour iOS
+      if (Platform.isIOS) {
+        await _firebaseMessaging.setForegroundNotificationPresentationOptions(
+          alert: true,
+          badge: true,
+          sound: true,
+        );
+      }
+
       // Configurer le gestionnaire de messages en premier plan
-      FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
         print('📩 Message reçu en premier plan: ${message.notification?.title}');
-        
+        await _playNotificationSound();
       });
+
+      // Configurer le gestionnaire de messages en arrière-plan
+      FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
       // Obtenir le token FCM
       String? token = await _firebaseMessaging.getToken();
@@ -128,61 +192,8 @@ class FirebaseMessagingService {
       if (settings.authorizationStatus == AuthorizationStatus.authorized ||
           settings.authorizationStatus == AuthorizationStatus.provisional) {
         
-        // Set foreground notification presentation options
-        await _firebaseMessaging.setForegroundNotificationPresentationOptions(
-          alert: true,
-          badge: true,
-          sound: true,
-        );
-
-        // iOS specific setup
-        if (Platform.isIOS) {
-          print("📱 Configuring iOS notifications...");
-          
-          // Initialize Firebase first
-          await Firebase.initializeApp(
-            options: DefaultFirebaseOptions.currentPlatform,
-          );
-          
-          // Get FCM token first
-          String? fcmToken = await _firebaseMessaging.getToken();
-          print('📱 FCM Token: $fcmToken');
-          
-          // Try to get APNS token with retry mechanism
-          int retryCount = 0;
-          String? apnsToken;
-          
-          while (apnsToken == null && retryCount < 3) {
-            try {
-              apnsToken = await _firebaseMessaging.getAPNSToken();
-              print('🍎 APNS Token (attempt ${retryCount + 1}): $apnsToken');
-              
-              if (apnsToken == null) {
-                retryCount++;
-                if (retryCount < 3) {
-                  print('⚠️ APNS Token is null, waiting before retry...');
-                  await Future.delayed(const Duration(seconds: 3));
-                }
-              }
-            } catch (e) {
-              print('❌ Error getting APNS token: $e');
-              retryCount++;
-              if (retryCount < 3) {
-                await Future.delayed(const Duration(seconds: 3));
-              }
-            }
-          }
-          
-          if (apnsToken == null) {
-            print('⚠️ Failed to get APNS token after 3 attempts');
-          }
-        }
-
         // Setup message handlers
         setupFirebaseMessaging();
-
-        // Handle background messages
-        FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
         // Listen for token refresh
         _firebaseMessaging.onTokenRefresh.listen((String token) {
@@ -201,9 +212,8 @@ class FirebaseMessagingService {
       } else {
         print("❌ Notification permissions not granted: ${settings.authorizationStatus}");
       }
-    } catch (e, stackTrace) {
+    } catch (e) {
       print("❌ Error initializing Firebase Messaging: $e");
-      print("Stack trace: $stackTrace");
     }
   }
 
@@ -226,6 +236,7 @@ class FirebaseMessagingService {
         print('📨 App ouverte via notification: ${message.notification?.title}');
         print('📨 Message data: ${message.data}');
         _handleNotificationTap(message);
+
       }, onError: (error) {
         print("❌ Error in onMessageOpenedApp listener: $error");
       });
@@ -263,28 +274,40 @@ class FirebaseMessagingService {
   }
 
   void _handleNotificationTap(RemoteMessage message) {
+          Navigator.push(
+            navigatorKey.currentContext!,
+            MaterialPageRoute(
+              builder: (context) => const OrderScreen(
+                backNavigation: true,
+              ),
+            ),
+          );
     // Gérer la navigation en fonction du type de notification
-    if (message.data.containsKey('type')) {
-      switch (message.data['type']) {
-        case 'order':
-          String orderId = message.data['orderId'];
-          print('Naviguer vers la commande: $orderId');
-          // TODO: Implémenter la navigation vers la page de commande
-          break;
-        case 'chat':
-          String chatId = message.data['chatId'];
-          print('Naviguer vers le chat: $chatId');
-          // TODO: Implémenter la navigation vers la page de chat
-          break;
-        default:
-          print('Type de notification non géré: ${message.data['type']}');
-      }
-    }
+    // if (message.data.containsKey('type')) {
+    //   switch (message.data['type']) {
+    //     case 'order':
+    //       String orderId = message.data['orderId'];
+    //       print('Naviguer vers la commande: $orderId');
+    //       // Naviguer vers la page de commande
+    //       Navigator.push(
+    //         navigatorKey.currentContext!,
+    //         MaterialPageRoute(
+    //           builder: (context) => const OrderScreen(
+    //             backNavigation: true,
+    //           ),
+    //         ),
+    //       );
+    //       break;
+    //     case 'chat':
+    //       String chatId = message.data['chatId'];
+    //       print('Naviguer vers le chat: $chatId');
+    //       // TODO: Implémenter la navigation vers la page de chat
+    //       break;
+    //     default:
+    //       print('Type de notification non géré: ${message.data['type']}');
+    //   }
+    // }
   }
-}
-
-Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  await Firebase.initializeApp();
 }
 
 void main() async {
@@ -499,6 +522,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       child: BlocBuilder<AuthCubit, AuthState>(
         builder: (context, state) {
           return MaterialApp(
+            navigatorKey: navigatorKey,
             debugShowCheckedModeBanner: false,
             title: 'Immo App',
             supportedLocales: const [
