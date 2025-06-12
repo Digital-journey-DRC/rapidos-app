@@ -16,7 +16,7 @@ class ProductDetailScreen extends StatefulWidget {
   final String tag;
   final String category;
   final String name;
-  final String price;
+  final double price;
   final String imagePath;
   final void Function()? goToCartTab;
   final String idVendeur;
@@ -261,7 +261,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   
                   // Price
                   Text(
-                    widget.price,
+                    "${widget.price.toStringAsFixed(0)} FC",
                     style: const TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 22,

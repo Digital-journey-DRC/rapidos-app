@@ -73,7 +73,7 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> with Sing
                   // Cover image with gradient overlay
                   ShaderMask(
                     shaderCallback: (rect) {
-                      return LinearGradient(
+                      return const LinearGradient(
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
                         colors: [Colors.black, Colors.transparent],
@@ -351,7 +351,7 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> with Sing
           stock: int.tryParse(product['stock']?.toString() ?? '0') ?? 0,
           id: int.tryParse(product['id']?.toString() ?? index.toString()) ?? index,
           name: product['name']?.toString() ?? '',
-          price: product['price'] != null ? '${product['price']} FC' : '',
+          price: product['price'] != null ? double.tryParse(product['price'].toString()) ?? 0.0 : 0.0,
           imagePath: product['media'] != null && product['media']['mediaUrl'] != null
               ? product['media']['mediaUrl']
               : 'https://via.placeholder.com/150',
@@ -366,7 +366,7 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> with Sing
     required String idVendeur,
     required int id,
     required String name,
-    required String price,
+    required double price,
     required String imagePath,
     required String tag,
     required String category,
@@ -482,7 +482,7 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> with Sing
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  price,
+                  "$price FC",
                   style: TextStyle(
                     color: Colors.grey.shade800,
                     fontSize: 14,

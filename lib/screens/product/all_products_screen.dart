@@ -86,7 +86,7 @@ class _TwitterStyleProductCard extends StatelessWidget {
               stock: product.stock,
               category: 'Catégorie',
               name: product.name,
-              price: '${product.price} FC',
+              price: product.price,
               imagePath: product.media?.mediaUrl != null
                 ? 'http://24.144.87.127:3333/${product.media!.mediaUrl}'
                 : 'https://via.placeholder.com/150',

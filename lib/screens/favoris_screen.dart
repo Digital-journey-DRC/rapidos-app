@@ -59,7 +59,7 @@ class FavorisScreen extends StatelessWidget {
                           stock: product['stock'],
                           category: product['category'] ?? '',
                           name: product['name'],
-                          price: '${product['price']}',
+                          price: product['price'],
                           imagePath: imageUrl,
                         ),
                       ),

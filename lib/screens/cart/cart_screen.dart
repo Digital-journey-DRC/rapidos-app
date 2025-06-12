@@ -921,7 +921,7 @@ class _CartScreenState extends State<CartScreen> {
                                         ),
                                         const SizedBox(height: 8),
                                         Text(
-                                          item['price'],
+                                          '${item['price']} FC',
                                           style: const TextStyle(
                                             fontWeight: FontWeight.bold,
                                             fontSize: 16,

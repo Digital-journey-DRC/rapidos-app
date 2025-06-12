@@ -349,7 +349,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                                 tag: 'Nouveau',
                                 category: 'Catégorie',
                                 name: product.name,
-                                price: '${product.price} FC',
+                                price: product.price,
                                 imagePath: product.media?.mediaUrl != null
                                     ? product.media!.mediaUrl
                                     : 'https://via.placeholder.com/150',
@@ -547,7 +547,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
     required String category,
     required int stock,
     required String name,
-    required String price,
+    required double price,
     required String imagePath,
   }) {
     return Builder(
@@ -655,7 +655,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        price,
+                        price.toString() + " FC",
                         style: const TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 14,
