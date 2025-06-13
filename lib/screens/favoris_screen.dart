@@ -49,16 +49,18 @@ class FavorisScreen extends StatelessWidget {
                 return InkWell(
                   borderRadius: BorderRadius.circular(12),
                   onTap: () {
+                    print(product['idVendeur']);
+                    print(product);
                     Navigator.push(
                       context,
                       MaterialPageRoute(
                         builder: (context) => ProductDetailScreen(
-                          idVendeur: product['vendeurId'],
-                          id: product['id'],
+                          idVendeur: product['vendeurId']??'',
+                          id: product['id']??'',
                           tag: 'Favori',
-                          stock: product['stock'],
+                          stock: product['stock']??0,
                           category: product['category'] ?? '',
-                          name: product['name'],
+                          name: product['name']??"",
                           price: product['price'],
                           imagePath: imageUrl,
                         ),
@@ -112,7 +114,7 @@ class FavorisScreen extends StatelessWidget {
                                 // ),
                                 const SizedBox(height: 8),
                                 Text(
-                                  '${product['price']}',
+                                  '${product['price']} FC',
                                   style: const TextStyle(
                                     fontWeight: FontWeight.bold,
                                     fontSize: 16,

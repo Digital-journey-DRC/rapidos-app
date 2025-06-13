@@ -88,50 +88,50 @@ class FirebaseMessagingService {
 
   final FirebaseMessaging _firebaseMessaging = FirebaseMessaging.instance;
 
-  static Future<void> saveTokenToFirestore(String token, AuthState authState) async {
-    try {
-      String? userId;
-      String? role;
+  // static Future<void> saveTokenToFirestore(String token, AuthState authState) async {
+  //   try {
+  //     String? userId;
+  //     String? role;
 
-      if (authState is AuthSuccess && authState.user != null) {
-        print('📱 AuthState user data: ${authState.user}');
-        userId = authState.user!['id']?.toString();
-        role = authState.user!['role'];
-        print('📱 From AuthState - userId: $userId, role: $role');
-      } else {
-        // Si l'état d'authentification n'a pas les données, essayer de les récupérer depuis SharedPreferences
-        final prefs = await SharedPreferences.getInstance();
-        final userDataStr = prefs.getString('user_data');
-        print('📱 SharedPreferences user data: $userDataStr');
+  //     if (authState is AuthSuccess && authState.user != null) {
+  //       print('📱 AuthState user data: ${authState.user}');
+  //       userId = authState.user!['id']?.toString();
+  //       role = authState.user!['role'];
+  //       print('📱 From AuthState - userId: $userId, role: $role');
+  //     } else {
+  //       // Si l'état d'authentification n'a pas les données, essayer de les récupérer depuis SharedPreferences
+  //       final prefs = await SharedPreferences.getInstance();
+  //       final userDataStr = prefs.getString('user_data');
+  //       print('📱 SharedPreferences user data: $userDataStr');
         
-        if (userDataStr != null) {
-          try {
-            final userData = jsonDecode(userDataStr);
-            print('📱 Parsed user data: $userData');
-            userId = userData['id']?.toString();
-            role = userData['role'];
-            print('📱 From SharedPreferences - userId: $userId, role: $role');
-          } catch (e) {
-            print('❌ Error parsing user data from SharedPreferences: $e');
-          }
-        }
-      }
+  //       if (userDataStr != null) {
+  //         try {
+  //           final userData = jsonDecode(userDataStr);
+  //           print('📱 Parsed user data: $userData');
+  //           userId = userData['id']?.toString();
+  //           role = userData['role'];
+  //           print('📱 From SharedPreferences - userId: $userId, role: $role');
+  //         } catch (e) {
+  //           print('❌ Error parsing user data from SharedPreferences: $e');
+  //         }
+  //       }
+  //     }
 
-      final docRef = FirebaseFirestore.instance.collection('tokens').doc(token);
-      await docRef.set({
-        'token': token,
-        'timestamp': FieldValue.serverTimestamp(),
-        'platform': Platform.isIOS ? 'ios' : 'android',
-        'role': role ?? 'user',
-        'userId': userId ?? '1',
-        'permission_status': (await FirebaseMessaging.instance.getNotificationSettings()).authorizationStatus.toString(),
-      });
+  //     final docRef = FirebaseFirestore.instance.collection('tokens').doc(token);
+  //     await docRef.set({
+  //       'token': token,
+  //       'timestamp': FieldValue.serverTimestamp(),
+  //       'platform': Platform.isIOS ? 'ios' : 'android',
+  //       'role': role ?? 'user',
+  //       'userId': userId ?? '1',
+  //       'permission_status': (await FirebaseMessaging.instance.getNotificationSettings()).authorizationStatus.toString(),
+  //     });
 
-      print("✅ Token saved to Firestore successfully");
-    } catch (e) {
-      print("❌ Error saving token to Firestore: $e");
-    }
-  }
+  //     print("✅ Token saved to Firestore successfully");
+  //   } catch (e) {
+  //     print("❌ Error saving token to Firestore: $e");
+  //   }
+  // }
 
   Future<void> initialize() async {
     try {
@@ -198,14 +198,14 @@ class FirebaseMessagingService {
         // Listen for token refresh
         _firebaseMessaging.onTokenRefresh.listen((String token) {
           print('🔄 FCM Token Refreshed: $token');
-          saveTokenToFirestore(token, AuthInitial());
+          // saveTokenToFirestore(token, AuthInitial());
         });
 
         // Get initial token
         String? initialToken = await _firebaseMessaging.getToken();
         if (initialToken != null) {
           print('✅ Initial FCM Token: $initialToken');
-          await saveTokenToFirestore(initialToken, AuthInitial());
+          // await saveTokenToFirestore(initialToken, AuthInitial());
         } else {
           print('⚠️ No FCM token received');
         }
@@ -429,7 +429,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
           // Listen for token refresh
           messaging.onTokenRefresh.listen((String token) {
             print('🔄 FCM Token Refreshed: $token');
-            FirebaseMessagingService.saveTokenToFirestore(token, _authCubit.state);
+            // FirebaseMessagingService.saveTokenToFirestore(token, _authCubit.state);
           });
 
           if (Platform.isIOS) {
@@ -464,7 +464,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
           String? token = await messaging.getToken();
           if (token != null) {
             print('✅ FCM Token received: $token');
-            await FirebaseMessagingService.saveTokenToFirestore(token, _authCubit.state);
+            // await FirebaseMessagingService.saveTokenToFirestore(token, _authCubit.state);
             return; // Success, exit the retry loop
           } else {
             print('⚠️ No FCM token received');

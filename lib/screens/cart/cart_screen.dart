@@ -177,15 +177,254 @@ class _CartScreenState extends State<CartScreen> {
 
   void _showAddressBottomSheet(
       BuildContext context, List<Map<String, dynamic>> cartItems) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+      ),
+      builder: (context) {
+        return BlocConsumer<OrderCubit, OrderState>(
+          listener: (context, state) {
+            if (state.success) {
+              Navigator.pop(context);
+              context.read<CartCubit>().clearCart();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Commande créée avec succès!'),
+                  backgroundColor: AppColors.success,
+                ),
+              );
+            } else if (state.error != null) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(state.error!),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            }
+          },
+          builder: (context, state) {
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 24,
+                right: 24,
+                top: 32,
+                bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+              ),
+              child: DraggableScrollableSheet(
+                initialChildSize: 0.9,
+                minChildSize: 0.5,
+                maxChildSize: 0.95,
+                expand: false,
+                builder: (context, scrollController) {
+                  return SingleChildScrollView(
+                    controller: scrollController,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Center(
+                          child: Container(
+                            width: 40,
+                            height: 4,
+                            margin: const EdgeInsets.only(bottom: 16),
+                            decoration: BoxDecoration(
+                              color: Colors.grey[300],
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
+                        ),
+                        const Text(
+                          'Adresse de livraison',
+                          style: TextStyle(
+                              fontSize: 20, fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 20),
+                        StreamBuilder<QuerySnapshot>(
+                          stream: () {
+                            final authState = context.read<AuthCubit>().state;
+                            final userId = authState is AuthSuccess &&
+                                    authState.user != null
+                                ? authState.user!['id']?.toString() ?? ''
+                                : '';
+                            return FirebaseFirestore.instance
+                                .collection('delivery_addresses')
+                                .where('userId', isEqualTo: userId)
+                                .snapshots();
+                          }(),
+                          builder: (context, snapshot) {
+                            if (snapshot.hasError) {
+                              return Text('Erreur: ${snapshot.error}');
+                            }
+
+                            if (snapshot.connectionState ==
+                                ConnectionState.waiting) {
+                              return const Center(
+                                  child: CircularProgressIndicator());
+                            }
+
+                            if (!snapshot.hasData ||
+                                snapshot.data!.docs.isEmpty) {
+                              return Column(
+                                children: [
+                                  Text(
+                                    'Aucune adresse enregistrée',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      color: Colors.grey[600],
+                                    ),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  TextButton.icon(
+                                    onPressed: () {
+                                      Navigator.pop(context);
+                                      _showNewAddressForm(context, cartItems);
+                                    },
+                                    icon: const Icon(Icons.add_location_alt),
+                                    label: const Text(
+                                        'Ajouter une nouvelle adresse'),
+                                  ),
+                                ],
+                              );
+                            }
+
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Vos adresses enregistrées :',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.grey[700],
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                ...snapshot.data!.docs.map((doc) {
+                                  final address =
+                                      doc.data() as Map<String, dynamic>;
+                                  return Card(
+                                    color: Colors.white,
+                                    margin: const EdgeInsets.only(bottom: 12),
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(16),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                              '${address['avenue']}, ${address['numero']}'),
+                                          Text(
+                                              '${address['quartier']}, ${address['commune']}'),
+                                          Text(
+                                              '${address['ville']}, ${address['pays']}'),
+                                          const SizedBox(height: 8),
+                                          SizedBox(
+                                            width: double.infinity,
+                                            child: ElevatedButton(
+                                              onPressed: state.isLoading
+                                                  ? null
+                                                  : () {
+                                                      context
+                                                          .read<OrderCubit>()
+                                                          .createOrder(
+                                                            produits: cartItems
+                                                                .map((item) {
+                                                              return {
+                                                                "id": int.parse(
+                                                                    item['id']
+                                                                        .toString()),
+                                                                "quantity":
+                                                                    item[
+                                                                        'quantity'],
+                                                              };
+                                                            }).toList(),
+                                                            ville: address[
+                                                                'ville'],
+                                                            commune: address[
+                                                                'commune'],
+                                                            quartier: address[
+                                                                'quartier'],
+                                                            avenue: address[
+                                                                'avenue'],
+                                                            codePostale: '',
+                                                            numero: address[
+                                                                'numero'],
+                                                            pays: address['pays'],
+                                                          );
+
+                                                      saveCart(
+                                                          context,
+                                                          cartItems,
+                                                          address['ville'],
+                                                          address['commune'],
+                                                          address['quartier'],
+                                                          address['avenue'],
+                                                          address['numero'],
+                                                          address['pays']);
+                                                    },
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor:
+                                                    AppColors.primary,
+                                                foregroundColor: Colors.white,
+                                                shape: RoundedRectangleBorder(
+                                                  borderRadius:
+                                                      BorderRadius.circular(12),
+                                                ),
+                                              ),
+                                              child: state.isLoading
+                                                  ? const CircularProgressIndicator(
+                                                      color: Colors.white)
+                                                  : const Text(
+                                                      'UTILISER CETTE ADRESSE',
+                                                      style: TextStyle(
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                        fontSize: 14,
+                                                      ),
+                                                    ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                }).toList(),
+                                const SizedBox(height: 16),
+                                TextButton.icon(
+                                  onPressed: () {
+                                    Navigator.pop(context);
+                                    _showNewAddressForm(context, cartItems);
+                                  },
+                                  icon: const Icon(Icons.add_location_alt),
+                                  label: const Text(
+                                      'Ajouter une nouvelle adresse'),
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showNewAddressForm(
+      BuildContext context, List<Map<String, dynamic>> cartItems) {
     final _villeController = TextEditingController();
     final _communeController = TextEditingController();
     final _quartierController = TextEditingController();
     final _avenueController = TextEditingController();
-    final _codePostaleController = TextEditingController();
     final _numeroController = TextEditingController();
     final _paysController = TextEditingController(text: 'RDC');
-    String? selectedVille;
-    String? selectedCommune;
     bool saveAddress = false;
 
     showModalBottomSheet(
@@ -225,525 +464,241 @@ class _CartScreenState extends State<CartScreen> {
                     top: 32,
                     bottom: MediaQuery.of(context).viewInsets.bottom + 24,
                   ),
-                  child: DraggableScrollableSheet(
-                    initialChildSize: 0.9,
-                    minChildSize: 0.5,
-                    maxChildSize: 0.95,
-                    expand: false,
-                    builder: (context, scrollController) {
-                      return SingleChildScrollView(
-                        controller: scrollController,
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
                           children: [
-                            Center(
-                              child: Container(
-                                width: 40,
-                                height: 4,
-                                margin: const EdgeInsets.only(bottom: 16),
-                                decoration: BoxDecoration(
-                                  color: Colors.grey[300],
-                                  borderRadius: BorderRadius.circular(2),
-                                ),
-                              ),
+                            IconButton(
+                              icon: const Icon(Icons.arrow_back),
+                              onPressed: () {
+                                Navigator.pop(context);
+                                _showAddressBottomSheet(context, cartItems);
+                              },
                             ),
                             const Text(
-                              'Adresse de livraison',
+                              'Nouvelle adresse',
                               style: TextStyle(
-                                  fontSize: 20, fontWeight: FontWeight.bold),
-                            ),
-                            const SizedBox(height: 20),
-                            StreamBuilder<QuerySnapshot>(
-                              stream: () {
-                                final authState =
-                                    context.read<AuthCubit>().state;
-                                final userId = authState is AuthSuccess &&
-                                        authState.user != null
-                                    ? authState.user!['id']?.toString() ?? ''
-                                    : '';
-                                return FirebaseFirestore.instance
-                                    .collection('delivery_addresses')
-                                    .where('userId', isEqualTo: userId)
-                                    .snapshots();
-                              }(),
-                              builder: (context, snapshot) {
-                                if (snapshot.hasError) {
-                                  return Text('Erreur: ${snapshot.error}');
-                                }
-
-                                if (snapshot.connectionState ==
-                                    ConnectionState.waiting) {
-                                  return const Center(
-                                      child: CircularProgressIndicator());
-                                }
-
-                                if (!snapshot.hasData ||
-                                    snapshot.data!.docs.isEmpty) {
-                                  return Column(
-                                    children: [
-                                      Text(
-                                        'Aucune adresse enregistrée',
-                                        style: TextStyle(
-                                          fontSize: 16,
-                                          color: Colors.grey[600],
-                                        ),
-                                      ),
-                                      const SizedBox(height: 16),
-                                      TextButton.icon(
-                                        onPressed: () {
-                                          setState(() {
-                                            useNewAddress.value = true;
-                                          });
-                                        },
-                                        icon:
-                                            const Icon(Icons.add_location_alt),
-                                        label: const Text(
-                                            'Ajouter une nouvelle adresse'),
-                                      ),
-                                      if (useNewAddress.value) ...[
-                                        const SizedBox(height: 16),
-                                        _buildAddressForm(
-                                          context,
-                                          state,
-                                          cartItems,
-                                          _villeController,
-                                          _communeController,
-                                          _quartierController,
-                                          _avenueController,
-                                          _numeroController,
-                                          _paysController,
-                                          selectedVille,
-                                          selectedCommune,
-                                          saveAddress,
-                                          setState,
-                                        ),
-                                      ],
-                                    ],
-                                  );
-                                }
-
-                                if (useNewAddress.value) {
-                                  return Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        children: [
-                                          IconButton(
-                                            icon: const Icon(Icons.arrow_back),
-                                            onPressed: () {
-                                              setState(() {
-                                                useNewAddress.value = false;
-                                              });
-                                            },
-                                          ),
-                                          const Text(
-                                            'Mes adresses',
-                                            style: TextStyle(
-                                              fontSize: 20,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 16),
-                                      _buildAddressForm(
-                                        context,
-                                        state,
-                                        cartItems,
-                                        _villeController,
-                                        _communeController,
-                                        _quartierController,
-                                        _avenueController,
-                                        _numeroController,
-                                        _paysController,
-                                        selectedVille,
-                                        selectedCommune,
-                                        saveAddress,
-                                        setState,
-                                      ),
-                                    ],
-                                  );
-                                }
-
-                                return Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'Vos adresses enregistrées :',
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.grey[700],
-                                      ),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    ...snapshot.data!.docs.map((doc) {
-                                      final address =
-                                          doc.data() as Map<String, dynamic>;
-                                      return Card(
-                                        color: Colors.white,
-                                        margin:
-                                            const EdgeInsets.only(bottom: 12),
-                                        child: Padding(
-                                          padding: const EdgeInsets.all(16),
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                  '${address['avenue']}, ${address['numero']}'),
-                                              Text(
-                                                  '${address['quartier']}, ${address['commune']}'),
-                                              Text(
-                                                  '${address['ville']}, ${address['pays']}'),
-                                              const SizedBox(height: 8),
-                                              SizedBox(
-                                                width: double.infinity,
-                                                child: ElevatedButton(
-                                                  onPressed: state.isLoading
-                                                      ? null
-                                                      : () {
-                                                          context
-                                                              .read<
-                                                                  OrderCubit>()
-                                                              .createOrder(
-                                                                produits:
-                                                                    cartItems.map(
-                                                                        (item) {
-                                                                  return {
-                                                                    "id": int.parse(
-                                                                        item['id']
-                                                                            .toString()),
-                                                                    "quantity":
-                                                                        item[
-                                                                            'quantity'],
-                                                                  };
-                                                                }).toList(),
-                                                                ville: address[
-                                                                    'ville'],
-                                                                commune: address[
-                                                                    'commune'],
-                                                                quartier: address[
-                                                                    'quartier'],
-                                                                avenue: address[
-                                                                    'avenue'],
-                                                                codePostale: '',
-                                                                numero: address[
-                                                                    'numero'],
-                                                                pays: address[
-                                                                    'pays'],
-                                                              );
-
-                                                          saveCart(
-                                                              context,
-                                                              cartItems,
-                                                              address['ville'],
-                                                              address[
-                                                                  'commune'],
-                                                              address[
-                                                                  'quartier'],
-                                                              address['avenue'],
-                                                              address['numero'],
-                                                              address['pays']);
-                                                        },
-                                                  style:
-                                                      ElevatedButton.styleFrom(
-                                                    backgroundColor:
-                                                        AppColors.primary,
-                                                    foregroundColor:
-                                                        Colors.white,
-                                                    shape:
-                                                        RoundedRectangleBorder(
-                                                      borderRadius:
-                                                          BorderRadius.circular(
-                                                              12),
-                                                    ),
-                                                  ),
-                                                  child: state.isLoading
-                                                      ? const CircularProgressIndicator(
-                                                          color: Colors.white)
-                                                      : const Text(
-                                                          'UTILISER CETTE ADRESSE',
-                                                          style: TextStyle(
-                                                            fontWeight:
-                                                                FontWeight.bold,
-                                                            fontSize: 14,
-                                                          ),
-                                                        ),
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      );
-                                    }).toList(),
-                                    const SizedBox(height: 16),
-                                    TextButton.icon(
-                                      onPressed: () {
-                                        setState(() {
-                                          useNewAddress.value = true;
-                                        });
-                                      },
-                                      icon: const Icon(Icons.add_location_alt),
-                                      label: const Text(
-                                          'Ajouter une nouvelle adresse'),
-                                    ),
-                                  ],
-                                );
-                              },
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ],
                         ),
-                      );
-                    },
+                        const SizedBox(height: 20),
+                        DropdownButtonFormField<String>(
+                          value: _villeController.text.isEmpty
+                              ? null
+                              : _villeController.text,
+                          decoration: InputDecoration(
+                            labelText: 'Ville',
+                            prefixIcon: const Icon(Icons.location_city),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            filled: true,
+                            fillColor: Colors.white,
+                          ),
+                          items: villes.map((String ville) {
+                            return DropdownMenuItem<String>(
+                              value: ville,
+                              child: Text(ville),
+                            );
+                          }).toList(),
+                          onChanged: (String? newValue) {
+                            setState(() {
+                              _villeController.text = newValue ?? '';
+                              _communeController.text = '';
+                            });
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                        DropdownButtonFormField<String>(
+                          value: _communeController.text.isEmpty
+                              ? null
+                              : _communeController.text,
+                          decoration: InputDecoration(
+                            labelText: 'Commune',
+                            prefixIcon: const Icon(Icons.location_on),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            filled: true,
+                            fillColor: Colors.white,
+                          ),
+                          items: _villeController.text == 'Kinshasa'
+                              ? communesKinshasa.map((String commune) {
+                                  return DropdownMenuItem<String>(
+                                    value: commune,
+                                    child: Text(commune),
+                                  );
+                                }).toList()
+                              : [],
+                          onChanged: (String? newValue) {
+                            setState(() {
+                              _communeController.text = newValue ?? '';
+                            });
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          controller: _quartierController,
+                          decoration: InputDecoration(
+                            labelText: 'Quartier',
+                            prefixIcon: const Icon(Icons.map),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            filled: true,
+                            fillColor: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          controller: _avenueController,
+                          decoration: InputDecoration(
+                            labelText: 'Avenue',
+                            prefixIcon: const Icon(Icons.streetview),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            filled: true,
+                            fillColor: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          controller: _numeroController,
+                          decoration: InputDecoration(
+                            labelText: 'Numéro',
+                            prefixIcon: const Icon(Icons.home),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            filled: true,
+                            fillColor: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          controller: _paysController,
+                          enabled: false,
+                          decoration: InputDecoration(
+                            labelText: 'Pays',
+                            prefixIcon: const Icon(Icons.public),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            filled: true,
+                            fillColor: Colors.grey[100],
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        CheckboxListTile(
+                          value: saveAddress,
+                          onChanged: (bool? value) {
+                            setState(() {
+                              saveAddress = value ?? false;
+                            });
+                          },
+                          title: const Text(
+                            'Enregistrer cette adresse pour mes futures commandes',
+                            style: TextStyle(fontSize: 14),
+                          ),
+                          controlAffinity: ListTileControlAffinity.leading,
+                          contentPadding: EdgeInsets.zero,
+                          dense: true,
+                        ),
+                        const SizedBox(height: 24),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 50,
+                          child: ElevatedButton(
+                            onPressed: state.isLoading
+                                ? null
+                                : () {
+                                    if (_villeController.text.isEmpty ||
+                                        _communeController.text.isEmpty ||
+                                        _quartierController.text.isEmpty ||
+                                        _avenueController.text.isEmpty ||
+                                        _numeroController.text.isEmpty) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                              'Veuillez remplir tous les champs'),
+                                          backgroundColor: Colors.red,
+                                        ),
+                                      );
+                                      return;
+                                    }
+
+                                    context.read<OrderCubit>().createOrder(
+                                          produits: cartItems.map((item) {
+                                            return {
+                                              "id": int.parse(
+                                                  item['id'].toString()),
+                                              "quantity": item['quantity'],
+                                            };
+                                          }).toList(),
+                                          ville: _villeController.text,
+                                          commune: _communeController.text,
+                                          quartier: _quartierController.text,
+                                          avenue: _avenueController.text,
+                                          codePostale: '',
+                                          numero: _numeroController.text,
+                                          pays: _paysController.text,
+                                        );
+
+                                    saveCart(
+                                        context,
+                                        cartItems,
+                                        _villeController.text,
+                                        _communeController.text,
+                                        _quartierController.text,
+                                        _avenueController.text,
+                                        _numeroController.text,
+                                        _paysController.text);
+
+                                    if (saveAddress) {
+                                      _saveDeliveryAddress(
+                                        context,
+                                        _villeController.text,
+                                        _communeController.text,
+                                        _quartierController.text,
+                                        _avenueController.text,
+                                        _numeroController.text,
+                                        _paysController.text,
+                                      );
+                                    }
+                                  },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primary,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: state.isLoading
+                                ? const CircularProgressIndicator(
+                                    color: Colors.white)
+                                : const Text(
+                                    'CONFIRMER LA COMMANDE',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 );
               },
             );
           },
-        );
-      },
-    );
-  }
-
-  Widget _buildAddressForm(
-    BuildContext context,
-    OrderState state,
-    List<Map<String, dynamic>> cartItems,
-    TextEditingController _villeController,
-    TextEditingController _communeController,
-    TextEditingController _quartierController,
-    TextEditingController _avenueController,
-    TextEditingController _numeroController,
-    TextEditingController _paysController,
-    String? selectedVille,
-    String? selectedCommune,
-    bool saveAddress,
-    StateSetter setState,
-  ) {
-    return StatefulBuilder(
-      builder: (context, formSetState) {
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Nouvelle adresse',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 16),
-            DropdownButtonFormField<String>(
-              value:
-                  _villeController.text.isEmpty ? null : _villeController.text,
-              decoration: InputDecoration(
-                labelText: 'Ville',
-                prefixIcon: const Icon(Icons.location_city),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                filled: true,
-                fillColor: Colors.white,
-              ),
-              items: villes.map((String ville) {
-                return DropdownMenuItem<String>(
-                  value: ville,
-                  child: Text(ville),
-                );
-              }).toList(),
-              onChanged: (String? newValue) {
-                formSetState(() {
-                  _villeController.text = newValue ?? '';
-                  _communeController.text = '';
-                });
-              },
-            ),
-            const SizedBox(height: 16),
-            DropdownButtonFormField<String>(
-              value: _communeController.text.isEmpty
-                  ? null
-                  : _communeController.text,
-              decoration: InputDecoration(
-                labelText: 'Commune',
-                prefixIcon: const Icon(Icons.location_on),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                filled: true,
-                fillColor: Colors.white,
-              ),
-              items: _villeController.text == 'Kinshasa'
-                  ? communesKinshasa.map((String commune) {
-                      return DropdownMenuItem<String>(
-                        value: commune,
-                        child: Text(commune),
-                      );
-                    }).toList()
-                  : [],
-              onChanged: (String? newValue) {
-                formSetState(() {
-                  _communeController.text = newValue ?? '';
-                });
-              },
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _quartierController,
-              enabled: true,
-              decoration: InputDecoration(
-                labelText: 'Quartier',
-                prefixIcon: const Icon(Icons.map),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                filled: true,
-                fillColor: Colors.white,
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _avenueController,
-              enabled: true,
-              decoration: InputDecoration(
-                labelText: 'Avenue',
-                prefixIcon: const Icon(Icons.streetview),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                filled: true,
-                fillColor: Colors.white,
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _numeroController,
-              enabled: true,
-              decoration: InputDecoration(
-                labelText: 'Numéro',
-                prefixIcon: const Icon(Icons.home),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                filled: true,
-                fillColor: Colors.white,
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _paysController,
-              enabled: false,
-              decoration: InputDecoration(
-                labelText: 'Pays',
-                prefixIcon: const Icon(Icons.public),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                filled: true,
-                fillColor: Colors.grey[100],
-              ),
-            ),
-            const SizedBox(height: 16),
-            StatefulBuilder(
-              builder: (context, checkboxSetState) {
-                return CheckboxListTile(
-                  value: saveAddress,
-                  onChanged: (bool? value) {
-                    checkboxSetState(() {
-                      saveAddress = value ?? false;
-                    });
-                  },
-                  title: const Text(
-                    'Enregistrer cette adresse pour mes futures commandes',
-                    style: TextStyle(fontSize: 14),
-                  ),
-                  controlAffinity: ListTileControlAffinity.leading,
-                  contentPadding: EdgeInsets.zero,
-                  dense: true,
-                );
-              },
-            ),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: ElevatedButton(
-                onPressed: state.isLoading
-                    ? null
-                    : () {
-                        if (_villeController.text.isEmpty ||
-                            _communeController.text.isEmpty ||
-                            _quartierController.text.isEmpty ||
-                            _avenueController.text.isEmpty ||
-                            _numeroController.text.isEmpty) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Veuillez remplir tous les champs'),
-                              backgroundColor: Colors.red,
-                            ),
-                          );
-                          return;
-                        }
-
-                        context.read<OrderCubit>().createOrder(
-                              produits: cartItems.map((item) {
-                                return {
-                                  "id": int.parse(item['id'].toString()),
-                                  "quantity": item['quantity'],
-                                };
-                              }).toList(),
-                              ville: _villeController.text,
-                              commune: _communeController.text,
-                              quartier: _quartierController.text,
-                              avenue: _avenueController.text,
-                              codePostale: '',
-                              numero: _numeroController.text,
-                              pays: _paysController.text,
-                            );
-
-                        saveCart(
-                            context,
-                            cartItems,
-                            _villeController.text,
-                            _communeController.text,
-                            _quartierController.text,
-                            _avenueController.text,
-                            _numeroController.text,
-                            _paysController.text);
-
-                        if (saveAddress) {
-                          _saveDeliveryAddress(
-                            context,
-                            _villeController.text,
-                            _communeController.text,
-                            _quartierController.text,
-                            _avenueController.text,
-                            _numeroController.text,
-                            _paysController.text,
-                          );
-                        }
-                      },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                child: state.isLoading
-                    ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text(
-                        'CONFIRMER LA COMMANDE',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
-                      ),
-              ),
-            ),
-          ],
         );
       },
     );

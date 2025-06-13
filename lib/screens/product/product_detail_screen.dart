@@ -70,6 +70,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     final productMap = {
       'id': widget.id,
       'name': widget.name,
+      'idVendeur': widget.idVendeur,
       'category': widget.category,
       'price': widget.price,
       'stock': widget.stock,
@@ -113,21 +114,21 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     });
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Article ajouté au panier'),
+        const SnackBar(
+          content: Text('Article ajouté au panier'),
           backgroundColor: AppColors.primary,
-          duration: const Duration(seconds: 2),
-          action: SnackBarAction(
-            label: 'Voir le panier',
-            textColor: Colors.white,
-            onPressed: () {
-              if (widget.goToCartTab != null) {
-                widget.goToCartTab!();
-              } else {
-                Navigator.of(context).popUntil((route) => route.isFirst);
-              }
-            },
-          ),
+          duration: Duration(seconds: 2),
+          // action: SnackBarAction(
+          //   label: 'Voir le panier',
+          //   textColor: Colors.white,
+          //   onPressed: () {
+          //     if (widget.goToCartTab != null) {
+          //       widget.goToCartTab!();
+          //     } else {
+          //       Navigator.of(context).popUntil((route) => route.isFirst);
+          //     }
+          //   },
+          // ),
         ),
       );
     }

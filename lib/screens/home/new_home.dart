@@ -15,6 +15,7 @@ import 'package:immo/cubit/merchant_cubit.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:immo/cubit/order_cubit.dart';
+import 'package:immo/cubit/cart_cubit.dart';
 
 class NewHomeScreen extends StatefulWidget {
   const NewHomeScreen({Key? key}) : super(key: key);
@@ -633,6 +634,66 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                         ),
                       ),
                     ),
+                    // Add to cart button
+                    Positioned(
+                      bottom: 1,
+                      right: 8,
+                      child: GestureDetector(
+                        onTap: () async {
+                          final newItem = {
+                            'id': id,
+                            'name': name,
+                            'category': category,
+                            'price': price,
+                            'imagePath': imagePath,
+                            'quantity': 1,
+                            'stock': stock,
+                            'idVendeur': idVendeur,
+                          };
+                          final success = await context.read<CartCubit>().addToCart(newItem);
+                          if (!success) {
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Stock insuffisant : il ne reste que $stock en stock.'),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                            }
+                            return;
+                          }
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: const Text('Article ajouté au panier'),
+                                backgroundColor: AppColors.primary,
+                                duration: const Duration(seconds: 2),
+                
+                              ),
+                            );
+                          }
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.1),
+                                blurRadius: 4,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: const Icon(
+                            Icons.add,
+                            color: Colors.white,
+                            size: 16,
+                          ),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
                 // Product details
@@ -649,7 +710,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                         overflow: TextOverflow.ellipsis,
                       ),
                       Text(
-                        stock.toString() + " en stock",
+                        "$stock en stock",
                         style:
                             const TextStyle(fontSize: 12, color: Colors.grey),
                       ),

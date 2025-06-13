@@ -147,7 +147,7 @@ class _OrderScreenState extends State<OrderScreen> {
         return Colors.red;
       case 'en route pour livraison':
         return Colors.green;
-      case 'prêt a expédié':
+      case 'prêt à expédier':
         return Colors.blue;
       case 'colis en cours de préparation':
         return Colors.orange;
@@ -174,7 +174,7 @@ class _OrderScreenState extends State<OrderScreen> {
         return 'ANNULÉ';
       case 'en route pour livraison':
         return 'EN ROUTE';
-      case 'prêt a expédié':
+      case 'prêt à expédier':
         return 'PRÊT À EXPÉDIER';
       case 'colis en cours de préparation':
         return 'EN PRÉPARATION';
@@ -332,7 +332,7 @@ class _OrderScreenState extends State<OrderScreen> {
                                       .collection('carts')
                                       .doc(docId)
                                       .update({
-                                    'status': 'prêt a expédié',
+                                    'status': 'prêt à expédier',
                                     'timestamp': FieldValue.serverTimestamp(),
                                     'packagePhoto': photoPath,
                                   });
@@ -401,19 +401,30 @@ class _OrderScreenState extends State<OrderScreen> {
         title: const Text('Commandes'),
         centerTitle: true,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (authState.user!['role'] == 'livreur')
-              _buildLivreurOrders()
-            else if (authState.user!['role'] == 'vendeur')
-              _buildVendeurOrders()
-            else
-              _buildClientOrders(),
-          ],
-        ),
+      body: Column(
+        children: [
+          if (authState.user!['role'] == 'livreur')
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: _buildLivreurOrders(),
+              ),
+            )
+          else if (authState.user!['role'] == 'vendeur')
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: _buildVendeurOrders(),
+              ),
+            )
+          else
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: _buildClientOrders(),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -491,15 +502,9 @@ class _OrderScreenState extends State<OrderScreen> {
             return bTimestamp.compareTo(aTimestamp); // Tri décroissant
           });
 
-        return ListView.separated(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-          separatorBuilder: (_, __) => const SizedBox(height: 8),
-          itemCount: sortedDocs.length,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemBuilder: (context, index) {
+        return Column(
+          children: sortedDocs.map((doc) {
             try {
-              final doc = sortedDocs[index];
               final data = doc.data() as Map<String, dynamic>;
 
               // Vérification et conversion sécurisée des items
@@ -523,330 +528,333 @@ class _OrderScreenState extends State<OrderScreen> {
               final adresse =
                   data['adresse']?.toString() ?? 'Adresse non spécifiée';
 
-              return InkWell(
-                borderRadius: BorderRadius.circular(18),
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => OrderDetailsScreen(
-                        orderData: data,
-                        orderId: doc.id,
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(18),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => OrderDetailsScreen(
+                          orderData: data,
+                          orderId: doc.id,
+                        ),
                       ),
-                    ),
-                  );
-                },
-                child: Stack(
-                  children: [
-                    Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(18),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.06),
-                            blurRadius: 10,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        children: [
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              // Timeline
-                              Container(
-                                width: 6,
-                                height: 110,
-                                margin: const EdgeInsets.only(
-                                    right: 10, top: 10, bottom: 10),
-                                decoration: BoxDecoration(
-                                  color: _statusColor(status),
-                                  borderRadius: BorderRadius.circular(8),
+                    );
+                  },
+                  child: Stack(
+                    children: [
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(18),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.06),
+                              blurRadius: 10,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          children: [
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Timeline
+                                Container(
+                                  width: 6,
+                                  height: 110,
+                                  margin: const EdgeInsets.only(
+                                      right: 10, top: 10, bottom: 10),
+                                  decoration: BoxDecoration(
+                                    color: _statusColor(status),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
                                 ),
-                              ),
-                              // Image produit
+                                // Image produit
+                                Padding(
+                                  padding: const EdgeInsets.only(
+                                      top: 16, left: 0, right: 10),
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(14),
+                                    child: firstItem != null &&
+                                            firstItem['imagePath'] != null
+                                        ? Image.network(
+                                            firstItem['imagePath'],
+                                            width: 70,
+                                            height: 70,
+                                            fit: BoxFit.cover,
+                                            errorBuilder:
+                                                (context, error, stackTrace) {
+                                              print(
+                                                  'Erreur de chargement image: $error');
+                                              return Container(
+                                                width: 70,
+                                                height: 70,
+                                                color: Colors.grey.shade200,
+                                                child: const Icon(Icons.image,
+                                                    color: Colors.grey),
+                                              );
+                                            },
+                                          )
+                                        : Container(
+                                            width: 70,
+                                            height: 70,
+                                            color: Colors.grey.shade200,
+                                            child: const Icon(Icons.image,
+                                                color: Colors.grey),
+                                          ),
+                                  ),
+                                ),
+                                // Détails commande
+                                Expanded(
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                        vertical: 16, horizontal: 0),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            Expanded(
+                                              child: Text(
+                                                firstItem?['name'] ?? 'Produit',
+                                                style: const TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 16,
+                                                ),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(
+                                                  horizontal: 12, vertical: 4),
+                                              margin: const EdgeInsets.only(right: 8),
+                                              decoration: BoxDecoration(
+                                                color: _statusColor(status)
+                                                    .withOpacity(0.1),
+                                                borderRadius:
+                                                    BorderRadius.circular(8),
+                                              ),
+                                              child: Text(
+                                                _translateStatus(status),
+                                                style: TextStyle(
+                                                  color: _statusColor(status),
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                                textAlign: TextAlign.center,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          adresse,
+                                          style: TextStyle(
+                                            color: Colors.grey.shade600,
+                                            fontSize: 14,
+                                          ),
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        const SizedBox(height: 12),
+                                        Row(
+                                          children: [
+                                            const Icon(Icons.calendar_today,
+                                                size: 14, color: AppColors.primary),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              _formatDate(timestamp),
+                                              style: const TextStyle(fontSize: 13),
+                                            ),
+                                            const SizedBox(width: 12),
+                                            const Icon(Icons.shopping_cart,
+                                                size: 14, color: AppColors.primary),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              '${items.length} article${items.length > 1 ? 's' : ''}',
+                                              style: const TextStyle(fontSize: 13),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            if (data['packagePhoto'] != null && (status.toLowerCase() == 'prêt à expédier' || status.toLowerCase() == 'en route pour livraison' || status.toLowerCase() == 'delivered')) ...[
                               Padding(
-                                padding: const EdgeInsets.only(
-                                    top: 16, left: 0, right: 10),
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(14),
-                                  child: firstItem != null &&
-                                          firstItem['imagePath'] != null
-                                      ? Image.network(
-                                          firstItem['imagePath'],
-                                          width: 70,
-                                          height: 70,
-                                          fit: BoxFit.cover,
-                                          errorBuilder:
-                                              (context, error, stackTrace) {
-                                            print(
-                                                'Erreur de chargement image: $error');
-                                            return Container(
-                                              width: 70,
-                                              height: 70,
-                                              color: Colors.grey.shade200,
-                                              child: const Icon(Icons.image,
-                                                  color: Colors.grey),
+                                padding: const EdgeInsets.all(16.0),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'Photo du colis:',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.bold,
+                                        color: AppColors.primary,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    GestureDetector(
+                                      onTap: () {
+                                        showDialog(
+                                          context: context,
+                                          builder: (BuildContext context) {
+                                            return Dialog(
+                                              insetPadding: EdgeInsets.zero,
+                                              child: Stack(
+                                                children: [
+                                                  InteractiveViewer(
+                                                    minScale: 0.5,
+                                                    maxScale: 4.0,
+                                                    child: Image.network(
+                                                      data['packagePhoto'],
+                                                      fit: BoxFit.contain,
+                                                      width: MediaQuery.of(context).size.width,
+                                                      height: MediaQuery.of(context).size.height,
+                                                    ),
+                                                  ),
+                                                  Positioned(
+                                                    top: 10,
+                                                    right: 10,
+                                                    child: IconButton(
+                                                      icon: const Icon(Icons.close, color: Colors.white),
+                                                      onPressed: () => Navigator.pop(context),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
                                             );
                                           },
-                                        )
-                                      : Container(
-                                          width: 70,
-                                          height: 70,
-                                          color: Colors.grey.shade200,
-                                          child: const Icon(Icons.image,
-                                              color: Colors.grey),
+                                        );
+                                      },
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(8),
+                                        child: Image.network(
+                                          data['packagePhoto'],
+                                          width: double.infinity,
+                                          height: 150,
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (context, error, stackTrace) {
+                                            return Container(
+                                              width: double.infinity,
+                                              height: 150,
+                                              color: Colors.grey.shade200,
+                                              child: const Icon(Icons.image, color: Colors.grey),
+                                            );
+                                          },
                                         ),
-                                ),
-                              ),
-                              // Détails commande
-                              Expanded(
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                      vertical: 16, horizontal: 0),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        children: [
-                                          Expanded(
-                                            child: Text(
-                                              firstItem?['name'] ?? 'Produit',
-                                              style: const TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                                fontSize: 16,
-                                              ),
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(
-                                                horizontal: 12, vertical: 4),
-                                            margin: const EdgeInsets.only(right: 8),
-                                            decoration: BoxDecoration(
-                                              color: _statusColor(status)
-                                                  .withOpacity(0.1),
-                                              borderRadius:
-                                                  BorderRadius.circular(8),
-                                            ),
-                                            child: Text(
-                                              _translateStatus(status),
-                                              style: TextStyle(
-                                                color: _statusColor(status),
-                                                fontSize: 12,
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                              textAlign: TextAlign.center,
-                                            ),
-                                          ),
-                                        ],
                                       ),
-                                      const SizedBox(height: 8),
-                                      Text(
-                                        adresse,
-                                        style: TextStyle(
-                                          color: Colors.grey.shade600,
-                                          fontSize: 14,
-                                        ),
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                      const SizedBox(height: 12),
-                                      Row(
-                                        children: [
-                                          const Icon(Icons.calendar_today,
-                                              size: 14, color: AppColors.primary),
-                                          const SizedBox(width: 4),
-                                          Text(
-                                            _formatDate(timestamp),
-                                            style: const TextStyle(fontSize: 13),
-                                          ),
-                                          const SizedBox(width: 12),
-                                          const Icon(Icons.shopping_cart,
-                                              size: 14, color: AppColors.primary),
-                                          const SizedBox(width: 4),
-                                          Text(
-                                            '${items.length} article${items.length > 1 ? 's' : ''}',
-                                            style: const TextStyle(fontSize: 13),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ],
-                          ),
-                          if (data['packagePhoto'] != null && (status.toLowerCase() == 'prêt a expédié' || status.toLowerCase() == 'en route pour livraison' || status.toLowerCase() == 'delivered')) ...[
-                            Padding(
-                              padding: const EdgeInsets.all(16.0),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text(
-                                    'Photo du colis:',
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.bold,
-                                      color: AppColors.primary,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  GestureDetector(
-                                    onTap: () {
-                                      showDialog(
-                                        context: context,
-                                        builder: (BuildContext context) {
-                                          return Dialog(
-                                            insetPadding: EdgeInsets.zero,
-                                            child: Stack(
-                                              children: [
-                                                InteractiveViewer(
-                                                  minScale: 0.5,
-                                                  maxScale: 4.0,
-                                                  child: Image.network(
-                                                    data['packagePhoto'],
-                                                    fit: BoxFit.contain,
-                                                    width: MediaQuery.of(context).size.width,
-                                                    height: MediaQuery.of(context).size.height,
-                                                  ),
-                                                ),
-                                                Positioned(
-                                                  top: 10,
-                                                  right: 10,
-                                                  child: IconButton(
-                                                    icon: const Icon(Icons.close, color: Colors.white),
-                                                    onPressed: () => Navigator.pop(context),
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          );
-                                        },
-                                      );
-                                    },
-                                    child: ClipRRect(
+                            if (status.toLowerCase() == 'pending')
+                              Padding(
+                                padding: const EdgeInsets.all(8.0),
+                                child: ElevatedButton(
+                                  onPressed: () async {
+                                    try {
+                                      await FirebaseFirestore.instance
+                                          .collection('carts')
+                                          .doc(doc.id)
+                                          .update({
+                                        'status': 'cancelled',
+                                        'timestamp': FieldValue.serverTimestamp(),
+                                      });
+
+                                      if (mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(
+                                            content: Text('Commande annulée avec succès'),
+                                            backgroundColor: Colors.green,
+                                          ),
+                                        );
+                                      }
+                                    } catch (e) {
+                                      if (mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(
+                                            content: Text('Erreur: $e'),
+                                            backgroundColor: Colors.red,
+                                          ),
+                                        );
+                                      }
+                                    }
+                                  },
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.red,
+                                    shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(8),
-                                      child: Image.network(
-                                        data['packagePhoto'],
-                                        width: double.infinity,
-                                        height: 150,
-                                        fit: BoxFit.cover,
-                                        errorBuilder: (context, error, stackTrace) {
-                                          return Container(
-                                            width: double.infinity,
-                                            height: 150,
-                                            color: Colors.grey.shade200,
-                                            child: const Icon(Icons.image, color: Colors.grey),
-                                          );
-                                        },
-                                      ),
                                     ),
+                                    minimumSize: const Size(double.infinity, 40),
                                   ),
-                                ],
+                                  child: const Text(
+                                    'Annuler la commande',
+                                    style: TextStyle(color: Colors.white),
+                                  ),
+                                ),
                               ),
-                            ),
+                            if (status.toLowerCase() == 'en route pour livraison')
+                              Padding(
+                                padding: const EdgeInsets.all(8.0),
+                                child: ElevatedButton(
+                                  onPressed: () async {
+                                    try {
+                                      await FirebaseFirestore.instance
+                                          .collection('carts')
+                                          .doc(doc.id)
+                                          .update({
+                                        'status': 'delivered',
+                                        'timestamp': FieldValue.serverTimestamp(),
+                                      });
+
+                                      if (mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(
+                                            content: Text('Livraison confirmée avec succès'),
+                                            backgroundColor: Colors.green,
+                                          ),
+                                        );
+                                      }
+                                    } catch (e) {
+                                      if (mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(
+                                            content: Text('Erreur: $e'),
+                                            backgroundColor: Colors.red,
+                                          ),
+                                        );
+                                      }
+                                    }
+                                  },
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.green,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    minimumSize: const Size(double.infinity, 40),
+                                  ),
+                                  child: const Text(
+                                    'Confirmer la livraison',
+                                    style: TextStyle(color: Colors.white),
+                                  ),
+                                ),
+                              ),
                           ],
-                          if (status.toLowerCase() == 'pending')
-                            Padding(
-                              padding: const EdgeInsets.all(8.0),
-                              child: ElevatedButton(
-                                onPressed: () async {
-                                  try {
-                                    await FirebaseFirestore.instance
-                                        .collection('carts')
-                                        .doc(doc.id)
-                                        .update({
-                                      'status': 'cancelled',
-                                      'timestamp': FieldValue.serverTimestamp(),
-                                    });
-
-                                    if (mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(
-                                          content: Text('Commande annulée avec succès'),
-                                          backgroundColor: Colors.green,
-                                        ),
-                                      );
-                                    }
-                                  } catch (e) {
-                                    if (mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(
-                                          content: Text('Erreur: $e'),
-                                          backgroundColor: Colors.red,
-                                        ),
-                                      );
-                                    }
-                                  }
-                                },
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.red,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  minimumSize: const Size(double.infinity, 40),
-                                ),
-                                child: const Text(
-                                  'Annuler la commande',
-                                  style: TextStyle(color: Colors.white),
-                                ),
-                              ),
-                            ),
-                          if (status.toLowerCase() == 'en route pour livraison')
-                            Padding(
-                              padding: const EdgeInsets.all(8.0),
-                              child: ElevatedButton(
-                                onPressed: () async {
-                                  try {
-                                    await FirebaseFirestore.instance
-                                        .collection('carts')
-                                        .doc(doc.id)
-                                        .update({
-                                      'status': 'delivered',
-                                      'timestamp': FieldValue.serverTimestamp(),
-                                    });
-
-                                    if (mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(
-                                          content: Text('Livraison confirmée avec succès'),
-                                          backgroundColor: Colors.green,
-                                        ),
-                                      );
-                                    }
-                                  } catch (e) {
-                                    if (mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(
-                                          content: Text('Erreur: $e'),
-                                          backgroundColor: Colors.red,
-                                        ),
-                                      );
-                                    }
-                                  }
-                                },
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.green,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  minimumSize: const Size(double.infinity, 40),
-                                ),
-                                child: const Text(
-                                  'Confirmer la livraison',
-                                  style: TextStyle(color: Colors.white),
-                                ),
-                              ),
-                            ),
-                        ],
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               );
             } catch (e) {
@@ -864,7 +872,7 @@ class _OrderScreenState extends State<OrderScreen> {
                 ),
               );
             }
-          },
+          }).toList(),
         );
       },
     );
@@ -878,7 +886,7 @@ class _OrderScreenState extends State<OrderScreen> {
 
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance.collection('carts').where('status',
-          whereIn: ['prêt a expédié', 'en route pour livraison']).snapshots(),
+          whereIn: ['prêt à expédier', 'en route pour livraison']).snapshots(),
       builder: (context, snapshot) {
         if (snapshot.hasError) {
           return Center(child: Text('Erreur: ${snapshot.error}'));
@@ -1093,7 +1101,7 @@ class _OrderScreenState extends State<OrderScreen> {
                       padding: const EdgeInsets.all(8.0),
                       child: Column(
                         children: [
-                          if (status == 'prêt a expédié' && data['packagePhoto'] != null) ...[
+                          if (status == 'prêt à expédier' && data['packagePhoto'] != null) ...[
                             Padding(
                               padding: const EdgeInsets.only(bottom: 16.0),
                               child: Column(
@@ -1164,7 +1172,7 @@ class _OrderScreenState extends State<OrderScreen> {
                             ),
                           ],
                           ElevatedButton(
-                            onPressed: status == 'prêt a expédié'
+                            onPressed: status == 'prêt à expédier'
                                 ? () async {
                                     try {
                                       await FirebaseFirestore.instance
@@ -1196,7 +1204,7 @@ class _OrderScreenState extends State<OrderScreen> {
                                   }
                                 : null,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: status == 'prêt a expédié'
+                              backgroundColor: status == 'prêt à expédier'
                                   ? AppColors.primary
                                   : Colors.grey,
                               shape: RoundedRectangleBorder(
@@ -1205,7 +1213,7 @@ class _OrderScreenState extends State<OrderScreen> {
                               minimumSize: const Size(double.infinity, 40),
                             ),
                             child: Text(
-                              status == 'prêt a expédié'
+                              status == 'prêt à expédier'
                                   ? 'Recevoir colis'
                                   : 'En cours de livraison',
                               style: const TextStyle(color: Colors.white),
@@ -1486,7 +1494,7 @@ class _OrderScreenState extends State<OrderScreen> {
                         ],
                       ),
                       // Contenu existant
-                      if (status == 'prêt a expédié' && data['packagePhoto'] != null)
+                      if (status == 'prêt à expédier' && data['packagePhoto'] != null)
                         Padding(
                           padding: const EdgeInsets.all(16.0),
                           child: Column(
