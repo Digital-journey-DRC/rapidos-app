@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:immo/cubit/listing_cubit.dart';
+import 'package:immo/screens/acheteur_location.dart';
 import 'package:immo/screens/cart/cart_screen.dart';
 import 'package:immo/screens/favoris_screen.dart';
 import 'package:immo/screens/home/home_livreur.dart';
@@ -38,10 +39,12 @@ class _MainScreenState extends State<MainScreen> {
     const FavorisScreen(),
     const HomeMarchantScreen(),
     const OrderScreen(backNavigation: false),
-    const HomeLivreurScreen()
+    const HomeLivreurScreen(),
+    const AcheteurLocation()
   ];
 
-  static Future<void> saveTokenToFirestore(String token, AuthState authState) async {
+  static Future<void> saveTokenToFirestore(
+      String token, AuthState authState) async {
     try {
       String? userId;
       String? role;
@@ -55,7 +58,7 @@ class _MainScreenState extends State<MainScreen> {
         final prefs = await SharedPreferences.getInstance();
         final userDataStr = prefs.getString('user_data');
         print('📱 SharedPreferences user data: $userDataStr');
-        
+
         if (userDataStr != null) {
           try {
             final userData = jsonDecode(userDataStr);
@@ -76,7 +79,10 @@ class _MainScreenState extends State<MainScreen> {
         'platform': Platform.isIOS ? 'ios' : 'android',
         'role': role ?? 'user',
         'userId': userId ?? '1',
-        'permission_status': (await FirebaseMessaging.instance.getNotificationSettings()).authorizationStatus.toString(),
+        'permission_status':
+            (await FirebaseMessaging.instance.getNotificationSettings())
+                .authorizationStatus
+                .toString(),
       });
 
       print("✅ Token saved to Firestore successfully");
@@ -101,7 +107,6 @@ class _MainScreenState extends State<MainScreen> {
 
       if (settings.authorizationStatus == AuthorizationStatus.authorized ||
           settings.authorizationStatus == AuthorizationStatus.provisional) {
-
         messaging.onTokenRefresh.listen((String token) {
           print('🔄 FCM Token Refreshed: $token');
           saveTokenToFirestore(token, context.read<AuthCubit>().state);
@@ -115,7 +120,8 @@ class _MainScreenState extends State<MainScreen> {
           print('⚠️ No FCM token received');
         }
       } else {
-        print("❌ Notification permissions not granted: ${settings.authorizationStatus}");
+        print(
+            "❌ Notification permissions not granted: ${settings.authorizationStatus}");
       }
     } catch (e) {
       print("❌ Error initializing Firebase Messaging: $e");
@@ -179,6 +185,10 @@ class _MainScreenState extends State<MainScreen> {
         icon: Icon(Icons.shopping_bag_outlined),
         label: 'Commandes',
       ),
+      const BottomNavigationBarItem(
+        icon: Icon(Icons.place_outlined),
+        label: 'Maps',
+      ),
     ];
 
     // Filtrer les écrans en fonction du rôle
@@ -189,7 +199,9 @@ class _MainScreenState extends State<MainScreen> {
         _screens[0], // NewHomeScreen
         _screens[1], // CartScreen
         _screens[2], // FavorisScreen
-        _screens[4], // HomeMarchantScreen
+        _screens[4],
+        _screens[6]
+        // HomeMarchantScreen
       ];
     } else if (isVendeur) {
       filteredScreens = [
@@ -206,16 +218,15 @@ class _MainScreenState extends State<MainScreen> {
       filteredScreens = [
         _screens[5],
         _screens[4],
-         // HomeLivreurScreen
-         // CartScreen
+        // HomeLivreurScreen
+        // CartScreen
         // HomeMarchantScreen
       ];
       navigationItems = const [
-        BottomNavigationBarItem(icon: Icon(Icons.bar_chart_outlined), label: 'Statistiques'),
+        BottomNavigationBarItem(
+            icon: Icon(Icons.bar_chart_outlined), label: 'Statistiques'),
         BottomNavigationBarItem(
             icon: Icon(Icons.shopping_cart_checkout), label: 'Livraisons'),
-        
-        
       ];
     } else {
       filteredScreens = _screens;

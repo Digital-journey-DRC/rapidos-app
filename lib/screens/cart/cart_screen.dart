@@ -9,6 +9,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:immo/cubit/cart_cubit.dart';
 import 'package:immo/cubit/order_cubit.dart';
 import 'package:immo/cubit/auth_cubit.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 class CartScreen extends StatefulWidget {
   final bool backNavigaton;
@@ -26,6 +28,65 @@ class _CartScreenState extends State<CartScreen> {
   void initState() {
     super.initState();
     _loadSavedAddresses();
+    _getCurrentLocation();
+  }
+
+  Future<void> _getCurrentLocation() async {
+    try {
+      // Vérifier et demander les permissions de localisation
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          return;
+        }
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        return;
+      }
+
+      // Obtenir la position actuelle
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+
+      // Récupérer l'utilisateur connecté
+      final authState = context.read<AuthCubit>().state;
+      if (authState is AuthSuccess && authState.user != null) {
+        final user = authState.user!;
+        final userId = user['id']?.toString() ?? '';
+        final userRole = user['role']?.toString() ?? '';
+
+        // Vérifier si un enregistrement existe déjà pour cet utilisateur
+        final locationQuery = await FirebaseFirestore.instance
+            .collection('locations')
+            .where('userId', isEqualTo: userId)
+            .get();
+
+        if (locationQuery.docs.isNotEmpty) {
+          // Mettre à jour l'enregistrement existant
+          await locationQuery.docs.first.reference.update({
+            'longitude': position.longitude,
+            'latitude': position.latitude,
+            'timestamp': FieldValue.serverTimestamp(),
+          });
+          print('✅ Position mise à jour avec succès');
+        } else {
+          // Créer un nouvel enregistrement
+          await FirebaseFirestore.instance.collection('locations').add({
+            'userId': userId,
+            'role': userRole,
+            'longitude': position.longitude,
+            'latitude': position.latitude,
+            'timestamp': FieldValue.serverTimestamp(),
+          });
+          print('✅ Nouvelle position enregistrée avec succès');
+        }
+      }
+    } catch (e) {
+      print('❌ Erreur lors de la récupération de la position: $e');
+    }
   }
 
   @override
@@ -515,33 +576,44 @@ class _CartScreenState extends State<CartScreen> {
                           },
                         ),
                         const SizedBox(height: 16),
-                        DropdownButtonFormField<String>(
-                          value: _communeController.text.isEmpty
-                              ? null
-                              : _communeController.text,
-                          decoration: InputDecoration(
-                            labelText: 'Commune',
-                            prefixIcon: const Icon(Icons.location_on),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            filled: true,
-                            fillColor: Colors.white,
-                          ),
-                          items: _villeController.text == 'Kinshasa'
-                              ? communesKinshasa.map((String commune) {
+                        _villeController.text == 'Kinshasa'
+                            ? DropdownButtonFormField<String>(
+                                value: _communeController.text.isEmpty
+                                    ? null
+                                    : _communeController.text,
+                                decoration: InputDecoration(
+                                  labelText: 'Commune',
+                                  prefixIcon: const Icon(Icons.location_on),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  filled: true,
+                                  fillColor: Colors.white,
+                                ),
+                                items: communesKinshasa.map((String commune) {
                                   return DropdownMenuItem<String>(
                                     value: commune,
                                     child: Text(commune),
                                   );
-                                }).toList()
-                              : [],
-                          onChanged: (String? newValue) {
-                            setState(() {
-                              _communeController.text = newValue ?? '';
-                            });
-                          },
-                        ),
+                                }).toList(),
+                                onChanged: (String? newValue) {
+                                  setState(() {
+                                    _communeController.text = newValue ?? '';
+                                  });
+                                },
+                              )
+                            : TextFormField(
+                                controller: _communeController,
+                                decoration: InputDecoration(
+                                  labelText: 'Commune',
+                                  prefixIcon: const Icon(Icons.location_on),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  filled: true,
+                                  fillColor: Colors.white,
+                                ),
+                              ),
                         const SizedBox(height: 16),
                         TextFormField(
                           controller: _quartierController,

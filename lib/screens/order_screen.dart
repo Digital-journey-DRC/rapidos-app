@@ -1,3 +1,7 @@
+// ignore_for_file: unnecessary_cast
+
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:immo/constants.dart';
@@ -16,11 +20,9 @@ import 'package:camera/camera.dart';
 class CameraColisScreen extends StatefulWidget {
   final Function(String imagePath) onPictureTaken;
   final List<CameraDescription> cameras;
-  const CameraColisScreen({
-    required this.onPictureTaken,
-    required this.cameras,
-    Key? key
-  }) : super(key: key);
+  const CameraColisScreen(
+      {required this.onPictureTaken, required this.cameras, Key? key})
+      : super(key: key);
 
   @override
   State<CameraColisScreen> createState() => _CameraColisScreenState();
@@ -178,6 +180,8 @@ class _OrderScreenState extends State<OrderScreen> {
         return 'PRÊT À EXPÉDIER';
       case 'colis en cours de préparation':
         return 'EN PRÉPARATION';
+      case 'rejected':
+        return 'REJETÉ';
       default:
         return status.toUpperCase();
     }
@@ -251,29 +255,43 @@ class _OrderScreenState extends State<OrderScreen> {
                             child: isUploading
                                 ? const CircularProgressIndicator()
                                 : IconButton(
-                                    icon: const Icon(Icons.camera_alt, size: 40, color: Colors.grey),
+                                    icon: const Icon(Icons.camera_alt,
+                                        size: 40, color: Colors.grey),
                                     onPressed: () async {
                                       Navigator.push(
                                         context,
                                         MaterialPageRoute(
-                                          builder: (context) => CameraColisScreen(
+                                          builder: (context) =>
+                                              CameraColisScreen(
                                             onPictureTaken: (imagePath) async {
-                                              setState(() { isUploading = true; });
+                                              setState(() {
+                                                isUploading = true;
+                                              });
                                               try {
                                                 final file = File(imagePath);
-                                                final fileName = 'colis_${DateTime.now().millisecondsSinceEpoch}.jpg';
-                                                final ref = FirebaseStorage.instance.ref().child('colis_photos').child(fileName);
+                                                final fileName =
+                                                    'colis_${DateTime.now().millisecondsSinceEpoch}.jpg';
+                                                final ref = FirebaseStorage
+                                                    .instance
+                                                    .ref()
+                                                    .child('colis_photos')
+                                                    .child(fileName);
                                                 await ref.putFile(file);
-                                                final downloadUrl = await ref.getDownloadURL();
+                                                final downloadUrl =
+                                                    await ref.getDownloadURL();
                                                 setState(() {
                                                   photoPath = downloadUrl;
                                                   isUploading = false;
                                                 });
                                               } catch (e) {
-                                                setState(() { isUploading = false; });
-                                                ScaffoldMessenger.of(context).showSnackBar(
+                                                setState(() {
+                                                  isUploading = false;
+                                                });
+                                                ScaffoldMessenger.of(context)
+                                                    .showSnackBar(
                                                   SnackBar(
-                                                    content: Text('Erreur lors de l\'upload : $e'),
+                                                    content: Text(
+                                                        'Erreur lors de l\'upload : $e'),
                                                     backgroundColor: Colors.red,
                                                   ),
                                                 );
@@ -301,7 +319,8 @@ class _OrderScreenState extends State<OrderScreen> {
                                 top: 8,
                                 right: 8,
                                 child: IconButton(
-                                  icon: const Icon(Icons.close, color: Colors.white),
+                                  icon: const Icon(Icons.close,
+                                      color: Colors.white),
                                   onPressed: () {
                                     setState(() {
                                       photoPath = null;
@@ -325,7 +344,9 @@ class _OrderScreenState extends State<OrderScreen> {
                       ),
                       const SizedBox(width: 16),
                       ElevatedButton(
-                        onPressed: isChecked && photoPath != null && !isUploading
+                        onPressed: isChecked &&
+                                photoPath != null &&
+                                !isUploading
                             ? () async {
                                 try {
                                   await FirebaseFirestore.instance
@@ -341,7 +362,132 @@ class _OrderScreenState extends State<OrderScreen> {
                                     Navigator.pop(context);
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       const SnackBar(
-                                        content: Text('Commande expédiée avec succès'),
+                                        content: Text(
+                                            'Commande expédiée avec succès'),
+                                        backgroundColor: Colors.green,
+                                      ),
+                                    );
+                                  }
+                                } catch (e) {
+                                  if (mounted) {
+                                    Navigator.pop(context);
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text('Erreur: $e'),
+                                        backgroundColor: Colors.red,
+                                      ),
+                                    );
+                                  }
+                                }
+                              }
+                            : null,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 24, vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        child: const Text('Rapidos'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showCodeConfirmationDialog(BuildContext context, String docId, String shortCode, String livreurId) {
+    final TextEditingController codeController = TextEditingController();
+    bool isCodeValid = false;
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setState) => Dialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Container(
+              width: MediaQuery.of(context).size.width * 0.9,
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Confirmation de livraison',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  const Text(
+                    'Veuillez entrer le code de confirmation à 4 chiffres fourni par le client',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: codeController,
+                    keyboardType: TextInputType.number,
+                    maxLength: 4,
+                    decoration: InputDecoration(
+                      hintText: 'Entrez le code à 4 chiffres',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      filled: true,
+                      fillColor: Colors.grey.shade50,
+                      prefixIcon: const Icon(Icons.lock_outline, color: Colors.grey),
+                      errorText: isCodeValid ? 'Code incorrect' : null,
+                    ),
+                    onChanged: (value) {
+                      setState(() {
+                        isCodeValid = value.length == 4 && value != shortCode;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 24),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text(
+                          'ANNULER',
+                          style: TextStyle(color: Colors.grey),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      ElevatedButton(
+                        onPressed: codeController.text == shortCode
+                            ? () async {
+                                try {
+                                  await FirebaseFirestore.instance
+                                      .collection('carts')
+                                      .doc(docId)
+                                      .update({
+                                    'status': 'delivered',
+                                    'livreur': livreurId,
+                                    'timestamp': FieldValue.serverTimestamp(),
+                                  });
+
+                                  if (mounted) {
+                                    Navigator.pop(context);
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Colis livré avec succès'),
                                         backgroundColor: Colors.green,
                                       ),
                                     );
@@ -367,7 +513,7 @@ class _OrderScreenState extends State<OrderScreen> {
                             borderRadius: BorderRadius.circular(8),
                           ),
                         ),
-                        child: const Text('Rapidos'),
+                        child: const Text('CONFIRMER'),
                       ),
                     ],
                   ),
@@ -525,6 +671,7 @@ class _OrderScreenState extends State<OrderScreen> {
               final firstItem = items.isNotEmpty ? items[0] : null;
               final status = data['status']?.toString() ?? 'pending';
               final timestamp = data['timestamp'] as Timestamp?;
+              final shortCode = data['shortCode']??"";
               final adresse =
                   data['adresse']?.toString() ?? 'Adresse non spécifiée';
 
@@ -614,7 +761,8 @@ class _OrderScreenState extends State<OrderScreen> {
                                     padding: const EdgeInsets.symmetric(
                                         vertical: 16, horizontal: 0),
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
                                         Row(
                                           children: [
@@ -631,9 +779,12 @@ class _OrderScreenState extends State<OrderScreen> {
                                             ),
                                             const SizedBox(width: 8),
                                             Container(
-                                              padding: const EdgeInsets.symmetric(
-                                                  horizontal: 12, vertical: 4),
-                                              margin: const EdgeInsets.only(right: 8),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      horizontal: 12,
+                                                      vertical: 4),
+                                              margin: const EdgeInsets.only(
+                                                  right: 8),
                                               decoration: BoxDecoration(
                                                 color: _statusColor(status)
                                                     .withOpacity(0.1),
@@ -666,29 +817,47 @@ class _OrderScreenState extends State<OrderScreen> {
                                         Row(
                                           children: [
                                             const Icon(Icons.calendar_today,
-                                                size: 14, color: AppColors.primary),
+                                                size: 14,
+                                                color: AppColors.primary),
                                             const SizedBox(width: 4),
                                             Text(
                                               _formatDate(timestamp),
-                                              style: const TextStyle(fontSize: 13),
+                                              style:
+                                                  const TextStyle(fontSize: 13),
                                             ),
                                             const SizedBox(width: 12),
                                             const Icon(Icons.shopping_cart,
-                                                size: 14, color: AppColors.primary),
+                                                size: 14,
+                                                color: AppColors.primary),
                                             const SizedBox(width: 4),
                                             Text(
                                               '${items.length} article${items.length > 1 ? 's' : ''}',
-                                              style: const TextStyle(fontSize: 13),
+                                              style:
+                                                  const TextStyle(fontSize: 13),
                                             ),
                                           ],
                                         ),
+                                        const SizedBox(height: 20,),
+                                        Row(
+                                          children: [
+                                            const Text("Code commande: ", ),
+                                            const SizedBox(width: 10,),
+                                            Text(shortCode,style:
+                                                  const TextStyle(fontSize: 20, color: AppColors.primary),),
+                                          ],
+                                        )
+                                        
                                       ],
                                     ),
                                   ),
                                 ),
                               ],
                             ),
-                            if (data['packagePhoto'] != null && (status.toLowerCase() == 'prêt à expédier' || status.toLowerCase() == 'en route pour livraison' || status.toLowerCase() == 'delivered')) ...[
+                            if (data['packagePhoto'] != null &&
+                                (status.toLowerCase() == 'prêt à expédier' ||
+                                    status.toLowerCase() ==
+                                        'en route pour livraison' ||
+                                    status.toLowerCase() == 'delivered')) ...[
                               Padding(
                                 padding: const EdgeInsets.all(16.0),
                                 child: Column(
@@ -718,16 +887,26 @@ class _OrderScreenState extends State<OrderScreen> {
                                                     child: Image.network(
                                                       data['packagePhoto'],
                                                       fit: BoxFit.contain,
-                                                      width: MediaQuery.of(context).size.width,
-                                                      height: MediaQuery.of(context).size.height,
+                                                      width:
+                                                          MediaQuery.of(context)
+                                                              .size
+                                                              .width,
+                                                      height:
+                                                          MediaQuery.of(context)
+                                                              .size
+                                                              .height,
                                                     ),
                                                   ),
                                                   Positioned(
                                                     top: 10,
                                                     right: 10,
                                                     child: IconButton(
-                                                      icon: const Icon(Icons.close, color: Colors.white),
-                                                      onPressed: () => Navigator.pop(context),
+                                                      icon: const Icon(
+                                                          Icons.close,
+                                                          color: Colors.white),
+                                                      onPressed: () =>
+                                                          Navigator.pop(
+                                                              context),
                                                     ),
                                                   ),
                                                 ],
@@ -743,12 +922,14 @@ class _OrderScreenState extends State<OrderScreen> {
                                           width: double.infinity,
                                           height: 150,
                                           fit: BoxFit.cover,
-                                          errorBuilder: (context, error, stackTrace) {
+                                          errorBuilder:
+                                              (context, error, stackTrace) {
                                             return Container(
                                               width: double.infinity,
                                               height: 150,
                                               color: Colors.grey.shade200,
-                                              child: const Icon(Icons.image, color: Colors.grey),
+                                              child: const Icon(Icons.image,
+                                                  color: Colors.grey),
                                             );
                                           },
                                         ),
@@ -769,20 +950,24 @@ class _OrderScreenState extends State<OrderScreen> {
                                           .doc(doc.id)
                                           .update({
                                         'status': 'cancelled',
-                                        'timestamp': FieldValue.serverTimestamp(),
+                                        'timestamp':
+                                            FieldValue.serverTimestamp(),
                                       });
 
                                       if (mounted) {
-                                        ScaffoldMessenger.of(context).showSnackBar(
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(
                                           const SnackBar(
-                                            content: Text('Commande annulée avec succès'),
+                                            content: Text(
+                                                'Commande annulée avec succès'),
                                             backgroundColor: Colors.green,
                                           ),
                                         );
                                       }
                                     } catch (e) {
                                       if (mounted) {
-                                        ScaffoldMessenger.of(context).showSnackBar(
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(
                                           SnackBar(
                                             content: Text('Erreur: $e'),
                                             backgroundColor: Colors.red,
@@ -796,56 +981,11 @@ class _OrderScreenState extends State<OrderScreen> {
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(8),
                                     ),
-                                    minimumSize: const Size(double.infinity, 40),
+                                    minimumSize:
+                                        const Size(double.infinity, 40),
                                   ),
                                   child: const Text(
                                     'Annuler la commande',
-                                    style: TextStyle(color: Colors.white),
-                                  ),
-                                ),
-                              ),
-                            if (status.toLowerCase() == 'en route pour livraison')
-                              Padding(
-                                padding: const EdgeInsets.all(8.0),
-                                child: ElevatedButton(
-                                  onPressed: () async {
-                                    try {
-                                      await FirebaseFirestore.instance
-                                          .collection('carts')
-                                          .doc(doc.id)
-                                          .update({
-                                        'status': 'delivered',
-                                        'timestamp': FieldValue.serverTimestamp(),
-                                      });
-
-                                      if (mounted) {
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          const SnackBar(
-                                            content: Text('Livraison confirmée avec succès'),
-                                            backgroundColor: Colors.green,
-                                          ),
-                                        );
-                                      }
-                                    } catch (e) {
-                                      if (mounted) {
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          SnackBar(
-                                            content: Text('Erreur: $e'),
-                                            backgroundColor: Colors.red,
-                                          ),
-                                        );
-                                      }
-                                    }
-                                  },
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.green,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    minimumSize: const Size(double.infinity, 40),
-                                  ),
-                                  child: const Text(
-                                    'Confirmer la livraison',
                                     style: TextStyle(color: Colors.white),
                                   ),
                                 ),
@@ -879,6 +1019,13 @@ class _OrderScreenState extends State<OrderScreen> {
   }
 
   Widget _buildLivreurOrders() {
+    String generate4DigitCode() {
+      final random = Random();
+      int code = (1000 + random.nextInt(9000))
+          as int; // Génère un nombre entre 1000 et 9999
+      return code.toString();
+    }
+
     final authState = context.read<AuthCubit>().state;
     if (authState is! AuthSuccess) {
       return const Center(child: Text('Non authentifié'));
@@ -886,7 +1033,7 @@ class _OrderScreenState extends State<OrderScreen> {
 
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance.collection('carts').where('status',
-          whereIn: ['prêt à expédier', 'en route pour livraison']).snapshots(),
+          whereIn: ['prêt à expédier', 'en route pour livraison', 'delivered']).snapshots(),
       builder: (context, snapshot) {
         if (snapshot.hasError) {
           return Center(child: Text('Erreur: ${snapshot.error}'));
@@ -1024,7 +1171,6 @@ class _OrderScreenState extends State<OrderScreen> {
                                         style: const TextStyle(
                                           fontWeight: FontWeight.bold,
                                           fontSize: 16,
-                                          color: AppColors.primary,
                                         ),
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
@@ -1101,7 +1247,8 @@ class _OrderScreenState extends State<OrderScreen> {
                       padding: const EdgeInsets.all(8.0),
                       child: Column(
                         children: [
-                          if (status == 'prêt à expédier' && data['packagePhoto'] != null) ...[
+                          if (status == 'prêt à expédier' &&
+                              data['packagePhoto'] != null) ...[
                             Padding(
                               padding: const EdgeInsets.only(bottom: 16.0),
                               child: Column(
@@ -1131,16 +1278,22 @@ class _OrderScreenState extends State<OrderScreen> {
                                                   child: Image.network(
                                                     data['packagePhoto'],
                                                     fit: BoxFit.contain,
-                                                    width: MediaQuery.of(context).size.width,
-                                                    height: MediaQuery.of(context).size.height,
+                                                    width: MediaQuery.of(context)
+                                                        .size
+                                                        .width,
+                                                    height: MediaQuery.of(context)
+                                                        .size
+                                                        .height,
                                                   ),
                                                 ),
                                                 Positioned(
                                                   top: 10,
                                                   right: 10,
                                                   child: IconButton(
-                                                    icon: const Icon(Icons.close, color: Colors.white),
-                                                    onPressed: () => Navigator.pop(context),
+                                                    icon: const Icon(Icons.close,
+                                                        color: Colors.white),
+                                                    onPressed: () =>
+                                                        Navigator.pop(context),
                                                   ),
                                                 ),
                                               ],
@@ -1161,7 +1314,8 @@ class _OrderScreenState extends State<OrderScreen> {
                                             width: double.infinity,
                                             height: 150,
                                             color: Colors.grey.shade200,
-                                            child: const Icon(Icons.image, color: Colors.grey),
+                                            child: const Icon(Icons.image,
+                                                color: Colors.grey),
                                           );
                                         },
                                       ),
@@ -1171,54 +1325,65 @@ class _OrderScreenState extends State<OrderScreen> {
                               ),
                             ),
                           ],
-                          ElevatedButton(
-                            onPressed: status == 'prêt à expédier'
-                                ? () async {
-                                    try {
-                                      await FirebaseFirestore.instance
-                                          .collection('carts')
-                                          .doc(doc.id)
-                                          .update({
-                                        'status': 'en route pour livraison',
-                                        'timestamp': FieldValue.serverTimestamp(),
-                                      });
+                          if (status != 'delivered') ...[
+                            ElevatedButton(
+                              onPressed: () async {
+                                if (status == 'prêt à expédier') {
+                                  try {
+                                    await FirebaseFirestore.instance
+                                        .collection('carts')
+                                        .doc(doc.id)
+                                        .update({
+                                      'status': 'en route pour livraison',
+                                      'livreur': authState.user!['id'].toString(),
+                                      'shortCode': generate4DigitCode(),
+                                      'timestamp': FieldValue.serverTimestamp(),
+                                    });
 
-                                      if (mounted) {
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          const SnackBar(
-                                            content: Text('Colis reçu avec succès'),
-                                            backgroundColor: Colors.green,
-                                          ),
-                                        );
-                                      }
-                                    } catch (e) {
-                                      if (mounted) {
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          SnackBar(
-                                            content: Text('Erreur: $e'),
-                                            backgroundColor: Colors.red,
-                                          ),
-                                        );
-                                      }
+                                    if (mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text('Colis reçu avec succès'),
+                                          backgroundColor: Colors.green,
+                                        ),
+                                      );
+                                    }
+                                  } catch (e) {
+                                    if (mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text('Erreur: $e'),
+                                          backgroundColor: Colors.red,
+                                        ),
+                                      );
                                     }
                                   }
-                                : null,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: status == 'prêt à expédier'
-                                  ? AppColors.primary
-                                  : Colors.grey,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
+                                } else if (status == 'en route pour livraison') {
+                                  final shortCode = data['shortCode']??"";
+                                  
+                                  _showCodeConfirmationDialog(
+                                    context,
+                                    doc.id,
+                                    shortCode,
+                                    authState.user!['id'].toString(),
+                                  );
+                                }
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.primary,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                minimumSize: const Size(double.infinity, 40),
                               ),
-                              minimumSize: const Size(double.infinity, 40),
+                              child: Text(
+                                status == 'prêt à expédier'
+                                    ? 'Recevoir colis'
+                                    : 'Confirmer la livraison',
+                                style: const TextStyle(color: Colors.white),
+                              ),
                             ),
-                            child: Text(
-                              status == 'prêt à expédier'
-                                  ? 'Recevoir colis'
-                                  : 'En cours de livraison',
-                              style: const TextStyle(color: Colors.white),
-                            ),
-                          ),
+                          ],
                         ],
                       ),
                     ),
@@ -1347,7 +1512,8 @@ class _OrderScreenState extends State<OrderScreen> {
               final data = doc.data() as Map<String, dynamic>;
               final status = data['status']?.toString() ?? 'pending';
               final timestamp = data['timestamp'] as Timestamp?;
-              final adresse = data['adresse']?.toString() ?? 'Adresse non spécifiée';
+              final adresse =
+                  data['adresse']?.toString() ?? 'Adresse non spécifiée';
 
               return Container(
                 margin: const EdgeInsets.only(bottom: 10),
@@ -1384,7 +1550,8 @@ class _OrderScreenState extends State<OrderScreen> {
                           Container(
                             width: 6,
                             height: 110,
-                            margin: const EdgeInsets.only(right: 10, top: 10, bottom: 10),
+                            margin: const EdgeInsets.only(
+                                right: 10, top: 10, bottom: 10),
                             decoration: BoxDecoration(
                               color: _statusColor(status),
                               borderRadius: BorderRadius.circular(8),
@@ -1392,21 +1559,26 @@ class _OrderScreenState extends State<OrderScreen> {
                           ),
                           // Image produit
                           Padding(
-                            padding: const EdgeInsets.only(top: 16, left: 0, right: 10),
+                            padding: const EdgeInsets.only(
+                                top: 16, left: 0, right: 10),
                             child: ClipRRect(
                               borderRadius: BorderRadius.circular(14),
-                              child: data['items'] != null && (data['items'] as List).isNotEmpty
+                              child: data['items'] != null &&
+                                      (data['items'] as List).isNotEmpty
                                   ? Image.network(
-                                      (data['items'] as List)[0]['imagePath'] ?? 'https://via.placeholder.com/80',
+                                      (data['items'] as List)[0]['imagePath'] ??
+                                          'https://via.placeholder.com/80',
                                       width: 70,
                                       height: 70,
                                       fit: BoxFit.cover,
-                                      errorBuilder: (context, error, stackTrace) {
+                                      errorBuilder:
+                                          (context, error, stackTrace) {
                                         return Container(
                                           width: 70,
                                           height: 70,
                                           color: Colors.grey.shade200,
-                                          child: const Icon(Icons.image, color: Colors.grey),
+                                          child: const Icon(Icons.image,
+                                              color: Colors.grey),
                                         );
                                       },
                                     )
@@ -1414,14 +1586,16 @@ class _OrderScreenState extends State<OrderScreen> {
                                       width: 70,
                                       height: 70,
                                       color: Colors.grey.shade200,
-                                      child: const Icon(Icons.image, color: Colors.grey),
+                                      child: const Icon(Icons.image,
+                                          color: Colors.grey),
                                     ),
                             ),
                           ),
                           // Détails commande
                           Expanded(
                             child: Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 0),
+                              padding: const EdgeInsets.symmetric(
+                                  vertical: 16, horizontal: 0),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
@@ -1429,8 +1603,12 @@ class _OrderScreenState extends State<OrderScreen> {
                                     children: [
                                       Expanded(
                                         child: Text(
-                                          data['items'] != null && (data['items'] as List).isNotEmpty
-                                              ? (data['items'] as List)[0]['name'] ?? 'Produit'
+                                          data['items'] != null &&
+                                                  (data['items'] as List)
+                                                      .isNotEmpty
+                                              ? (data['items'] as List)[0]
+                                                      ['name'] ??
+                                                  'Produit'
                                               : 'Produit',
                                           style: const TextStyle(
                                             fontWeight: FontWeight.bold,
@@ -1442,10 +1620,13 @@ class _OrderScreenState extends State<OrderScreen> {
                                       ),
                                       const SizedBox(width: 8),
                                       Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 12, vertical: 4),
                                         decoration: BoxDecoration(
-                                          color: _statusColor(status).withOpacity(0.1),
-                                          borderRadius: BorderRadius.circular(8),
+                                          color: _statusColor(status)
+                                              .withOpacity(0.1),
+                                          borderRadius:
+                                              BorderRadius.circular(8),
                                         ),
                                         child: Text(
                                           _translateStatus(status),
@@ -1472,14 +1653,16 @@ class _OrderScreenState extends State<OrderScreen> {
                                   const SizedBox(height: 12),
                                   Row(
                                     children: [
-                                      const Icon(Icons.calendar_today, size: 14, color: AppColors.primary),
+                                      const Icon(Icons.calendar_today,
+                                          size: 14, color: AppColors.primary),
                                       const SizedBox(width: 4),
                                       Text(
                                         _formatDate(timestamp),
                                         style: const TextStyle(fontSize: 13),
                                       ),
                                       const SizedBox(width: 12),
-                                      const Icon(Icons.shopping_cart, size: 14, color: AppColors.primary),
+                                      const Icon(Icons.shopping_cart,
+                                          size: 14, color: AppColors.primary),
                                       const SizedBox(width: 4),
                                       Text(
                                         '${(data['items'] as List?)?.length ?? 0} article${((data['items'] as List?)?.length ?? 0) > 1 ? 's' : ''}',
@@ -1494,7 +1677,8 @@ class _OrderScreenState extends State<OrderScreen> {
                         ],
                       ),
                       // Contenu existant
-                      if (status == 'prêt à expédier' && data['packagePhoto'] != null)
+                      if (status == 'prêt à expédier' &&
+                          data['packagePhoto'] != null)
                         Padding(
                           padding: const EdgeInsets.all(16.0),
                           child: Column(
@@ -1524,16 +1708,22 @@ class _OrderScreenState extends State<OrderScreen> {
                                               child: Image.network(
                                                 data['packagePhoto'],
                                                 fit: BoxFit.contain,
-                                                width: MediaQuery.of(context).size.width,
-                                                height: MediaQuery.of(context).size.height,
+                                                width: MediaQuery.of(context)
+                                                    .size
+                                                    .width,
+                                                height: MediaQuery.of(context)
+                                                    .size
+                                                    .height,
                                               ),
                                             ),
                                             Positioned(
                                               top: 10,
                                               right: 10,
                                               child: IconButton(
-                                                icon: const Icon(Icons.close, color: Colors.white),
-                                                onPressed: () => Navigator.pop(context),
+                                                icon: const Icon(Icons.close,
+                                                    color: Colors.white),
+                                                onPressed: () =>
+                                                    Navigator.pop(context),
                                               ),
                                             ),
                                           ],
@@ -1554,7 +1744,8 @@ class _OrderScreenState extends State<OrderScreen> {
                                         width: double.infinity,
                                         height: 150,
                                         color: Colors.grey.shade200,
-                                        child: const Icon(Icons.image, color: Colors.grey),
+                                        child: const Icon(Icons.image,
+                                            color: Colors.grey),
                                       );
                                     },
                                   ),
@@ -1581,21 +1772,26 @@ class _OrderScreenState extends State<OrderScreen> {
                                                 .collection('carts')
                                                 .doc(doc.id)
                                                 .update({
-                                              'status': 'colis en cours de préparation',
-                                              'timestamp': FieldValue.serverTimestamp(),
+                                              'status':
+                                                  'colis en cours de préparation',
+                                              'timestamp':
+                                                  FieldValue.serverTimestamp(),
                                             });
 
                                             if (mounted) {
-                                              ScaffoldMessenger.of(context).showSnackBar(
+                                              ScaffoldMessenger.of(context)
+                                                  .showSnackBar(
                                                 const SnackBar(
-                                                  content: Text('Commande acceptée avec succès'),
+                                                  content: Text(
+                                                      'Commande acceptée avec succès'),
                                                   backgroundColor: Colors.green,
                                                 ),
                                               );
                                             }
                                           } catch (e) {
                                             if (mounted) {
-                                              ScaffoldMessenger.of(context).showSnackBar(
+                                              ScaffoldMessenger.of(context)
+                                                  .showSnackBar(
                                                 SnackBar(
                                                   content: Text('Erreur: $e'),
                                                   backgroundColor: Colors.red,
@@ -1607,9 +1803,11 @@ class _OrderScreenState extends State<OrderScreen> {
                                         style: ElevatedButton.styleFrom(
                                           backgroundColor: AppColors.primary,
                                           shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(8),
+                                            borderRadius:
+                                                BorderRadius.circular(8),
                                           ),
-                                          minimumSize: const Size(double.infinity, 40),
+                                          minimumSize:
+                                              const Size(double.infinity, 40),
                                         ),
                                         child: const Text(
                                           'Accepter',
@@ -1622,32 +1820,46 @@ class _OrderScreenState extends State<OrderScreen> {
                                       child: ElevatedButton(
                                         onPressed: () async {
                                           // Afficher la boîte de dialogue pour la raison du rejet
-                                          final TextEditingController reasonController = TextEditingController();
-                                          bool? confirmed = await showDialog<bool>(
+                                          final TextEditingController
+                                              reasonController =
+                                              TextEditingController();
+                                          bool? confirmed =
+                                              await showDialog<bool>(
                                             context: context,
                                             builder: (BuildContext context) {
                                               return StatefulBuilder(
                                                 builder: (context, setState) {
                                                   return AlertDialog(
-                                                    shape: RoundedRectangleBorder(
-                                                      borderRadius: BorderRadius.circular(16),
+                                                    shape:
+                                                        RoundedRectangleBorder(
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                              16),
                                                     ),
                                                     title: Row(
                                                       children: [
-                                                        const Icon(Icons.warning_amber_rounded, color: Colors.red),
-                                                        const SizedBox(width: 8),
+                                                        const Icon(
+                                                            Icons
+                                                                .warning_amber_rounded,
+                                                            color: Colors.red),
+                                                        const SizedBox(
+                                                            width: 8),
                                                         const Text(
                                                           'Rejeter la commande',
                                                           style: TextStyle(
                                                             fontSize: 18,
-                                                            fontWeight: FontWeight.bold,
+                                                            fontWeight:
+                                                                FontWeight.bold,
                                                           ),
                                                         ),
                                                       ],
                                                     ),
                                                     content: Column(
-                                                      mainAxisSize: MainAxisSize.min,
-                                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                                      mainAxisSize:
+                                                          MainAxisSize.min,
+                                                      crossAxisAlignment:
+                                                          CrossAxisAlignment
+                                                              .start,
                                                       children: [
                                                         const Text(
                                                           'Veuillez indiquer la raison du rejet de cette commande.',
@@ -1656,50 +1868,89 @@ class _OrderScreenState extends State<OrderScreen> {
                                                             fontSize: 14,
                                                           ),
                                                         ),
-                                                        const SizedBox(height: 16),
+                                                        const SizedBox(
+                                                            height: 16),
                                                         TextField(
-                                                          controller: reasonController,
-                                                          decoration: InputDecoration(
-                                                            hintText: 'Entrez la raison du rejet',
-                                                            border: OutlineInputBorder(
-                                                              borderRadius: BorderRadius.circular(8),
+                                                          controller:
+                                                              reasonController,
+                                                          decoration:
+                                                              InputDecoration(
+                                                            hintText:
+                                                                'Entrez la raison du rejet',
+                                                            border:
+                                                                OutlineInputBorder(
+                                                              borderRadius:
+                                                                  BorderRadius
+                                                                      .circular(
+                                                                          8),
                                                             ),
                                                             filled: true,
-                                                            fillColor: Colors.grey.shade50,
-                                                            prefixIcon: const Icon(Icons.edit_note, color: Colors.grey),
-                                                            errorText: reasonController.text.isEmpty ? 'Ce champ est obligatoire' : null,
+                                                            fillColor: Colors
+                                                                .grey.shade50,
+                                                            prefixIcon: const Icon(
+                                                                Icons.edit_note,
+                                                                color: Colors
+                                                                    .grey),
+                                                            errorText:
+                                                                reasonController
+                                                                        .text
+                                                                        .isEmpty
+                                                                    ? 'Ce champ est obligatoire'
+                                                                    : null,
                                                           ),
                                                           maxLines: 3,
                                                           onChanged: (value) {
-                                                            setState(() {}); // Pour mettre à jour la validation en temps réel
+                                                            setState(
+                                                                () {}); // Pour mettre à jour la validation en temps réel
                                                           },
                                                         ),
                                                       ],
                                                     ),
                                                     actions: [
                                                       TextButton(
-                                                        onPressed: () => Navigator.pop(context, false),
+                                                        onPressed: () =>
+                                                            Navigator.pop(
+                                                                context, false),
                                                         child: const Text(
                                                           'ANNULER',
-                                                          style: TextStyle(color: Colors.grey),
+                                                          style: TextStyle(
+                                                              color:
+                                                                  Colors.grey),
                                                         ),
                                                       ),
                                                       ElevatedButton(
-                                                        onPressed: reasonController.text.trim().isEmpty
-                                                            ? null
-                                                            : () {
-                                                                Navigator.pop(context, true);
-                                                              },
-                                                        style: ElevatedButton.styleFrom(
-                                                          backgroundColor: Colors.red,
-                                                          disabledBackgroundColor: Colors.red.withOpacity(0.5),
-                                                          shape: RoundedRectangleBorder(
-                                                            borderRadius: BorderRadius.circular(8),
+                                                        onPressed:
+                                                            reasonController
+                                                                    .text
+                                                                    .trim()
+                                                                    .isEmpty
+                                                                ? null
+                                                                : () {
+                                                                    Navigator.pop(
+                                                                        context,
+                                                                        true);
+                                                                  },
+                                                        style: ElevatedButton
+                                                            .styleFrom(
+                                                          backgroundColor:
+                                                              Colors.red,
+                                                          disabledBackgroundColor:
+                                                              Colors.red
+                                                                  .withOpacity(
+                                                                      0.5),
+                                                          shape:
+                                                              RoundedRectangleBorder(
+                                                            borderRadius:
+                                                                BorderRadius
+                                                                    .circular(
+                                                                        8),
                                                           ),
                                                         ),
                                                         child: const Text(
                                                           'REJETER',
-                                                          style: TextStyle(color: Colors.white),
+                                                          style: TextStyle(
+                                                              color:
+                                                                  Colors.white),
                                                         ),
                                                       ),
                                                     ],
@@ -1709,28 +1960,37 @@ class _OrderScreenState extends State<OrderScreen> {
                                             },
                                           );
 
-                                          if (confirmed == true && reasonController.text.trim().isNotEmpty) {
+                                          if (confirmed == true &&
+                                              reasonController.text
+                                                  .trim()
+                                                  .isNotEmpty) {
                                             try {
                                               await FirebaseFirestore.instance
                                                   .collection('carts')
                                                   .doc(doc.id)
                                                   .update({
                                                 'status': 'rejected',
-                                                'rejectionReason': reasonController.text.trim(),
-                                                'timestamp': FieldValue.serverTimestamp(),
+                                                'rejectionReason':
+                                                    reasonController.text
+                                                        .trim(),
+                                                'timestamp': FieldValue
+                                                    .serverTimestamp(),
                                               });
 
                                               if (mounted) {
-                                                ScaffoldMessenger.of(context).showSnackBar(
+                                                ScaffoldMessenger.of(context)
+                                                    .showSnackBar(
                                                   const SnackBar(
-                                                    content: Text('Commande rejetée'),
+                                                    content: Text(
+                                                        'Commande rejetée'),
                                                     backgroundColor: Colors.red,
                                                   ),
                                                 );
                                               }
                                             } catch (e) {
                                               if (mounted) {
-                                                ScaffoldMessenger.of(context).showSnackBar(
+                                                ScaffoldMessenger.of(context)
+                                                    .showSnackBar(
                                                   SnackBar(
                                                     content: Text('Erreur: $e'),
                                                     backgroundColor: Colors.red,
@@ -1743,9 +2003,11 @@ class _OrderScreenState extends State<OrderScreen> {
                                         style: ElevatedButton.styleFrom(
                                           backgroundColor: Colors.red,
                                           shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(8),
+                                            borderRadius:
+                                                BorderRadius.circular(8),
                                           ),
-                                          minimumSize: const Size(double.infinity, 40),
+                                          minimumSize:
+                                              const Size(double.infinity, 40),
                                         ),
                                         child: const Text(
                                           'REJETER',
@@ -1757,7 +2019,8 @@ class _OrderScreenState extends State<OrderScreen> {
                                 ),
                               ),
                               Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 8.0),
                                 child: ElevatedButton(
                                   onPressed: () {
                                     // Afficher le popup de contact
@@ -1766,7 +2029,8 @@ class _OrderScreenState extends State<OrderScreen> {
                                       builder: (BuildContext context) {
                                         return Dialog(
                                           shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(16),
+                                            borderRadius:
+                                                BorderRadius.circular(16),
                                           ),
                                           child: Container(
                                             padding: const EdgeInsets.all(20),
@@ -1790,39 +2054,62 @@ class _OrderScreenState extends State<OrderScreen> {
                                                 ),
                                                 const SizedBox(height: 20),
                                                 Row(
-                                                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                                  mainAxisAlignment:
+                                                      MainAxisAlignment
+                                                          .spaceEvenly,
                                                   children: [
                                                     // Bouton Appel normal
                                                     ElevatedButton(
                                                       onPressed: () {
-                                                        final phoneNumber = data['phone'] ?? '';
-                                                        if (phoneNumber.isNotEmpty) {
-                                                          launchUrl(Uri.parse('tel:$phoneNumber'));
+                                                        final phoneNumber =
+                                                            data['phone'] ?? '';
+                                                        if (phoneNumber
+                                                            .isNotEmpty) {
+                                                          launchUrl(Uri.parse(
+                                                              'tel:$phoneNumber'));
                                                         } else {
-                                                          ScaffoldMessenger.of(context).showSnackBar(
+                                                          ScaffoldMessenger.of(
+                                                                  context)
+                                                              .showSnackBar(
                                                             const SnackBar(
-                                                              content: Text('Numéro de téléphone non disponible'),
-                                                              backgroundColor: Colors.red,
+                                                              content: Text(
+                                                                  'Numéro de téléphone non disponible'),
+                                                              backgroundColor:
+                                                                  Colors.red,
                                                             ),
                                                           );
                                                         }
                                                         Navigator.pop(context);
                                                       },
-                                                      style: ElevatedButton.styleFrom(
-                                                        backgroundColor: AppColors.primary,
-                                                        shape: RoundedRectangleBorder(
-                                                          borderRadius: BorderRadius.circular(8),
+                                                      style: ElevatedButton
+                                                          .styleFrom(
+                                                        backgroundColor:
+                                                            AppColors.primary,
+                                                        shape:
+                                                            RoundedRectangleBorder(
+                                                          borderRadius:
+                                                              BorderRadius
+                                                                  .circular(8),
                                                         ),
-                                                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                                                        padding:
+                                                            const EdgeInsets
+                                                                .symmetric(
+                                                                horizontal: 20,
+                                                                vertical: 12),
                                                       ),
                                                       child: const Row(
-                                                        mainAxisSize: MainAxisSize.min,
+                                                        mainAxisSize:
+                                                            MainAxisSize.min,
                                                         children: [
-                                                          Icon(Icons.phone, color: Colors.white),
+                                                          Icon(Icons.phone,
+                                                              color:
+                                                                  Colors.white),
                                                           SizedBox(width: 8),
                                                           Text(
                                                             'Appeler',
-                                                            style: TextStyle(color: Colors.white),
+                                                            style: TextStyle(
+                                                                color: Colors
+                                                                    .white),
                                                           ),
                                                         ],
                                                       ),
@@ -1830,35 +2117,57 @@ class _OrderScreenState extends State<OrderScreen> {
                                                     // Bouton WhatsApp
                                                     ElevatedButton(
                                                       onPressed: () {
-                                                        final phoneNumber = data['phone'] ?? '';
-                                                        if (phoneNumber.isNotEmpty) {
-                                                          final whatsappUrl = 'https://wa.me/$phoneNumber';
-                                                          launchUrl(Uri.parse(whatsappUrl));
+                                                        final phoneNumber =
+                                                            data['phone'] ?? '';
+                                                        if (phoneNumber
+                                                            .isNotEmpty) {
+                                                          final whatsappUrl =
+                                                              'https://wa.me/$phoneNumber';
+                                                          launchUrl(Uri.parse(
+                                                              whatsappUrl));
                                                         } else {
-                                                          ScaffoldMessenger.of(context).showSnackBar(
+                                                          ScaffoldMessenger.of(
+                                                                  context)
+                                                              .showSnackBar(
                                                             const SnackBar(
-                                                              content: Text('Numéro de téléphone non disponible'),
-                                                              backgroundColor: Colors.red,
+                                                              content: Text(
+                                                                  'Numéro de téléphone non disponible'),
+                                                              backgroundColor:
+                                                                  Colors.red,
                                                             ),
                                                           );
                                                         }
                                                         Navigator.pop(context);
                                                       },
-                                                      style: ElevatedButton.styleFrom(
-                                                        backgroundColor: Colors.green,
-                                                        shape: RoundedRectangleBorder(
-                                                          borderRadius: BorderRadius.circular(8),
+                                                      style: ElevatedButton
+                                                          .styleFrom(
+                                                        backgroundColor:
+                                                            Colors.green,
+                                                        shape:
+                                                            RoundedRectangleBorder(
+                                                          borderRadius:
+                                                              BorderRadius
+                                                                  .circular(8),
                                                         ),
-                                                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                                                        padding:
+                                                            const EdgeInsets
+                                                                .symmetric(
+                                                                horizontal: 20,
+                                                                vertical: 12),
                                                       ),
                                                       child: const Row(
-                                                        mainAxisSize: MainAxisSize.min,
+                                                        mainAxisSize:
+                                                            MainAxisSize.min,
                                                         children: [
-                                                          Icon(Icons.message, color: Colors.white),
+                                                          Icon(Icons.message,
+                                                              color:
+                                                                  Colors.white),
                                                           SizedBox(width: 8),
                                                           Text(
                                                             'WhatsApp',
-                                                            style: TextStyle(color: Colors.white),
+                                                            style: TextStyle(
+                                                                color: Colors
+                                                                    .white),
                                                           ),
                                                         ],
                                                       ),
@@ -1867,10 +2176,12 @@ class _OrderScreenState extends State<OrderScreen> {
                                                 ),
                                                 const SizedBox(height: 16),
                                                 TextButton(
-                                                  onPressed: () => Navigator.pop(context),
+                                                  onPressed: () =>
+                                                      Navigator.pop(context),
                                                   child: const Text(
                                                     'ANNULER',
-                                                    style: TextStyle(color: Colors.grey),
+                                                    style: TextStyle(
+                                                        color: Colors.grey),
                                                   ),
                                                 ),
                                               ],
@@ -1885,7 +2196,8 @@ class _OrderScreenState extends State<OrderScreen> {
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(8),
                                     ),
-                                    minimumSize: const Size(double.infinity, 40),
+                                    minimumSize:
+                                        const Size(double.infinity, 40),
                                   ),
                                   child: const Text(
                                     'Contacter',
@@ -1906,7 +2218,8 @@ class _OrderScreenState extends State<OrderScreen> {
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(8),
                                     ),
-                                    minimumSize: const Size(double.infinity, 40),
+                                    minimumSize:
+                                        const Size(double.infinity, 40),
                                   ),
                                   child: const Text(
                                     'Expédier',
@@ -2044,6 +2357,7 @@ class _OrderScreenState extends State<OrderScreen> {
     );
   }
 }
+
 class OrderCardShimmer extends StatelessWidget {
   const OrderCardShimmer({Key? key}) : super(key: key);
 
@@ -2137,4 +2451,3 @@ class OrderCardShimmer extends StatelessWidget {
     );
   }
 }
-
