@@ -2044,7 +2044,6 @@ class _OrderScreenState extends State<OrderScreen> {
     );
   }
 }
-
 class OrderCardShimmer extends StatelessWidget {
   const OrderCardShimmer({Key? key}) : super(key: key);
 
@@ -2138,3 +2137,4 @@ class OrderCardShimmer extends StatelessWidget {
     );
   }
 }
+
