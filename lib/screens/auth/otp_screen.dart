@@ -298,7 +298,7 @@ class _OTPScreenState extends State<OTPScreen> {
                         children: [
                           const TextSpan(
                             text:
-                                'Veuillez entrer le code à 6 chiffres envoyé sur WhatsApp au numéro ',
+                                'Veuillez entrer le code à 6 chiffres envoyé au numéro ',
                           ),
                           TextSpan(
                             text: _maskedPhoneNumber,

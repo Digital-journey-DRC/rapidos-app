@@ -57,6 +57,7 @@ class _CartScreenState extends State<CartScreen> {
         final user = authState.user!;
         final userId = user['id']?.toString() ?? '';
         final userRole = user['role']?.toString() ?? '';
+        final phone = user['phone']?.toString() ?? '';
 
         // Vérifier si un enregistrement existe déjà pour cet utilisateur
         final locationQuery = await FirebaseFirestore.instance
@@ -79,6 +80,7 @@ class _CartScreenState extends State<CartScreen> {
             'role': userRole,
             'longitude': position.longitude,
             'latitude': position.latitude,
+            'phone': phone,
             'timestamp': FieldValue.serverTimestamp(),
           });
           print('✅ Nouvelle position enregistrée avec succès');

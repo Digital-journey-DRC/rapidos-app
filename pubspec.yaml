@@ -101,6 +101,7 @@ flutter:
     - assets/images/kin.png
     - assets/images/
     - assets/notif.mp3
+    - assets/images/pin-livreur.png
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

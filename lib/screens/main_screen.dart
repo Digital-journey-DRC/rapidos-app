@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:immo/cubit/listing_cubit.dart';
-import 'package:immo/screens/acheteur_location.dart';
 import 'package:immo/screens/cart/cart_screen.dart';
 import 'package:immo/screens/favoris_screen.dart';
 import 'package:immo/screens/home/home_livreur.dart';
@@ -9,6 +9,7 @@ import 'package:immo/screens/home/home_marchant.dart';
 import 'package:immo/screens/home/new_home.dart';
 
 import 'package:immo/screens/order_screen.dart';
+import 'package:immo/screens/tracking_map_page.dart';
 
 import '../constants.dart';
 import '../cubit/auth_cubit.dart';
@@ -40,7 +41,7 @@ class _MainScreenState extends State<MainScreen> {
     const HomeMarchantScreen(),
     const OrderScreen(backNavigation: false),
     const HomeLivreurScreen(),
-    const AcheteurLocation()
+    const TrackingMapPage()
   ];
 
   static Future<void> saveTokenToFirestore(
@@ -217,6 +218,7 @@ class _MainScreenState extends State<MainScreen> {
     } else if (isLivreur) {
       filteredScreens = [
         _screens[5],
+        _screens[6],
         _screens[4],
         // HomeLivreurScreen
         // CartScreen
@@ -225,6 +227,8 @@ class _MainScreenState extends State<MainScreen> {
       navigationItems = const [
         BottomNavigationBarItem(
             icon: Icon(Icons.bar_chart_outlined), label: 'Statistiques'),
+        BottomNavigationBarItem(
+            icon: Icon(Icons.place_outlined), label: 'Maps'),
         BottomNavigationBarItem(
             icon: Icon(Icons.shopping_cart_checkout), label: 'Livraisons'),
       ];
