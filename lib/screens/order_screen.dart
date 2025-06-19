@@ -547,7 +547,7 @@ class _OrderScreenState extends State<OrderScreen> {
             : null,
         backgroundColor: Colors.white,
         elevation: 0,
-        title: const Text('Commandes'),
+        title: const Text('Commandes', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),),
         centerTitle: true,
       ),
       body: Column(

@@ -7,6 +7,7 @@ import 'package:immo/screens/favoris_screen.dart';
 import 'package:immo/screens/home/home_livreur.dart';
 import 'package:immo/screens/home/home_marchant.dart';
 import 'package:immo/screens/home/new_home.dart';
+import 'package:immo/screens/home/voir_plus_produits.dart';
 
 import 'package:immo/screens/order_screen.dart';
 import 'package:immo/screens/tracking_map_page.dart';
@@ -41,7 +42,8 @@ class _MainScreenState extends State<MainScreen> {
     const HomeMarchantScreen(),
     const OrderScreen(backNavigation: false),
     const HomeLivreurScreen(),
-    const TrackingMapPage()
+    const TrackingMapPage(),
+    const VoirPlusProduitsScreen(),
   ];
 
   static Future<void> saveTokenToFirestore(
@@ -207,11 +209,12 @@ class _MainScreenState extends State<MainScreen> {
     } else if (isVendeur) {
       filteredScreens = [
         _screens[3], // HomeMarchantScreen
-        // _screens[3], // HomeMarchantScreen (pour l'onglet Produits)
+        _screens[7], // HomeMarchantScreen (pour l'onglet Produits)
         _screens[4], // HomeMarchantScreen (pour l'onglet Profil)
       ];
       navigationItems = const [
         BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Accueil'),
+        BottomNavigationBarItem(icon: Icon(Icons.shopping_bag), label: 'Produits'),
         BottomNavigationBarItem(
             icon: Icon(Icons.shopping_cart_checkout), label: 'Commandes'),
       ];

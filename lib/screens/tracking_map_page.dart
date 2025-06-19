@@ -8,6 +8,9 @@ import 'package:flutter/services.dart';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:url_launcher/url_launcher.dart';
+import 'dart:convert';
+import 'dart:math';
+import 'package:http/http.dart' as http;
 
 class TrackingMapPage extends StatefulWidget {
   const TrackingMapPage({Key? key}) : super(key: key);
@@ -19,68 +22,203 @@ class TrackingMapPage extends StatefulWidget {
 class _TrackingMapPageState extends State<TrackingMapPage> {
   GoogleMapController? _mapController;
   Set<Marker> _markers = {};
+  Set<Polyline> _polylines = {};
   bool _isLoading = true;
   String? _currentOrderId;
   late BitmapDescriptor livreurIcon; // icon du livreur (non nullable)
   MapType _currentMapType = MapType.normal;
   String? _livreurPhone; // Stockage du numéro de téléphone du livreur
   String? _acheteurPhone; // Stockage du numéro de téléphone de l'acheteur
+  LatLng? _livreurPosition;
+  LatLng? _acheteurPosition;
+  String? _routeDistance;
+  String? _routeDuration;
+  bool _hasActiveOrders = false;
 
   @override
   void initState() {
     super.initState();
-    // Initialiser l'icône du livreur avant tout
+    // Initialiser l'icône du livreur et démarrer immédiatement
     _initializeMarkerIcon();
-    // Centrer la carte sur la position de l'utilisateur après un court délai
-    Future.delayed(const Duration(milliseconds: 500), () {
+    // Démarrer immédiatement les mises à jour de localisation
+    _setupLocationUpdates();
+    // Réduire le délai pour un chargement plus rapide
+    Future.delayed(const Duration(milliseconds: 100), () {
       _centerMapOnUserLocation();
     });
   }
 
   Future<void> _initializeMarkerIcon() async {
     try {
-      print('Loading livreur icon from assets...'); // Debug log
+      print('Loading livreur icon from assets...');
 
       // Charger l'image depuis les assets
       final ByteData bytes =
           await rootBundle.load('assets/images/pin-livreur.png');
       final Uint8List data = bytes.buffer.asUint8List();
 
-      // Redimensionner l'image pour qu'elle soit adaptée à la carte
-      final Uint8List resizedData = await _resizeImage(data, 150, 150);
+      // Réduire la taille de l'image pour améliorer les performances
+      final Uint8List resizedData = await _resizeImage(data, 80, 80);
 
       // Créer l'icône à partir des données de l'image
       livreurIcon = BitmapDescriptor.fromBytes(resizedData);
 
-      print('Livreur icon loaded successfully with custom size'); // Debug log
+      print('Livreur icon loaded successfully with optimized size');
 
-      // Une fois l'icône chargée, initialiser le reste de l'application
-      _setupLocationUpdates();
+      // Appliquer le style de la carte
       _setMapStyle();
     } catch (e) {
-      print('Error loading livreur icon: $e'); // Debug log
-      // En cas d'erreur, utiliser l'icône bleue par défaut
+      print('Error loading livreur icon: $e');
+      // En cas d'erreur, utiliser l'icône bleue par défaut immédiatement
       livreurIcon =
           BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue);
-      // Quand même initialiser le reste de l'application
-      _setupLocationUpdates();
+      // Appliquer le style de la carte
       _setMapStyle();
     }
   }
 
   Future<Uint8List> _resizeImage(Uint8List data, int width, int height) async {
-    // Décoder l'image
     final ui.Codec codec = await ui.instantiateImageCodec(data,
         targetWidth: width, targetHeight: height);
 
-    // Obtenir le cadre de l'image
     final ui.FrameInfo frameInfo = await codec.getNextFrame();
 
-    // Convertir l'image en bytes
     final ByteData? byteData =
         await frameInfo.image.toByteData(format: ui.ImageByteFormat.png);
 
     return byteData!.buffer.asUint8List();
+  }
+
+  Future<void> _calculateRoute(LatLng origin, LatLng destination) async {
+    try {
+      print('Calculating route from ${origin.latitude}, ${origin.longitude} to ${destination.latitude}, ${destination.longitude}');
+      
+      // Utiliser l'API Google Maps Directions pour un itinéraire précis
+      final String apiKey = 'AIzaSyCuLBjM3oTYfFSbJwXccj4xP8oynDV5JnM';
+      final String url = 'https://maps.googleapis.com/maps/api/directions/json?'
+          'origin=${origin.latitude},${origin.longitude}'
+          '&destination=${destination.latitude},${destination.longitude}'
+          '&key=$apiKey';
+
+      final response = await http.get(Uri.parse(url));
+      
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        
+        if (data['status'] == 'OK') {
+          final List<dynamic> routes = data['routes'];
+          if (routes.isNotEmpty) {
+            final List<dynamic> legs = routes[0]['legs'];
+            if (legs.isNotEmpty) {
+              final List<dynamic> steps = legs[0]['steps'];
+              
+              List<LatLng> polylineCoordinates = [];
+              
+              for (var step in steps) {
+                final String polyline = step['polyline']['points'];
+                final List<LatLng> decodedPolyline = _decodePolyline(polyline);
+                polylineCoordinates.addAll(decodedPolyline);
+              }
+              
+              setState(() {
+                _polylines.clear();
+                _polylines.add(
+                  Polyline(
+                    polylineId: const PolylineId('route'),
+                    color: AppColors.primary,
+                    points: polylineCoordinates,
+                    width: 5,
+                  ),
+                );
+              });
+              
+              print('Route calculated successfully with ${polylineCoordinates.length} points');
+              
+              // Afficher les informations de l'itinéraire
+              final leg = legs[0];
+              final distance = leg['distance']['text'];
+              final duration = leg['duration']['text'];
+              
+              setState(() {
+                _routeDistance = distance;
+                _routeDuration = duration;
+              });
+              
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Itinéraire: $distance, $duration'),
+                    duration: const Duration(seconds: 3),
+                  ),
+                );
+              }
+            }
+          }
+        } else {
+          print('Directions API error: ${data['status']}');
+          // En cas d'erreur, utiliser la ligne droite simple
+          _calculateSimpleRoute(origin, destination);
+        }
+      } else {
+        print('HTTP error: ${response.statusCode}');
+        // En cas d'erreur, utiliser la ligne droite simple
+        _calculateSimpleRoute(origin, destination);
+      }
+    } catch (e) {
+      print('Error calculating route: $e');
+      // En cas d'erreur, utiliser la ligne droite simple
+      _calculateSimpleRoute(origin, destination);
+    }
+  }
+
+  void _calculateSimpleRoute(LatLng origin, LatLng destination) {
+    // Méthode de fallback : ligne droite entre les deux points
+    List<LatLng> polylineCoordinates = [origin, destination];
+    
+    setState(() {
+      _polylines.clear();
+      _polylines.add(
+        Polyline(
+          polylineId: const PolylineId('route'),
+          color: AppColors.primary,
+          points: polylineCoordinates,
+          width: 5,
+        ),
+      );
+    });
+    
+    print('Simple route calculated as fallback');
+  }
+
+  List<LatLng> _decodePolyline(String encoded) {
+    List<LatLng> poly = [];
+    int index = 0, len = encoded.length;
+    int lat = 0, lng = 0;
+
+    while (index < len) {
+      int b, shift = 0, result = 0;
+      do {
+        b = encoded.codeUnitAt(index++) - 63;
+        result |= (b & 0x1f) << shift;
+        shift += 5;
+      } while (b >= 0x20);
+      int dlat = ((result & 1) != 0 ? ~(result >> 1) : (result >> 1));
+      lat += dlat;
+
+      shift = 0;
+      result = 0;
+      do {
+        b = encoded.codeUnitAt(index++) - 63;
+        result |= (b & 0x1f) << shift;
+        shift += 5;
+      } while (b >= 0x20);
+      int dlng = ((result & 1) != 0 ? ~(result >> 1) : (result >> 1));
+      lng += dlng;
+
+      final p = LatLng((lat / 1E5).toDouble(), (lng / 1E5).toDouble());
+      poly.add(p);
+    }
+    return poly;
   }
 
   void _setupLocationUpdates() {
@@ -90,26 +228,95 @@ class _TrackingMapPageState extends State<TrackingMapPage> {
     final userRole = authState.user!['role'];
     final userId = authState.user!['id'].toString();
 
-    print('User Role: $userRole, User ID: $userId'); // Debug log
+    print('User Role: $userRole, User ID: $userId');
 
-    // Écouter toutes les positions pertinentes
-    FirebaseFirestore.instance
-        .collection('locations')
-        .where('role', whereIn: ['livreur', 'acheteur'])
-        .snapshots()
-        .listen((snapshot) {
-          print('Received ${snapshot.docs.length} location updates'); // Debug log
-          for (var doc in snapshot.docs) {
-            final data = doc.data();
-            print('Location data: ${data.toString()}'); // Debug log for each document
+    // Filtrer les commandes selon le rôle de l'utilisateur connecté
+    Query cartQuery = FirebaseFirestore.instance
+        .collection('carts')
+        .where('status', isEqualTo: 'en route pour livraison');
+
+    if (userRole == 'acheteur') {
+      // Si l'utilisateur est un acheteur, filtrer par idClient
+      cartQuery = cartQuery.where('idClient', isEqualTo: userId);
+    } else if (userRole == 'livreur') {
+      // Si l'utilisateur est un livreur, filtrer par le champ livreur
+      cartQuery = cartQuery.where('livreur', isEqualTo: userId);
+    }
+
+    // Écouter les commandes filtrées avec une fréquence optimisée
+    cartQuery.snapshots().listen((cartSnapshot) {
+      print('Received ${cartSnapshot.docs.length} cart updates for user $userId with role $userRole');
+      
+      // Mettre à jour immédiatement l'état des commandes actives
+      setState(() {
+        _hasActiveOrders = cartSnapshot.docs.isNotEmpty;
+        _isLoading = false;
+      });
+      
+      if (cartSnapshot.docs.isNotEmpty) {
+        print('Active orders found, setting up location tracking...');
+        
+        if (userRole == 'acheteur') {
+          // Pour un acheteur, récupérer l'ID du livreur depuis la commande
+          final livreurIds = cartSnapshot.docs
+              .map((doc) => (doc.data() as Map<String, dynamic>)['livreur'] as String?)
+              .where((id) => id != null && id!.isNotEmpty)
+              .map((id) => id!)
+              .toSet();
+          
+          print('Livreur IDs from carts for acheteur: $livreurIds');
+          
+          if (livreurIds.isNotEmpty) {
+            // Écouter les positions des livreurs avec une fréquence optimisée
+            FirebaseFirestore.instance
+                .collection('locations')
+                .where('userId', whereIn: livreurIds.toList())
+                .where('role', isEqualTo: 'livreur')
+                .snapshots()
+                .listen((locationSnapshot) {
+                  print('Received ${locationSnapshot.docs.length} livreur location updates');
+                  _updateMarkers(locationSnapshot.docs, userRole, cartSnapshot.docs);
+                });
           }
-          if (snapshot.docs.isNotEmpty) {
-            _updateMarkers(snapshot.docs, userRole);
+        } else if (userRole == 'livreur') {
+          // Pour un livreur, récupérer l'ID du client depuis la commande
+          final clientIds = cartSnapshot.docs
+              .map((doc) => (doc.data() as Map<String, dynamic>)['idClient'] as String?)
+              .where((id) => id != null && id!.isNotEmpty)
+              .map((id) => id!)
+              .toSet();
+          
+          print('Client IDs from carts for livreur: $clientIds');
+          
+          if (clientIds.isNotEmpty) {
+            // Écouter les positions des clients avec une fréquence optimisée
+            FirebaseFirestore.instance
+                .collection('locations')
+                .where('userId', whereIn: clientIds.toList())
+                .where('role', isEqualTo: 'acheteur')
+                .snapshots()
+                .listen((locationSnapshot) {
+                  print('Received ${locationSnapshot.docs.length} client location updates');
+                  _updateMarkers(locationSnapshot.docs, userRole, cartSnapshot.docs);
+                });
           }
+        }
+      } else {
+        // Si aucune commande, nettoyer les marqueurs et polylines
+        setState(() {
+          _markers.clear();
+          _polylines.clear();
+          _livreurPosition = null;
+          _acheteurPosition = null;
+          _routeDistance = null;
+          _routeDuration = null;
         });
+        print('No active orders, cleared map data');
+      }
+    });
   }
 
-  void _updateMarkers(List<QueryDocumentSnapshot> locations, String userRole) {
+  void _updateMarkers(List<QueryDocumentSnapshot> otherLocations, String userRole, List<QueryDocumentSnapshot> carts) {
     final markers = <Marker>{};
     final authState = context.read<AuthCubit>().state;
     if (authState is! AuthSuccess || authState.user == null) return;
@@ -117,115 +324,231 @@ class _TrackingMapPageState extends State<TrackingMapPage> {
     final userId = authState.user!['id'].toString();
     LatLng? myPosition;
 
-    print('Updating markers for role: $userRole'); // Debug log
-    print('Livreur icon personnalisée utilisée'); // Debug log
+    print('Updating markers for role: $userRole');
+    print('Livreur icon personnalisée utilisée');
 
     // Filtrer les positions pour n'avoir qu'une seule position par utilisateur
     final Map<String, QueryDocumentSnapshot> latestPositions = {};
-    for (var doc in locations) {
+    for (var doc in otherLocations) {
       final data = doc.data() as Map<String, dynamic>;
       final locationUserId = data['userId'] as String;
       latestPositions[locationUserId] = doc;
     }
 
-    // Traiter les positions filtrées
-    for (var doc in latestPositions.values) {
-      final data = doc.data() as Map<String, dynamic>;
-      final role = data['role'] as String;
-      final locationUserId = data['userId'] as String;
-      final phone = data['phone'] as String?; // Récupérer le numéro de téléphone
+    if (userRole == 'acheteur') {
+      // Pour un acheteur, afficher la position du livreur
+      for (var doc in latestPositions.values) {
+        final data = doc.data() as Map<String, dynamic>;
+        final locationUserId = data['userId'] as String;
+        final phone = data['phone'] as String?;
 
-      print('Processing location - Role: $role, UserId: $locationUserId, Phone: $phone'); // Debug log
-      
-      // Stocker le numéro de téléphone selon le rôle
-      if (role == 'livreur') {
+        print('Processing livreur location for acheteur - UserId: $locationUserId, Phone: $phone');
+        
+        // Stocker le numéro de téléphone du livreur
         setState(() {
           _livreurPhone = phone;
-          print('Updated livreur phone to: $_livreurPhone'); // Debug log
+          print('Updated livreur phone to: $_livreurPhone');
         });
-      } else if (role == 'acheteur') {
-        setState(() {
-          _acheteurPhone = phone;
-          print('Updated acheteur phone to: $_acheteurPhone'); // Debug log
-        });
-      }
-      
-      // Afficher la position de l'utilisateur connecté
-      if (locationUserId == userId) {
-        myPosition = LatLng(
-          data['latitude'] as double,
-          data['longitude'] as double,
-        );
-        markers.add(
-          Marker(
-            markerId: MarkerId('my_position'),
-            position: myPosition,
-            icon: userRole == 'livreur' 
-                ? livreurIcon
-                : BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
-            infoWindow: InfoWindow(
-              title: userRole == 'livreur' ? 'Ma position (Livreur)' : 'Ma position',
-              snippet: 'Position actuelle',
-            ),
-            zIndex: 2,
-            visible: true,
-          ),
-        );
-        print('Added my position marker'); // Debug log
-      }
-      
-      // Afficher la position de l'autre partie (livreur ou acheteur)
-      if ((userRole == 'livreur' && role == 'acheteur') ||
-          (userRole == 'acheteur' && role == 'livreur')) {
-        final otherPosition = LatLng(
+        
+        // Afficher la position du livreur
+        final livreurPosition = LatLng(
           data['latitude'] as double,
           data['longitude'] as double,
         );
 
-        if (role == 'livreur') {
-          markers.add(
-            Marker(
-              markerId: MarkerId('${role}_${data['userId']}'),
-              position: otherPosition,
-              icon: livreurIcon,
-              infoWindow: InfoWindow(
-                title: 'Position du livreur',
-                snippet: phone != null ? 'Tél: $phone' : 'En route vers vous',
-              ),
-              zIndex: 1,
-              anchor: const Offset(0.5, 0.5),
+        // Stocker la position du livreur pour le calcul d'itinéraire
+        _livreurPosition = livreurPosition;
+
+        markers.add(
+          Marker(
+            markerId: MarkerId('livreur_$locationUserId'),
+            position: livreurPosition,
+            icon: livreurIcon,
+            infoWindow: InfoWindow(
+              title: 'Position du livreur',
+              snippet: phone != null ? 'Tél: $phone' : 'En route vers vous',
             ),
-          );
-        } else {
-          markers.add(
-            Marker(
-              markerId: MarkerId('${role}_${data['userId']}'),
-              position: otherPosition,
-              icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
-              infoWindow: InfoWindow(
-                title: 'Position de l\'acheteur',
-                snippet: phone != null ? 'Tél: $phone' : 'En attente de livraison',
-              ),
-              zIndex: 1,
-            ),
-          );
-        }
-        print('Added other party marker for role: $role'); // Debug log
+            zIndex: 1,
+            anchor: const Offset(0.5, 0.5),
+          ),
+        );
+        print('Added livreur marker for acheteur');
       }
+
+      // Afficher la position de l'acheteur connecté
+      FirebaseFirestore.instance
+          .collection('locations')
+          .where('userId', isEqualTo: userId)
+          .where('role', isEqualTo: 'acheteur')
+          .limit(1)
+          .get()
+          .then((acheteurSnapshot) {
+            if (acheteurSnapshot.docs.isNotEmpty) {
+              final acheteurData = acheteurSnapshot.docs.first.data();
+              final acheteurPhone = acheteurData['phone'] as String?;
+              
+              setState(() {
+                _acheteurPhone = acheteurPhone;
+              });
+              
+              final acheteurPosition = LatLng(
+                acheteurData['latitude'] as double,
+                acheteurData['longitude'] as double,
+              );
+              
+              // Stocker la position de l'acheteur pour le calcul d'itinéraire
+              _acheteurPosition = acheteurPosition;
+              
+              markers.add(
+                Marker(
+                  markerId: MarkerId('my_position'),
+                  position: acheteurPosition,
+                  icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+                  infoWindow: InfoWindow(
+                    title: 'Ma position (Acheteur)',
+                    snippet: 'Position actuelle',
+                  ),
+                  zIndex: 2,
+                  visible: true,
+                ),
+              );
+              
+              myPosition = acheteurPosition;
+              print('Added acheteur position marker');
+              
+              // Calculer l'itinéraire si les deux positions sont disponibles
+              if (_livreurPosition != null && _acheteurPosition != null) {
+                _calculateRoute(_livreurPosition!, _acheteurPosition!);
+              }
+            }
+          });
+    } else if (userRole == 'livreur') {
+      // Pour un livreur, afficher la position du client
+      for (var doc in latestPositions.values) {
+        final data = doc.data() as Map<String, dynamic>;
+        final locationUserId = data['userId'] as String;
+        final phone = data['phone'] as String?;
+
+        print('Processing client location for livreur - UserId: $locationUserId, Phone: $phone');
+        
+        // Stocker le numéro de téléphone du client
+        setState(() {
+          _acheteurPhone = phone;
+          print('Updated client phone to: $_acheteurPhone');
+        });
+        
+        // Afficher la position du client
+        final clientPosition = LatLng(
+          data['latitude'] as double,
+          data['longitude'] as double,
+        );
+
+        // Stocker la position du client pour le calcul d'itinéraire
+        _acheteurPosition = clientPosition;
+
+        markers.add(
+          Marker(
+            markerId: MarkerId('client_$locationUserId'),
+            position: clientPosition,
+            icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+            infoWindow: InfoWindow(
+              title: 'Position du client',
+              snippet: phone != null ? 'Tél: $phone' : 'En attente de livraison',
+            ),
+            zIndex: 1,
+          ),
+        );
+        print('Added client marker for livreur');
+      }
+
+      // Afficher la position du livreur connecté
+      FirebaseFirestore.instance
+          .collection('locations')
+          .where('userId', isEqualTo: userId)
+          .where('role', isEqualTo: 'livreur')
+          .limit(1)
+          .get()
+          .then((livreurSnapshot) {
+            if (livreurSnapshot.docs.isNotEmpty) {
+              final livreurData = livreurSnapshot.docs.first.data();
+              final livreurPhone = livreurData['phone'] as String?;
+              
+              setState(() {
+                _livreurPhone = livreurPhone;
+              });
+              
+              final livreurPosition = LatLng(
+                livreurData['latitude'] as double,
+                livreurData['longitude'] as double,
+              );
+              
+              // Stocker la position du livreur pour le calcul d'itinéraire
+              _livreurPosition = livreurPosition;
+              
+              markers.add(
+                Marker(
+                  markerId: MarkerId('my_position'),
+                  position: livreurPosition,
+                  icon: livreurIcon,
+                  infoWindow: InfoWindow(
+                    title: 'Ma position (Livreur)',
+                    snippet: 'Position actuelle',
+                  ),
+                  zIndex: 2,
+                  visible: true,
+                ),
+              );
+              
+              myPosition = livreurPosition;
+              print('Added livreur position marker');
+              
+              // Calculer l'itinéraire si les deux positions sont disponibles
+              if (_livreurPosition != null && _acheteurPosition != null) {
+                _calculateRoute(_livreurPosition!, _acheteurPosition!);
+              }
+            }
+          });
     }
 
     setState(() {
       _markers = markers;
       _isLoading = false;
     });
-    print('Total markers on map: ${_markers.length}'); // Debug log
+    print('Total markers on map: ${_markers.length}');
 
-    // Forcer le centrage sur la position de l'utilisateur
+    // Centrer sur la position appropriée seulement si nécessaire
     if (myPosition != null && _mapController != null) {
+      // Si les deux positions sont disponibles, ajuster la carte pour montrer l'itinéraire complet
+      if (_livreurPosition != null && _acheteurPosition != null) {
+        // Utiliser un délai court pour éviter les conflits
+        Future.delayed(const Duration(milliseconds: 50), () {
+          if (mounted) _fitMapToRoute();
+        });
+      } else {
+        // Sinon, centrer sur la position de l'utilisateur
+        _mapController!.animateCamera(
+          CameraUpdate.newCameraPosition(
+            CameraPosition(
+              target: myPosition!,
+              zoom: 15,
+              tilt: 0,
+              bearing: 0,
+            ),
+          ),
+        );
+      }
+    } else if (latestPositions.isNotEmpty && _mapController != null) {
+      // Centrer sur la position de l'autre partie
+      final firstOtherData = latestPositions.values.first.data() as Map<String, dynamic>;
+      final otherPosition = LatLng(
+        firstOtherData['latitude'] as double,
+        firstOtherData['longitude'] as double,
+      );
+      
       _mapController!.animateCamera(
         CameraUpdate.newCameraPosition(
           CameraPosition(
-            target: myPosition,
+            target: otherPosition,
             zoom: 15,
             tilt: 0,
             bearing: 0,
@@ -351,8 +674,10 @@ class _TrackingMapPageState extends State<TrackingMapPage> {
   void _onMapCreated(GoogleMapController controller) {
     _mapController = controller;
     _setMapStyle();
-    // Centrer la carte une fois que le contrôleur est créé
-    _centerMapOnUserLocation();
+    // Centrer la carte immédiatement si des marqueurs sont déjà disponibles
+    if (_markers.isNotEmpty) {
+      _centerMapOnUserLocation();
+    }
   }
 
   Future<void> _makePhoneCall(String phoneNumber) async {
@@ -378,16 +703,42 @@ class _TrackingMapPageState extends State<TrackingMapPage> {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    if (_isLoading) {
-      return const Scaffold(
-        body: Center(
-          child: CircularProgressIndicator(),
+  void _fitMapToRoute() {
+    if (_mapController != null && _markers.isNotEmpty) {
+      double minLat = double.infinity;
+      double maxLat = -double.infinity;
+      double minLng = double.infinity;
+      double maxLng = -double.infinity;
+
+      // Calculer les limites basées sur les marqueurs
+      for (var marker in _markers) {
+        minLat = min(minLat, marker.position.latitude);
+        maxLat = max(maxLat, marker.position.latitude);
+        minLng = min(minLng, marker.position.longitude);
+        maxLng = max(maxLng, marker.position.longitude);
+      }
+
+      // Ajouter un padding
+      const double padding = 0.01; // Environ 1km
+      minLat -= padding;
+      maxLat += padding;
+      minLng -= padding;
+      maxLng += padding;
+
+      _mapController!.animateCamera(
+        CameraUpdate.newLatLngBounds(
+          LatLngBounds(
+            southwest: LatLng(minLat, minLng),
+            northeast: LatLng(maxLat, maxLng),
+          ),
+          50, // padding en pixels
         ),
       );
     }
+  }
 
+  @override
+  Widget build(BuildContext context) {
     final authState = context.read<AuthCubit>().state;
     String? userRole;
     if (authState is AuthSuccess && authState.user != null) {
@@ -397,120 +748,274 @@ class _TrackingMapPageState extends State<TrackingMapPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Suivi de livraison'),
+        title: const Text('Suivi de livraison',style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
         backgroundColor: Colors.white,
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.black),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: () {
+              setState(() {
+                _isLoading = true;
+                _markers.clear();
+                _polylines.clear();
+                _livreurPosition = null;
+                _acheteurPosition = null;
+                _routeDistance = null;
+                _routeDuration = null;
+              });
+              // Re-démarrer les listeners
+              _setupLocationUpdates();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Actualisation en cours...')),
+              );
+            },
+            tooltip: 'Actualiser',
+          ),
+          IconButton(
+            icon: const Icon(Icons.route),
+            onPressed: () {
+              if (_livreurPosition != null && _acheteurPosition != null) {
+                _calculateRoute(_livreurPosition!, _acheteurPosition!);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Itinéraire recalculé')),
+                );
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Positions non disponibles pour calculer l\'itinéraire')),
+                );
+              }
+            },
+            tooltip: 'Recalculer l\'itinéraire',
+          ),
+          IconButton(
+            icon: const Icon(Icons.fit_screen),
+            onPressed: _fitMapToRoute,
+            tooltip: 'Ajuster à l\'itinéraire',
+          ),
           IconButton(
             icon: const Icon(Icons.my_location),
             onPressed: _centerMapOnUserLocation,
           ),
         ],
       ),
-      body: Stack(
-        children: [
-          GoogleMap(
-            initialCameraPosition: const CameraPosition(
-              target: LatLng(-4.325, 15.308),
-              zoom: 15,
-            ),
-            onMapCreated: _onMapCreated,
-            markers: _markers,
-            myLocationEnabled: true,
-            myLocationButtonEnabled: true,
-            zoomControlsEnabled: true,
-            mapToolbarEnabled: false,
-            mapType: _currentMapType,
-            compassEnabled: true,
-            zoomGesturesEnabled: true,
-            rotateGesturesEnabled: true,
-            scrollGesturesEnabled: true,
-            tiltGesturesEnabled: true,
-          ),
-          Positioned(
-            bottom: 16,
-            left: 16,
-            right: 16,
-            child: Card(
-              elevation: 4,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: isLivreur
-                            ? Colors.green.withOpacity(0.1)
-                            : Colors.red.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Icon(
-                        isLivreur
-                            ? Icons.location_on
-                            : Icons.delivery_dining,
-                        color: isLivreur
-                            ? Colors.green
-                            : Colors.red,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        isLivreur
-                            ? 'Position de l\'acheteur'
-                            : 'Position du livreur',
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                    const SizedBox(width: 20),
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: () {
-                          final phoneToCall = isLivreur
-                              ? _acheteurPhone
-                              : _livreurPhone;
-                          print('Current livreur phone: $_livreurPhone'); // Debug log
-                          print('Current acheteur phone: $_acheteurPhone'); // Debug log
-                          print('Attempting to call: $phoneToCall'); // Debug log
-                          if (phoneToCall != null && phoneToCall.isNotEmpty) {
-                            _makePhoneCall(phoneToCall);
-                          } else {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Numéro de téléphone non disponible'),
+      body: _hasActiveOrders 
+          ? Stack(
+              children: [
+                GoogleMap(
+                  initialCameraPosition: const CameraPosition(
+                    target: LatLng(-4.325, 15.308),
+                    zoom: 12,
+                  ),
+                  onMapCreated: _onMapCreated,
+                  markers: _markers,
+                  polylines: _polylines,
+                  myLocationEnabled: true,
+                  myLocationButtonEnabled: true,
+                  zoomControlsEnabled: true,
+                  mapToolbarEnabled: false,
+                  mapType: _currentMapType,
+                  compassEnabled: true,
+                  zoomGesturesEnabled: true,
+                  rotateGesturesEnabled: true,
+                  scrollGesturesEnabled: true,
+                  tiltGesturesEnabled: true,
+                ),
+                // Indicateur de chargement seulement si vraiment nécessaire
+                if (_isLoading && _markers.isEmpty)
+                  const Positioned(
+                    top: 100,
+                    left: 0,
+                    right: 0,
+                    child: Center(
+                      child: Card(
+                        child: Padding(
+                          padding: EdgeInsets.all(16),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(strokeWidth: 2),
                               ),
-                            );
-                          }
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: AppColors.primary,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: const Text(
-                            'Appeler',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                            ),
+                              SizedBox(width: 16),
+                              Text('Chargement de la carte...'),
+                            ],
                           ),
                         ),
                       ),
                     ),
-                  ],
+                  ),
+                Positioned(
+                  bottom: 16,
+                  left: 16,
+                  right: 16,
+                  child: Column(
+                    children: [
+                      // Carte d'informations d'itinéraire
+                      if (_routeDistance != null && _routeDuration != null)
+                        Card(
+                          elevation: 4,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: Colors.blue.withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: const Icon(
+                                    Icons.route,
+                                    color: Colors.blue,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Distance: $_routeDistance',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        'Durée: $_routeDuration',
+                                        style: const TextStyle(
+                                          color: Colors.grey,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      const SizedBox(height: 8),
+                      // Carte d'appel existante
+                      Card(
+                        elevation: 4,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: isLivreur
+                                      ? Colors.green.withOpacity(0.1)
+                                      : Colors.red.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Icon(
+                                  isLivreur
+                                      ? Icons.location_on
+                                      : Icons.delivery_dining,
+                                  color: isLivreur
+                                      ? Colors.green
+                                      : Colors.red,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  isLivreur
+                                      ? 'Position de l\'acheteur'
+                                      : 'Position du livreur',
+                                  style: const TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                              const SizedBox(width: 20),
+                              Expanded(
+                                child: GestureDetector(
+                                  onTap: () {
+                                    final phoneToCall = isLivreur
+                                        ? _acheteurPhone
+                                        : _livreurPhone;
+                                    print('Current livreur phone: $_livreurPhone');
+                                    print('Current acheteur phone: $_acheteurPhone');
+                                    print('Attempting to call: $phoneToCall');
+                                    if (phoneToCall != null && phoneToCall.isNotEmpty) {
+                                      _makePhoneCall(phoneToCall);
+                                    } else {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text('Numéro de téléphone non disponible'),
+                                        ),
+                                      );
+                                    }
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.primary,
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: const Text(
+                                      'Appeler',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
+              ],
+            )
+          : Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.delivery_dining,
+                    size: 80,
+                    color: Colors.grey[400],
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Aucune livraison en cours',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Vous n\'avez pas de commande\n en cours',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey[500],
+                    ),
+                  ),
+                ],
               ),
             ),
-          ),
-        ],
-      ),
     );
   }
 
