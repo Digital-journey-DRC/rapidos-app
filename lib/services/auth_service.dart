@@ -177,10 +177,10 @@ class AuthService {
   }) async {
     try {
       final response = await http.post(
-        Uri.parse('$baseUrl/api/v1/auth/send-otp'),
+        Uri.parse('$baseUrl/users/forgot-password'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
-          'number': phone,
+          'phone': phone,
         }),
       );
 
@@ -242,12 +242,13 @@ class AuthService {
   }) async {
     try {
       final response = await http.post(
-        Uri.parse('$baseUrl/api/v1/auth/change-password-otp'),
+        Uri.parse('$baseUrl/users/reset-password'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'number': number,
           'otp': otp,
           'newPassword': newPassword,
+          'confirmNewPassword': newPassword
         }),
       );
 

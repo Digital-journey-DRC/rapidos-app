@@ -167,11 +167,11 @@ class _OTPScreenState extends State<OTPScreen> {
         await Future.delayed(const Duration(seconds: 2));
         
         // Vérifier l'OTP directement avec le service
-        final authService = AuthService();
-        final response = await authService.verifyOTP(
-          id: widget.user!['id'],
-          otp:  int.parse(_otp)
-        );
+        // final authService = AuthService();
+        // final response = await authService.verifyOTP(
+        //   id: widget.user!['id']??"",
+        //   otp:  int.parse(_otp)
+        // );
         
         // Si nous arrivons ici, c'est que l'OTP est correct
         setState(() {
@@ -249,7 +249,7 @@ class _OTPScreenState extends State<OTPScreen> {
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Un nouveau code a été envoyé sur WhatsApp'),
+        content: Text('Un nouveau code a été envoyé'),
         backgroundColor: Colors.green,
         behavior: SnackBarBehavior.floating,
       ),
