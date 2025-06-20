@@ -466,7 +466,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
 
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-              child: Text('Position du livreur', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black)),
+              child: Text('Ma position', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black)),
             ),
 
             Padding(

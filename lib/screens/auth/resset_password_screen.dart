@@ -171,12 +171,7 @@ class _RessetPasswordScreenState extends State<RessetPasswordScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     const SizedBox(height: 50),
-                    Image.asset(
-                      AppAssets.backgroundImage,
-                      height: 70,
-                      width: 100,
-                      fit: BoxFit.contain,
-                    ),
+                    Image.asset(AppAssets.logo, width: 100, height: 100),
                     const SizedBox(height: 10),
                     Text(
                       'Nouveau mot de passe',
