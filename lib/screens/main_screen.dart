@@ -75,20 +75,26 @@ class _MainScreenState extends State<MainScreen> {
         }
       }
 
-      final docRef = FirebaseFirestore.instance.collection('tokens').doc(token);
+      if (userId == null) {
+        print('❌ userId is null, cannot save token');
+        return;
+      }
+
+      // Utiliser userId comme identifiant du document
+      final docRef = FirebaseFirestore.instance.collection('tokens').doc(userId);
       await docRef.set({
         'token': token,
         'timestamp': FieldValue.serverTimestamp(),
         'platform': Platform.isIOS ? 'ios' : 'android',
         'role': role ?? 'user',
-        'userId': userId ?? '1',
+        'userId': userId,
         'permission_status':
             (await FirebaseMessaging.instance.getNotificationSettings())
                 .authorizationStatus
                 .toString(),
-      });
+      }, SetOptions(merge: true)); // merge pour ne pas effacer d'autres champs
 
-      print("✅ Token saved to Firestore successfully");
+      print("✅ Token saved to Firestore successfully (by userId)");
     } catch (e) {
       print("❌ Error saving token to Firestore: $e");
     }
