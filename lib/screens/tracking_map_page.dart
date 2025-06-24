@@ -11,6 +11,8 @@ import 'package:url_launcher/url_launcher.dart';
 import 'dart:convert';
 import 'dart:math';
 import 'package:http/http.dart' as http;
+import 'dart:async';
+import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 
 class TrackingMapPage extends StatefulWidget {
   const TrackingMapPage({Key? key}) : super(key: key);
@@ -87,138 +89,6 @@ class _TrackingMapPageState extends State<TrackingMapPage> {
         await frameInfo.image.toByteData(format: ui.ImageByteFormat.png);
 
     return byteData!.buffer.asUint8List();
-  }
-
-  Future<void> _calculateRoute(LatLng origin, LatLng destination) async {
-    try {
-      print('Calculating route from ${origin.latitude}, ${origin.longitude} to ${destination.latitude}, ${destination.longitude}');
-      
-      // Utiliser l'API Google Maps Directions pour un itinéraire précis
-      final String apiKey = 'AIzaSyCuLBjM3oTYfFSbJwXccj4xP8oynDV5JnM';
-      final String url = 'https://maps.googleapis.com/maps/api/directions/json?'
-          'origin=${origin.latitude},${origin.longitude}'
-          '&destination=${destination.latitude},${destination.longitude}'
-          '&key=$apiKey';
-
-      final response = await http.get(Uri.parse(url));
-      
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        
-        if (data['status'] == 'OK') {
-          final List<dynamic> routes = data['routes'];
-          if (routes.isNotEmpty) {
-            final List<dynamic> legs = routes[0]['legs'];
-            if (legs.isNotEmpty) {
-              final List<dynamic> steps = legs[0]['steps'];
-              
-              List<LatLng> polylineCoordinates = [];
-              
-              for (var step in steps) {
-                final String polyline = step['polyline']['points'];
-                final List<LatLng> decodedPolyline = _decodePolyline(polyline);
-                polylineCoordinates.addAll(decodedPolyline);
-              }
-              
-              setState(() {
-                _polylines.clear();
-                _polylines.add(
-                  Polyline(
-                    polylineId: const PolylineId('route'),
-                    color: AppColors.primary,
-                    points: polylineCoordinates,
-                    width: 5,
-                  ),
-                );
-              });
-              
-              print('Route calculated successfully with ${polylineCoordinates.length} points');
-              
-              // Afficher les informations de l'itinéraire
-              final leg = legs[0];
-              final distance = leg['distance']['text'];
-              final duration = leg['duration']['text'];
-              
-              setState(() {
-                _routeDistance = distance;
-                _routeDuration = duration;
-              });
-              
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Itinéraire: $distance, $duration'),
-                    duration: const Duration(seconds: 3),
-                  ),
-                );
-              }
-            }
-          }
-        } else {
-          print('Directions API error: ${data['status']}');
-          // En cas d'erreur, utiliser la ligne droite simple
-          _calculateSimpleRoute(origin, destination);
-        }
-      } else {
-        print('HTTP error: ${response.statusCode}');
-        // En cas d'erreur, utiliser la ligne droite simple
-        _calculateSimpleRoute(origin, destination);
-      }
-    } catch (e) {
-      print('Error calculating route: $e');
-      // En cas d'erreur, utiliser la ligne droite simple
-      _calculateSimpleRoute(origin, destination);
-    }
-  }
-
-  void _calculateSimpleRoute(LatLng origin, LatLng destination) {
-    // Méthode de fallback : ligne droite entre les deux points
-    List<LatLng> polylineCoordinates = [origin, destination];
-    
-    setState(() {
-      _polylines.clear();
-      _polylines.add(
-        Polyline(
-          polylineId: const PolylineId('route'),
-          color: AppColors.primary,
-          points: polylineCoordinates,
-          width: 5,
-        ),
-      );
-    });
-    
-    print('Simple route calculated as fallback');
-  }
-
-  List<LatLng> _decodePolyline(String encoded) {
-    List<LatLng> poly = [];
-    int index = 0, len = encoded.length;
-    int lat = 0, lng = 0;
-
-    while (index < len) {
-      int b, shift = 0, result = 0;
-      do {
-        b = encoded.codeUnitAt(index++) - 63;
-        result |= (b & 0x1f) << shift;
-        shift += 5;
-      } while (b >= 0x20);
-      int dlat = ((result & 1) != 0 ? ~(result >> 1) : (result >> 1));
-      lat += dlat;
-
-      shift = 0;
-      result = 0;
-      do {
-        b = encoded.codeUnitAt(index++) - 63;
-        result |= (b & 0x1f) << shift;
-        shift += 5;
-      } while (b >= 0x20);
-      int dlng = ((result & 1) != 0 ? ~(result >> 1) : (result >> 1));
-      lng += dlng;
-
-      final p = LatLng((lat / 1E5).toDouble(), (lng / 1E5).toDouble());
-      poly.add(p);
-    }
-    return poly;
   }
 
   void _setupLocationUpdates() {
@@ -737,6 +607,113 @@ class _TrackingMapPageState extends State<TrackingMapPage> {
     }
   }
 
+  Future<void> _calculateRoute(LatLng origin, LatLng destination) async {
+    try {
+      print('Calculating route from ${origin.latitude}, ${origin.longitude} to ${destination.latitude}, ${destination.longitude}');
+      
+      // Utiliser le package flutter_polyline_points pour l'itinéraire
+      PolylinePoints polylinePoints = PolylinePoints();
+      
+      PolylineResult result = await polylinePoints.getRouteBetweenCoordinates(
+        googleApiKey: 'AIzaSyCuLBjM3oTYfFSbJwXccj4xP8oynDV5JnM',
+        request: PolylineRequest(
+          origin: PointLatLng(origin.latitude, origin.longitude),
+          destination: PointLatLng(destination.latitude, destination.longitude),
+          mode: TravelMode.driving,
+        ),
+      );
+      
+      if (result.status == 'OK') {
+        List<LatLng> polylineCoordinates = result.points
+            .map((point) => LatLng(point.latitude, point.longitude))
+            .toList();
+        
+        print('Route calculated successfully with ${polylineCoordinates.length} points');
+        
+        setState(() {
+          _polylines.clear();
+          _polylines.add(
+            Polyline(
+              polylineId: const PolylineId('route'),
+              color: AppColors.primary,
+              points: polylineCoordinates,
+              width: 5,
+            ),
+          );
+        });
+        
+        // Calculer la distance et durée approximatives
+        if (polylineCoordinates.isNotEmpty) {
+          double totalDistance = 0;
+          for (int i = 1; i < polylineCoordinates.length; i++) {
+            totalDistance += _calculateDistance(polylineCoordinates[i-1], polylineCoordinates[i]);
+          }
+          
+          String distanceText = '${totalDistance.toStringAsFixed(1)} km';
+          String durationText = '${(totalDistance * 2).round()} min'; // Estimation: 2 min par km
+          
+          setState(() {
+            _routeDistance = distanceText;
+            _routeDuration = durationText;
+          });
+          
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Itinéraire: $distanceText, $durationText'),
+                duration: const Duration(seconds: 3),
+              ),
+            );
+          }
+        }
+      } else {
+        print('Polyline API error: ${result.status}');
+        print('Error message: ${result.errorMessage}');
+        // En cas d'erreur, utiliser la ligne droite simple
+        _calculateSimpleRoute(origin, destination);
+      }
+    } catch (e) {
+      print('Error calculating route: $e');
+      // En cas d'erreur, utiliser la ligne droite simple
+      _calculateSimpleRoute(origin, destination);
+    }
+  }
+
+  // Fonction pour calculer la distance entre deux points
+  double _calculateDistance(LatLng point1, LatLng point2) {
+    const double earthRadius = 6371; // Rayon de la Terre en km
+    
+    double lat1 = point1.latitude * pi / 180;
+    double lat2 = point2.latitude * pi / 180;
+    double deltaLat = (point2.latitude - point1.latitude) * pi / 180;
+    double deltaLng = (point2.longitude - point1.longitude) * pi / 180;
+    
+    double a = sin(deltaLat / 2) * sin(deltaLat / 2) +
+        cos(lat1) * cos(lat2) * sin(deltaLng / 2) * sin(deltaLng / 2);
+    double c = 2 * atan2(sqrt(a), sqrt(1 - a));
+    
+    return earthRadius * c;
+  }
+
+  void _calculateSimpleRoute(LatLng origin, LatLng destination) {
+    // Méthode de fallback : ligne droite entre les deux points
+    List<LatLng> polylineCoordinates = [origin, destination];
+    
+    setState(() {
+      _polylines.clear();
+      _polylines.add(
+        Polyline(
+          polylineId: const PolylineId('route'),
+          color: AppColors.primary,
+          points: polylineCoordinates,
+          width: 5,
+        ),
+      );
+    });
+    
+    print('Simple route calculated as fallback');
+  }
+
   @override
   Widget build(BuildContext context) {
     final authState = context.read<AuthCubit>().state;
@@ -1021,6 +998,7 @@ class _TrackingMapPageState extends State<TrackingMapPage> {
 
   @override
   void dispose() {
+    // Nettoyer les ressources
     _mapController?.dispose();
     super.dispose();
   }
