@@ -13,6 +13,8 @@ import 'dart:math';
 import 'package:http/http.dart' as http;
 import 'dart:async';
 import 'package:flutter_polyline_points/flutter_polyline_points.dart';
+import 'package:flutter_tts/flutter_tts.dart';
+import 'package:geolocator/geolocator.dart';
 
 class TrackingMapPage extends StatefulWidget {
   const TrackingMapPage({Key? key}) : super(key: key);
@@ -36,6 +38,21 @@ class _TrackingMapPageState extends State<TrackingMapPage> {
   String? _routeDistance;
   String? _routeDuration;
   bool _hasActiveOrders = false;
+  
+  // Variables pour la navigation vocale
+  FlutterTts? _flutterTts;
+  bool _isVoiceNavigationActive = false;
+  Timer? _voiceNavigationTimer;
+  List<String> _navigationInstructions = [];
+  int _currentInstructionIndex = 0;
+  
+  // Variables pour la navigation vocale dynamique en temps réel
+  StreamSubscription<Position>? _positionStreamSubscription;
+  List<Map<String, dynamic>> _navigationSteps = [];
+  int _currentStepIndex = 0;
+  Set<int> _alreadySpoken = {};
+  bool _isRealTimeNavigationActive = false;
+  Position? _currentPosition;
 
   @override
   void initState() {
@@ -44,10 +61,14 @@ class _TrackingMapPageState extends State<TrackingMapPage> {
     _initializeMarkerIcon();
     // Démarrer immédiatement les mises à jour de localisation
     _setupLocationUpdates();
-    // Réduire le délai pour un chargement plus rapide
-    Future.delayed(const Duration(milliseconds: 100), () {
-      _centerMapOnUserLocation();
-    });
+    // Centrer la carte immédiatement sans délai
+    _centerMapOnUserLocation();
+    
+    // Initialiser la navigation vocale de manière asynchrone
+    _initializeVoiceNavigation();
+    
+    // Initialiser les permissions de géolocalisation
+    _initializeLocationPermissions();
   }
 
   Future<void> _initializeMarkerIcon() async {
@@ -59,23 +80,27 @@ class _TrackingMapPageState extends State<TrackingMapPage> {
           await rootBundle.load('assets/images/pin-livreur.png');
       final Uint8List data = bytes.buffer.asUint8List();
 
-      // Réduire la taille de l'image pour améliorer les performances
-      final Uint8List resizedData = await _resizeImage(data, 80, 80);
+      // Réduire la taille de l'image pour améliorer les performances (plus petit)
+      final Uint8List resizedData = await _resizeImage(data, 60, 60);
 
       // Créer l'icône à partir des données de l'image
       livreurIcon = BitmapDescriptor.fromBytes(resizedData);
 
       print('Livreur icon loaded successfully with optimized size');
 
-      // Appliquer le style de la carte
-      _setMapStyle();
+      // Appliquer le style de la carte immédiatement
+      if (_mapController != null) {
+        _setMapStyle();
+      }
     } catch (e) {
       print('Error loading livreur icon: $e');
       // En cas d'erreur, utiliser l'icône bleue par défaut immédiatement
       livreurIcon =
           BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue);
       // Appliquer le style de la carte
-      _setMapStyle();
+      if (_mapController != null) {
+        _setMapStyle();
+      }
     }
   }
 
@@ -89,6 +114,67 @@ class _TrackingMapPageState extends State<TrackingMapPage> {
         await frameInfo.image.toByteData(format: ui.ImageByteFormat.png);
 
     return byteData!.buffer.asUint8List();
+  }
+
+  // Initialiser la navigation vocale de manière sécurisée
+  Future<void> _initializeVoiceNavigation() async {
+    try {
+      _flutterTts = FlutterTts();
+      
+      // Configuration pour iOS
+      await _flutterTts!.setSharedInstance(true);
+      await _flutterTts!.setIosAudioCategory(
+        IosTextToSpeechAudioCategory.ambient,
+        [
+          IosTextToSpeechAudioCategoryOptions.allowBluetooth,
+          IosTextToSpeechAudioCategoryOptions.allowBluetoothA2DP,
+          IosTextToSpeechAudioCategoryOptions.mixWithOthers
+        ],
+        IosTextToSpeechAudioMode.voicePrompt
+      );
+      
+      // Configuration par défaut
+      await _flutterTts!.setLanguage("fr-FR");
+      await _flutterTts!.setSpeechRate(0.5);
+      await _flutterTts!.setVolume(1.0);
+      await _flutterTts!.setPitch(1.0);
+      
+      print("🔊 Navigation vocale initialisée avec succès");
+    } catch (e) {
+      print("❌ Erreur lors de l'initialisation de la navigation vocale: $e");
+      // Ne pas faire échouer l'application si la navigation vocale échoue
+    }
+  }
+
+  // Initialiser les permissions de géolocalisation
+  Future<void> _initializeLocationPermissions() async {
+    try {
+      // Vérifier si les services de localisation sont activés
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        print("❌ Les services de localisation sont désactivés");
+        return;
+      }
+
+      // Vérifier les permissions
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          print("❌ Permissions de localisation refusées");
+          return;
+        }
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        print("❌ Permissions de localisation refusées définitivement");
+        return;
+      }
+
+      print("✅ Permissions de géolocalisation accordées");
+    } catch (e) {
+      print("❌ Erreur lors de l'initialisation des permissions: $e");
+    }
   }
 
   void _setupLocationUpdates() {
@@ -137,7 +223,7 @@ class _TrackingMapPageState extends State<TrackingMapPage> {
           print('Livreur IDs from carts for acheteur: $livreurIds');
           
           if (livreurIds.isNotEmpty) {
-            // Écouter les positions des livreurs avec une fréquence optimisée
+            // Écouter les positions des livreurs avec une fréquence optimisée (moins fréquent)
             FirebaseFirestore.instance
                 .collection('locations')
                 .where('userId', whereIn: livreurIds.toList())
@@ -159,7 +245,7 @@ class _TrackingMapPageState extends State<TrackingMapPage> {
           print('Client IDs from carts for livreur: $clientIds');
           
           if (clientIds.isNotEmpty) {
-            // Écouter les positions des clients avec une fréquence optimisée
+            // Écouter les positions des clients avec une fréquence optimisée (moins fréquent)
             FirebaseFirestore.instance
                 .collection('locations')
                 .where('userId', whereIn: clientIds.toList())
@@ -215,10 +301,8 @@ class _TrackingMapPageState extends State<TrackingMapPage> {
         print('Processing livreur location for acheteur - UserId: $locationUserId, Phone: $phone');
         
         // Stocker le numéro de téléphone du livreur
-        setState(() {
-          _livreurPhone = phone;
-          print('Updated livreur phone to: $_livreurPhone');
-        });
+        _livreurPhone = phone;
+        print('Updated livreur phone to: $_livreurPhone');
         
         // Afficher la position du livreur
         final livreurPosition = LatLng(
@@ -257,9 +341,7 @@ class _TrackingMapPageState extends State<TrackingMapPage> {
               final acheteurData = acheteurSnapshot.docs.first.data();
               final acheteurPhone = acheteurData['phone'] as String?;
               
-              setState(() {
-                _acheteurPhone = acheteurPhone;
-              });
+              _acheteurPhone = acheteurPhone;
               
               final acheteurPosition = LatLng(
                 acheteurData['latitude'] as double,
@@ -302,10 +384,8 @@ class _TrackingMapPageState extends State<TrackingMapPage> {
         print('Processing client location for livreur - UserId: $locationUserId, Phone: $phone');
         
         // Stocker le numéro de téléphone du client
-        setState(() {
-          _acheteurPhone = phone;
-          print('Updated client phone to: $_acheteurPhone');
-        });
+        _acheteurPhone = phone;
+        print('Updated client phone to: $_acheteurPhone');
         
         // Afficher la position du client
         final clientPosition = LatLng(
@@ -343,9 +423,7 @@ class _TrackingMapPageState extends State<TrackingMapPage> {
               final livreurData = livreurSnapshot.docs.first.data();
               final livreurPhone = livreurData['phone'] as String?;
               
-              setState(() {
-                _livreurPhone = livreurPhone;
-              });
+              _livreurPhone = livreurPhone;
               
               final livreurPosition = LatLng(
                 livreurData['latitude'] as double,
@@ -380,10 +458,12 @@ class _TrackingMapPageState extends State<TrackingMapPage> {
           });
     }
 
+    // Un seul setState pour toutes les mises à jour
     setState(() {
       _markers = markers;
       _isLoading = false;
     });
+    
     print('Total markers on map: ${_markers.length}');
 
     // Centrer sur la position appropriée seulement si nécessaire
@@ -521,32 +601,59 @@ class _TrackingMapPageState extends State<TrackingMapPage> {
   }
 
   void _centerMapOnUserLocation() {
-    if (_mapController != null && _markers.isNotEmpty) {
-      // Trouver le marqueur de la position de l'utilisateur
-      final myMarker = _markers.firstWhere(
-        (marker) => marker.markerId.value == 'my_position',
-        orElse: () => _markers.first,
-      );
+    if (_mapController != null) {
+      if (_markers.isNotEmpty) {
+        // Trouver le marqueur de la position de l'utilisateur
+        final myMarker = _markers.firstWhere(
+          (marker) => marker.markerId.value == 'my_position',
+          orElse: () => _markers.first,
+        );
 
-      _mapController!.animateCamera(
-        CameraUpdate.newCameraPosition(
-          CameraPosition(
-            target: myMarker.position,
-            zoom: 15,
-            tilt: 0,
-            bearing: 0,
+        _mapController!.animateCamera(
+          CameraUpdate.newCameraPosition(
+            CameraPosition(
+              target: myMarker.position,
+              zoom: 15,
+              tilt: 0,
+              bearing: 0,
+            ),
           ),
-        ),
-      );
+        );
+      } else {
+        // Position par défaut si aucun marqueur
+        _mapController!.animateCamera(
+          CameraUpdate.newCameraPosition(
+            const CameraPosition(
+              target: LatLng(-4.325, 15.308),
+              zoom: 12,
+              tilt: 0,
+              bearing: 0,
+            ),
+          ),
+        );
+      }
     }
   }
 
   void _onMapCreated(GoogleMapController controller) {
     _mapController = controller;
+    
+    // Appliquer le style de la carte immédiatement
     _setMapStyle();
+    
     // Centrer la carte immédiatement si des marqueurs sont déjà disponibles
     if (_markers.isNotEmpty) {
       _centerMapOnUserLocation();
+    } else {
+      // Sinon, centrer sur une position par défaut (Kinshasa)
+      controller.animateCamera(
+        CameraUpdate.newCameraPosition(
+          const CameraPosition(
+            target: LatLng(-4.325, 15.308),
+            zoom: 12,
+          ),
+        ),
+      );
     }
   }
 
@@ -665,6 +772,9 @@ class _TrackingMapPageState extends State<TrackingMapPage> {
               ),
             );
           }
+          
+          // Obtenir les instructions de navigation de manière asynchrone et sécurisée
+          _getNavigationInstructionsAsync(origin, destination);
         }
       } else {
         print('Polyline API error: ${result.status}');
@@ -712,6 +822,292 @@ class _TrackingMapPageState extends State<TrackingMapPage> {
     });
     
     print('Simple route calculated as fallback');
+  }
+
+  // Nettoyer les balises HTML des instructions
+  String _cleanHtmlInstructions(String htmlInstructions) {
+    // Supprimer les balises HTML courantes
+    String cleanText = htmlInstructions
+        .replaceAll(RegExp(r'<[^>]*>'), '') // Supprimer toutes les balises HTML
+        .replaceAll('&nbsp;', ' ') // Remplacer les espaces insécables
+        .replaceAll('&amp;', '&') // Remplacer les ampersands
+        .replaceAll('&lt;', '<') // Remplacer les <
+        .replaceAll('&gt;', '>') // Remplacer les >
+        .replaceAll('&quot;', '"') // Remplacer les guillemets
+        .trim(); // Supprimer les espaces en début et fin
+    
+    // Traduction en français des instructions de navigation
+    cleanText = cleanText
+        .replaceAll(RegExp(r'\bTurn left onto\b', caseSensitive: false), 'Tournez à gauche sur')
+        .replaceAll(RegExp(r'\bTurn right onto\b', caseSensitive: false), 'Tournez à droite sur')
+        .replaceAll(RegExp(r'\bContinue onto\b', caseSensitive: false), 'Continuez sur')
+        .replaceAll(RegExp(r'\bTurn left\b', caseSensitive: false), 'Tournez à gauche')
+        .replaceAll(RegExp(r'\bTurn right\b', caseSensitive: false), 'Tournez à droite')
+        .replaceAll(RegExp(r'\bTurn\b', caseSensitive: false), 'Tournez')
+        .replaceAll(RegExp(r'\bturn\b', caseSensitive: false), 'Tournez')
+        .replaceAll(RegExp(r'\bContinue\b', caseSensitive: false), 'Continuez')
+        .replaceAll(RegExp(r'\bcontinue\b', caseSensitive: false), 'Continuez')
+        .replaceAll(RegExp(r'\bleft\b', caseSensitive: false), 'gauche')
+        .replaceAll(RegExp(r'\bright\b', caseSensitive: false), 'droite')
+        .replaceAll(RegExp(r'\bonto\b', caseSensitive: false), 'sur')
+        .replaceAll(RegExp(r'\bstraight\b', caseSensitive: false), 'tout droit')
+        .replaceAll(RegExp(r'\bthe\b', caseSensitive: false), '')
+        .replaceAll(RegExp(r'\band\b', caseSensitive: false), 'et')
+        .replaceAll(RegExp(r'\bat\b', caseSensitive: false), 'à');
+    
+    return cleanText;
+  }
+
+  // Obtenir les instructions de navigation de manière asynchrone et sécurisée
+  Future<void> _getNavigationInstructionsAsync(LatLng origin, LatLng destination) async {
+    try {
+      final String apiKey = 'AIzaSyCuLBjM3oTYfFSbJwXccj4xP8oynDV5JnM';
+      final String url = 'https://maps.googleapis.com/maps/api/directions/json?'
+          'origin=${origin.latitude},${origin.longitude}'
+          '&destination=${destination.latitude},${destination.longitude}'
+          '&language=fr'
+          '&region=CD'
+          '&key=$apiKey';
+
+      final response = await http.get(Uri.parse(url));
+      
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        
+        if (data['status'] == 'OK') {
+          final List<dynamic> routes = data['routes'];
+          if (routes.isNotEmpty) {
+            final List<dynamic> legs = routes[0]['legs'];
+            if (legs.isNotEmpty) {
+              final List<dynamic> steps = legs[0]['steps'];
+              
+              // Démarrer la navigation vocale dynamique en temps réel
+              _startRealTimeNavigation(steps);
+            }
+          }
+        }
+      }
+    } catch (e) {
+      print('Error getting navigation instructions: $e');
+      // Ne pas faire échouer le calcul de route à cause des instructions vocales
+    }
+  }
+
+  // Démarrer la navigation vocale dynamique en temps réel
+  void _startRealTimeNavigation(List<dynamic> steps) {
+    try {
+      // Arrêter la navigation précédente si elle est active
+      _stopRealTimeNavigation();
+
+      // Convertir les steps en format utilisable
+      _navigationSteps = steps.map((step) => {
+        'html_instructions': step['html_instructions'],
+        'end_location': step['end_location'],
+        'distance': step['distance'],
+        'duration': step['duration'],
+      }).toList();
+
+      print("🗺️ Démarrage de la navigation vocale dynamique avec ${_navigationSteps.length} étapes");
+
+      // Réinitialiser les variables
+      _currentStepIndex = 0;
+      _alreadySpoken.clear();
+      _isRealTimeNavigationActive = true;
+
+      // Démarrer le stream de position
+      _startPositionStream();
+
+      if (mounted) {
+        setState(() {
+          _isVoiceNavigationActive = true;
+        });
+      }
+
+    } catch (e) {
+      print("❌ Erreur lors du démarrage de la navigation dynamique: $e");
+    }
+  }
+
+  // Démarrer le stream de position pour la navigation en temps réel
+  void _startPositionStream() {
+    try {
+      const LocationSettings locationSettings = LocationSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 10, // Mettre à jour tous les 10 mètres
+      );
+
+      _positionStreamSubscription = Geolocator.getPositionStream(
+        locationSettings: locationSettings,
+      ).listen(
+        (Position position) {
+          _currentPosition = position;
+          _checkProximityToStep();
+        },
+        onError: (error) {
+          print("❌ Erreur du stream de position: $error");
+        },
+      );
+
+      print("📍 Stream de position démarré");
+    } catch (e) {
+      print("❌ Erreur lors du démarrage du stream de position: $e");
+    }
+  }
+
+  // Vérifier la proximité avec l'étape actuelle
+  void _checkProximityToStep() {
+    if (!_isRealTimeNavigationActive || _currentPosition == null || _navigationSteps.isEmpty) {
+      return;
+    }
+
+    // Trouver l'étape la plus proche
+    double minDistance = double.infinity;
+    int closestStepIndex = -1;
+
+    for (int i = 0; i < _navigationSteps.length; i++) {
+      if (_alreadySpoken.contains(i)) continue;
+
+      final step = _navigationSteps[i];
+      final endLocation = step['end_location'];
+      
+      double distance = Geolocator.distanceBetween(
+        _currentPosition!.latitude,
+        _currentPosition!.longitude,
+        endLocation['lat'].toDouble(),
+        endLocation['lng'].toDouble(),
+      );
+
+      if (distance < minDistance) {
+        minDistance = distance;
+        closestStepIndex = i;
+      }
+    }
+
+    // Si on est proche d'une étape (moins de 30 mètres) et qu'elle n'a pas encore été lue
+    if (closestStepIndex != -1 && minDistance <= 30 && !_alreadySpoken.contains(closestStepIndex)) {
+      _speakStepInstruction(closestStepIndex);
+    }
+
+    // Vérifier si toutes les étapes sont terminées
+    if (_alreadySpoken.length == _navigationSteps.length) {
+      _stopRealTimeNavigation();
+      _speakArrivalMessage();
+    }
+  }
+
+  // Lire l'instruction d'une étape
+  void _speakStepInstruction(int stepIndex) {
+    try {
+      if (_flutterTts == null || stepIndex >= _navigationSteps.length) {
+        return;
+      }
+
+      final step = _navigationSteps[stepIndex];
+      String instruction = _cleanHtmlInstructions(step['html_instructions']);
+      
+      print("🔊 Lecture de l'étape ${stepIndex + 1}: $instruction");
+      
+      _flutterTts!.speak(instruction);
+      _alreadySpoken.add(stepIndex);
+      _currentStepIndex = stepIndex;
+
+    } catch (e) {
+      print("❌ Erreur lors de la lecture de l'étape: $e");
+    }
+  }
+
+  // Lire le message d'arrivée
+  void _speakArrivalMessage() {
+    try {
+      if (_flutterTts == null) return;
+      
+      print("🎯 Arrivée à destination");
+      _flutterTts!.speak("Vous êtes arrivé à destination");
+      
+    } catch (e) {
+      print("❌ Erreur lors du message d'arrivée: $e");
+    }
+  }
+
+  // Arrêter la navigation vocale dynamique
+  void _stopRealTimeNavigation() {
+    try {
+      _isRealTimeNavigationActive = false;
+      
+      if (_positionStreamSubscription != null) {
+        _positionStreamSubscription!.cancel();
+        _positionStreamSubscription = null;
+      }
+
+      // Ne pas vider _navigationSteps pour permettre le redémarrage
+      // _navigationSteps.clear();
+      _currentStepIndex = 0;
+      _alreadySpoken.clear();
+      _currentPosition = null;
+
+      if (mounted) {
+        setState(() {
+          _isVoiceNavigationActive = false;
+        });
+      }
+
+      print("🛑 Navigation vocale dynamique arrêtée");
+    } catch (e) {
+      print("❌ Erreur lors de l'arrêt de la navigation dynamique: $e");
+    }
+  }
+
+  // Redémarrer la navigation vocale dynamique
+  void _restartRealTimeNavigation() {
+    try {
+      if (_navigationSteps.isNotEmpty) {
+        // Réinitialiser les variables pour un nouveau départ
+        _currentStepIndex = 0;
+        _alreadySpoken.clear();
+        _isRealTimeNavigationActive = true;
+        
+        // Démarrer le stream de position
+        _startPositionStream();
+        
+        if (mounted) {
+          setState(() {
+            _isVoiceNavigationActive = true;
+          });
+        }
+        
+        print("🔄 Navigation vocale dynamique redémarrée avec ${_navigationSteps.length} étapes");
+      } else {
+        print("❌ Aucune étape de navigation disponible pour redémarrer");
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Aucun itinéraire disponible. Recalculez l\'itinéraire.'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      print("❌ Erreur lors du redémarrage de la navigation: $e");
+    }
+  }
+
+  // Obtenir le statut de la navigation vocale
+  String _getNavigationStatus() {
+    if (!_isRealTimeNavigationActive) {
+      return "Navigation inactive";
+    }
+    
+    if (_navigationSteps.isEmpty) {
+      return "Aucune étape";
+    }
+    
+    int completedSteps = _alreadySpoken.length;
+    int totalSteps = _navigationSteps.length;
+    
+    if (completedSteps >= totalSteps) {
+      return "Arrivée à destination";
+    }
+    
+    return "Étape ${completedSteps + 1} sur $totalSteps";
   }
 
   @override
@@ -876,6 +1272,72 @@ class _TrackingMapPageState extends State<TrackingMapPage> {
                                     ],
                                   ),
                                 ),
+                                // Bouton de navigation vocale
+                                GestureDetector(
+                                  onTap: () {
+                                    if (_isVoiceNavigationActive) {
+                                      _stopRealTimeNavigation();
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text('Navigation vocale désactivée'),
+                                          duration: Duration(seconds: 2),
+                                        ),
+                                      );
+                                    } else {
+                                      // Redémarrer la navigation vocale si des instructions sont disponibles
+                                      if (_navigationSteps.isNotEmpty) {
+                                        _restartRealTimeNavigation();
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(
+                                            content: Text('Navigation vocale activée'),
+                                            duration: Duration(seconds: 2),
+                                          ),
+                                        );
+                                      } else {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(
+                                            content: Text('Aucun itinéraire disponible. Recalculez l\'itinéraire.'),
+                                            duration: Duration(seconds: 3),
+                                          ),
+                                        );
+                                      }
+                                    }
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: _isVoiceNavigationActive 
+                                          ? Colors.green.withOpacity(0.1)
+                                          :  Colors.red.withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          _isVoiceNavigationActive 
+                                              ? Icons.volume_off
+                                              : Icons.volume_up,
+                                          color: _isVoiceNavigationActive 
+                                              ? Colors.green
+                                              : Colors.red,
+                                          size: 20,
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          _getNavigationStatus(),
+                                          style: TextStyle(
+                                            fontSize: 8,
+                                            color: _isVoiceNavigationActive 
+                                                ? Colors.green
+                                                : Colors.red,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
                               ],
                             ),
                           ),
@@ -998,6 +1460,9 @@ class _TrackingMapPageState extends State<TrackingMapPage> {
 
   @override
   void dispose() {
+    // Arrêter la navigation vocale
+    _stopRealTimeNavigation();
+    
     // Nettoyer les ressources
     _mapController?.dispose();
     super.dispose();
