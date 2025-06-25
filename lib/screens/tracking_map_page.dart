@@ -69,6 +69,9 @@ class _TrackingMapPageState extends State<TrackingMapPage> {
     
     // Initialiser les permissions de géolocalisation
     _initializeLocationPermissions();
+    
+    // Mettre à jour la position du livreur connecté
+    _updateLivreurPosition();
   }
 
   Future<void> _initializeMarkerIcon() async {
@@ -174,6 +177,60 @@ class _TrackingMapPageState extends State<TrackingMapPage> {
       print("✅ Permissions de géolocalisation accordées");
     } catch (e) {
       print("❌ Erreur lors de l'initialisation des permissions: $e");
+    }
+  }
+
+  // Mettre à jour la position du livreur connecté
+  Future<void> _updateLivreurPosition() async {
+    try {
+      final authState = context.read<AuthCubit>().state;
+      if (authState is! AuthSuccess || authState.user == null) return;
+
+      final userRole = authState.user!['role'];
+      final userId = authState.user!['id'].toString();
+      final userPhone = authState.user!['phone'] as String?;
+
+      // Vérifier si l'utilisateur est un livreur
+      if (userRole != 'livreur') {
+        print("ℹ️ Utilisateur n'est pas un livreur, pas de mise à jour de position");
+        return;
+      }
+
+      print("🚚 Mise à jour de la position du livreur connecté...");
+
+      // Obtenir la position actuelle
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+
+      print("📍 Position obtenue: ${position.latitude}, ${position.longitude}");
+
+      // Créer le document de position pour le livreur (champs essentiels seulement)
+      Map<String, dynamic> positionData = {
+        'userId': userId,           // Identifiant unique du livreur
+        'role': 'livreur',          // Rôle pour filtrer les positions
+        'latitude': position.latitude,    // Position GPS
+        'longitude': position.longitude,  // Position GPS
+        'phone': userPhone,         // Numéro pour les appels
+        'timestamp': FieldValue.serverTimestamp(), // Moment de la mise à jour
+      };
+
+      // Sauvegarder la position dans Firestore
+      await FirebaseFirestore.instance
+          .collection('locations')
+          .doc(userId)
+          .set(positionData, SetOptions(merge: true));
+
+      print("✅ Position du livreur mise à jour avec succès");
+
+      // Mettre à jour la position locale pour l'affichage
+      setState(() {
+        _livreurPosition = LatLng(position.latitude, position.longitude);
+        _livreurPhone = userPhone;
+      });
+
+    } catch (e) {
+      print("❌ Erreur lors de la mise à jour de la position du livreur: $e");
     }
   }
 
@@ -881,8 +938,14 @@ class _TrackingMapPageState extends State<TrackingMapPage> {
             if (legs.isNotEmpty) {
               final List<dynamic> steps = legs[0]['steps'];
               
-              // Démarrer la navigation vocale dynamique en temps réel
-              _startRealTimeNavigation(steps);
+              // Essayer d'abord la navigation vocale dynamique
+              try {
+                _startRealTimeNavigation(steps);
+              } catch (e) {
+                print("❌ Navigation dynamique échouée, utilisation du fallback: $e");
+                // Fallback vers la navigation vocale simple
+                _startSimpleVoiceNavigation(steps);
+              }
             }
           }
         }
@@ -913,6 +976,11 @@ class _TrackingMapPageState extends State<TrackingMapPage> {
       _currentStepIndex = 0;
       _alreadySpoken.clear();
       _isRealTimeNavigationActive = true;
+
+      // Lire immédiatement la première instruction
+      if (_navigationSteps.isNotEmpty) {
+        _speakStepInstruction(0);
+      }
 
       // Démarrer le stream de position
       _startPositionStream();
@@ -1087,6 +1155,10 @@ class _TrackingMapPageState extends State<TrackingMapPage> {
       }
     } catch (e) {
       print("❌ Erreur lors du redémarrage de la navigation: $e");
+      // Essayer la navigation simple en fallback
+      if (_navigationSteps.isNotEmpty) {
+        _startSimpleVoiceNavigation(_navigationSteps);
+      }
     }
   }
 
@@ -1108,6 +1180,63 @@ class _TrackingMapPageState extends State<TrackingMapPage> {
     }
     
     return "Étape ${completedSteps + 1} sur $totalSteps";
+  }
+
+  // Navigation vocale simple en fallback (sans géolocalisation)
+  void _startSimpleVoiceNavigation(List<dynamic> steps) {
+    try {
+      if (_flutterTts == null) {
+        print("❌ FlutterTts n'est pas initialisé");
+        return;
+      }
+
+      // Arrêter la navigation précédente
+      _stopRealTimeNavigation();
+
+      // Extraire et nettoyer les instructions
+      List<String> instructions = steps
+          .map((step) => _cleanHtmlInstructions(step['html_instructions']))
+          .where((instruction) => instruction.isNotEmpty)
+          .toList();
+
+      if (instructions.isEmpty) {
+        print("❌ Aucune instruction de navigation trouvée");
+        return;
+      }
+
+      print("🔊 Démarrage de la navigation vocale simple avec ${instructions.length} instructions");
+
+      if (mounted) {
+        setState(() {
+          _isVoiceNavigationActive = true;
+        });
+      }
+
+      // Lire la première instruction immédiatement
+      if (instructions.isNotEmpty) {
+        _flutterTts!.speak(instructions[0]);
+        print("🔊 Lecture de la première instruction: ${instructions[0]}");
+      }
+
+      // Programmer la lecture des instructions suivantes
+      _voiceNavigationTimer = Timer.periodic(const Duration(seconds: 10), (timer) {
+        int currentIndex = timer.tick;
+        if (currentIndex < instructions.length && mounted && _isVoiceNavigationActive) {
+          _flutterTts!.speak(instructions[currentIndex]);
+          print("🔊 Lecture de l'instruction ${currentIndex + 1}: ${instructions[currentIndex]}");
+        } else {
+          timer.cancel();
+          if (mounted) {
+            setState(() {
+              _isVoiceNavigationActive = false;
+            });
+          }
+        }
+      });
+
+    } catch (e) {
+      print("❌ Erreur lors du démarrage de la navigation simple: $e");
+    }
   }
 
   @override
