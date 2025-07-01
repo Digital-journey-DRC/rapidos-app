@@ -3,6 +3,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:immo/cubit/listing_cubit.dart';
 import 'package:immo/screens/cart/cart_screen.dart';
+import 'package:immo/screens/express_livreur.dart';
+import 'package:immo/screens/express_screen.dart';
 import 'package:immo/screens/favoris_screen.dart';
 import 'package:immo/screens/home/home_livreur.dart';
 import 'package:immo/screens/home/home_marchant.dart';
@@ -44,6 +46,8 @@ class _MainScreenState extends State<MainScreen> {
     const HomeLivreurScreen(),
     const TrackingMapPage(),
     const VoirPlusProduitsScreen(),
+    const ExpressScreen(),
+    const ExpressLivreur(),
   ];
 
   static Future<void> saveTokenToFirestore(
@@ -216,19 +220,23 @@ class _MainScreenState extends State<MainScreen> {
       filteredScreens = [
         _screens[3], // HomeMarchantScreen
         _screens[7], // HomeMarchantScreen (pour l'onglet Produits)
-        _screens[4], // HomeMarchantScreen (pour l'onglet Profil)
+        _screens[4],
+        _screens[8], // HomeMarchantScreen (pour l'onglet Profil)
       ];
       navigationItems = const [
         BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Accueil'),
         BottomNavigationBarItem(icon: Icon(Icons.shopping_bag), label: 'Produits'),
         BottomNavigationBarItem(
             icon: Icon(Icons.shopping_cart_checkout), label: 'Commandes'),
+        BottomNavigationBarItem(
+            icon: Icon(Icons.bolt_outlined), label: 'Express'),
       ];
     } else if (isLivreur) {
       filteredScreens = [
         _screens[5],
         _screens[6],
         _screens[4],
+        _screens[9],
         // HomeLivreurScreen
         // CartScreen
         // HomeMarchantScreen
@@ -240,6 +248,8 @@ class _MainScreenState extends State<MainScreen> {
             icon: Icon(Icons.place_outlined), label: 'Maps'),
         BottomNavigationBarItem(
             icon: Icon(Icons.shopping_cart_checkout), label: 'Livraisons'),
+        BottomNavigationBarItem(
+            icon: Icon(Icons.bolt_outlined), label: 'Express'),
       ];
     } else {
       filteredScreens = _screens;

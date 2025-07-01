@@ -51,6 +51,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:immo/cubits/express/express_cubit.dart';
 
 final AudioPlayer player = AudioPlayer();
 
@@ -535,6 +536,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         BlocProvider(create: (context) => OrderCubit()),
         BlocProvider(create: (context) => MerchantCubit()),
         BlocProvider(create: (context) => FavoritesCubit()),
+        BlocProvider(create: (context) => ExpressCubit()),
       ],
       child: BlocBuilder<AuthCubit, AuthState>(
         builder: (context, state) {
