@@ -258,9 +258,9 @@ void saveCommande() async {
                                 borderRadius: BorderRadius.circular(8),
                                 child: Image.file(_imageFile!, fit: BoxFit.cover),
                               )
-                            : Column(
+                            : const Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
-                                children: const [
+                                children:[
                                   Icon(Icons.add_photo_alternate, color: Colors.grey),
                                   SizedBox(height: 8),
                                   Text('Ajouter une image', style: TextStyle(color: Colors.grey)),
