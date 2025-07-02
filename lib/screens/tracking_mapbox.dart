@@ -16,14 +16,14 @@ import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:geolocator/geolocator.dart';
 
-class TrackingMapPage extends StatefulWidget {
-  const TrackingMapPage({Key? key}) : super(key: key);
+class TrackingMapBox extends StatefulWidget {
+  const TrackingMapBox({Key? key}) : super(key: key);
 
   @override
-  State<TrackingMapPage> createState() => _TrackingMapPageState();
+  State<TrackingMapBox> createState() => _TrackingMapBoxState();
 }
 
-class _TrackingMapPageState extends State<TrackingMapPage> {
+class _TrackingMapBoxState extends State<TrackingMapBox> {
   GoogleMapController? _mapController;
   Set<Marker> _markers = {};
   Set<Polyline> _polylines = {};
