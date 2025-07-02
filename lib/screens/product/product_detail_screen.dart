@@ -46,7 +46,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   void initState() {
     super.initState();
     _checkIfInCart();
-    context.read<MerchantCubit>().fetchMerchants();
+    context.read<MerchantCubit>().fetchMerchants(context);
     _checkIfFavorite();
   }
 

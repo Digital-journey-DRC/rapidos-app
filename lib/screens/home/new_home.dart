@@ -16,6 +16,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:immo/cubit/order_cubit.dart';
 import 'package:immo/cubit/cart_cubit.dart';
+import 'package:immo/screens/tracking_map_page.dart';
 
 class NewHomeScreen extends StatefulWidget {
   const NewHomeScreen({Key? key}) : super(key: key);
@@ -35,7 +36,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
     super.initState();
     context.read<FeaturedProductCubit>().fetchFeaturedProducts();
     context.read<CategoryCubit>().fetchCategories();
-    context.read<MerchantCubit>().fetchMerchants();
+    context.read<MerchantCubit>().fetchMerchants(context);
     _fetchOrdersAndLocation();
   }
 
@@ -477,33 +478,105 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                       child: Center(child: CircularProgressIndicator()),
                     )
                   : _commandes.isNotEmpty
-                      ? Container(
-                          height: 200,
-                          width: double.infinity,
-                          decoration: BoxDecoration(
-                            color: Colors.grey[200],
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(12),
-                            child: _currentPosition == null
-                                ? const Center(child: Text('Impossible d\'obtenir la localisation', style: TextStyle(color: Colors.black54)))
-                                : GoogleMap(
-                                    initialCameraPosition: CameraPosition(
-                                      target: LatLng(
-                                        _currentPosition!.latitude,
-                                        _currentPosition!.longitude,
-                                      ),
-                                      zoom: 15,
-                                    ),
-                                    onMapCreated: (GoogleMapController controller) {
-                                      _mapController = controller;
-                                    },
-                                    myLocationEnabled: true,
-                                    myLocationButtonEnabled: true,
-                                    zoomControlsEnabled: true,
-                                    mapType: MapType.normal,
+                      ? MouseRegion(
+                          cursor: SystemMouseCursors.click,
+                          child: InkWell(
+                            onTap: () {
+                              Navigator.push(context, MaterialPageRoute(builder: (context) => const TrackingMapPage()));
+                            },
+                            child: Container(
+                              height: 200,
+                              width: double.infinity,
+                              decoration: BoxDecoration(
+                                color: Colors.grey[200],
+                                borderRadius: BorderRadius.circular(12),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.1),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 2),
                                   ),
+                                ],
+                              ),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(12),
+                                child: Stack(
+                                  children: [
+                                    _currentPosition == null
+                                        ? const Center(child: Text('Impossible d\'obtenir la localisation', style: TextStyle(color: Colors.black54)))
+                                        : GoogleMap(
+                                            initialCameraPosition: CameraPosition(
+                                              target: LatLng(
+                                                _currentPosition!.latitude,
+                                                _currentPosition!.longitude,
+                                              ),
+                                              zoom: 15,
+                                            ),
+                                            onMapCreated: (GoogleMapController controller) {
+                                              _mapController = controller;
+                                            },
+                                            myLocationEnabled: true,
+                                            myLocationButtonEnabled: true,
+                                            zoomControlsEnabled: true,
+                                            mapType: MapType.normal,
+                                          ),
+                                    // Overlay avec effet de survol
+                                    Positioned.fill(
+                                      child: Material(
+                                        color: Colors.transparent,
+                                        child: InkWell(
+                                          onTap: () {
+                                            Navigator.push(context, MaterialPageRoute(builder: (context) => const TrackingMapPage()));
+                                          },
+                                          child: Container(
+                                            decoration: BoxDecoration(
+                                              borderRadius: BorderRadius.circular(12),
+                                              gradient: LinearGradient(
+                                                begin: Alignment.topCenter,
+                                                end: Alignment.bottomCenter,
+                                                colors: [
+                                                  Colors.transparent,
+                                                  Colors.black.withOpacity(0.3),
+                                                ],
+                                              ),
+                                            ),
+                                            child: const Center(
+                                              child: Column(
+                                                mainAxisAlignment: MainAxisAlignment.end,
+                                                children: [
+                                                  Icon(
+                                                    Icons.fullscreen,
+                                                    color: Colors.white,
+                                                    size: 24,
+                                                  ),
+                                                  SizedBox(height: 8),
+                                                  Text(
+                                                    'Voir la carte en détail',
+                                                    style: TextStyle(
+                                                      color: Colors.white,
+                                                      fontSize: 14,
+                                                      fontWeight: FontWeight.w600,
+                                                      shadows: [
+                                                        Shadow(
+                                                          offset: Offset(0, 1),
+                                                          blurRadius: 3,
+                                                          color: Colors.black54,
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                  SizedBox(height: 16),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
                           ),
                         )
                       : Container(

@@ -959,6 +959,21 @@ class _TrackingMapPageState extends State<TrackingMapPage> {
   // Démarrer la navigation vocale dynamique en temps réel
   void _startRealTimeNavigation(List<dynamic> steps) {
     try {
+      // Vérifier le rôle de l'utilisateur
+      final authState = context.read<AuthCubit>().state;
+      if (authState is! AuthSuccess || authState.user == null) {
+        print("❌ Utilisateur non connecté, navigation vocale désactivée");
+        return;
+      }
+
+      final userRole = authState.user!['role'];
+      
+      // Désactiver la navigation vocale pour les acheteurs
+      if (userRole == 'acheteur') {
+        print("ℹ️ Navigation vocale désactivée pour l'acheteur");
+        return;
+      }
+
       // Arrêter la navigation précédente si elle est active
       _stopRealTimeNavigation();
 
@@ -1128,6 +1143,27 @@ class _TrackingMapPageState extends State<TrackingMapPage> {
   // Redémarrer la navigation vocale dynamique
   void _restartRealTimeNavigation() {
     try {
+      // Vérifier le rôle de l'utilisateur
+      final authState = context.read<AuthCubit>().state;
+      if (authState is! AuthSuccess || authState.user == null) {
+        print("❌ Utilisateur non connecté, navigation vocale désactivée");
+        return;
+      }
+
+      final userRole = authState.user!['role'];
+      
+      // Désactiver la navigation vocale pour les acheteurs
+      if (userRole == 'acheteur') {
+        print("ℹ️ Navigation vocale désactivée pour l'acheteur");
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Navigation vocale non disponible pour les acheteurs'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+        return;
+      }
+
       if (_navigationSteps.isNotEmpty) {
         // Réinitialiser les variables pour un nouveau départ
         _currentStepIndex = 0;
@@ -1401,71 +1437,87 @@ class _TrackingMapPageState extends State<TrackingMapPage> {
                                     ],
                                   ),
                                 ),
-                                // Bouton de navigation vocale
-                                GestureDetector(
-                                  onTap: () {
-                                    if (_isVoiceNavigationActive) {
-                                      _stopRealTimeNavigation();
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(
-                                          content: Text('Navigation vocale désactivée'),
-                                          duration: Duration(seconds: 2),
-                                        ),
-                                      );
-                                    } else {
-                                      // Redémarrer la navigation vocale si des instructions sont disponibles
-                                      if (_navigationSteps.isNotEmpty) {
-                                        _restartRealTimeNavigation();
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          const SnackBar(
-                                            content: Text('Navigation vocale activée'),
-                                            duration: Duration(seconds: 2),
-                                          ),
-                                        );
-                                      } else {
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          const SnackBar(
-                                            content: Text('Aucun itinéraire disponible. Recalculez l\'itinéraire.'),
-                                            duration: Duration(seconds: 3),
-                                          ),
-                                        );
-                                      }
+                                // Bouton de navigation vocale - Caché pour les acheteurs
+                                Builder(
+                                  builder: (context) {
+                                    // Vérifier le rôle de l'utilisateur
+                                    final authState = context.read<AuthCubit>().state;
+                                    final userRole = authState is AuthSuccess && authState.user != null 
+                                        ? authState.user!['role'] 
+                                        : null;
+                                    final isAcheteur = userRole == 'acheteur';
+                                    
+                                    // Cacher complètement le bouton pour les acheteurs
+                                    if (isAcheteur) {
+                                      return const SizedBox.shrink();
                                     }
-                                  },
-                                  child: Container(
-                                    padding: const EdgeInsets.all(8),
-                                    decoration: BoxDecoration(
-                                      color: _isVoiceNavigationActive 
-                                          ? Colors.green.withOpacity(0.1)
-                                          :  Colors.red.withOpacity(0.1),
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: Column(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(
-                                          _isVoiceNavigationActive 
-                                              ? Icons.volume_off
-                                              : Icons.volume_up,
+                                    
+                                    return GestureDetector(
+                                      onTap: () {
+                                        if (_isVoiceNavigationActive) {
+                                          _stopRealTimeNavigation();
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            const SnackBar(
+                                              content: Text('Navigation vocale désactivée'),
+                                              duration: Duration(seconds: 2),
+                                            ),
+                                          );
+                                        } else {
+                                          // Redémarrer la navigation vocale si des instructions sont disponibles
+                                          if (_navigationSteps.isNotEmpty) {
+                                            _restartRealTimeNavigation();
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              const SnackBar(
+                                                content: Text('Navigation vocale activée'),
+                                                duration: Duration(seconds: 2),
+                                              ),
+                                            );
+                                          } else {
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              const SnackBar(
+                                                content: Text('Aucun itinéraire disponible. Recalculez l\'itinéraire.'),
+                                                duration: Duration(seconds: 3),
+                                              ),
+                                            );
+                                          }
+                                        }
+                                      },
+                                      child: Container(
+                                        padding: const EdgeInsets.all(8),
+                                        decoration: BoxDecoration(
                                           color: _isVoiceNavigationActive 
-                                              ? Colors.green
-                                              : Colors.red,
-                                          size: 20,
+                                              ? Colors.green.withOpacity(0.1)
+                                              : Colors.red.withOpacity(0.1),
+                                          borderRadius: BorderRadius.circular(8),
                                         ),
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          _getNavigationStatus(),
-                                          style: TextStyle(
-                                            fontSize: 8,
-                                            color: _isVoiceNavigationActive 
-                                                ? Colors.green
-                                                : Colors.red,
-                                            fontWeight: FontWeight.bold,
-                                          ),
+                                        child: Column(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(
+                                              _isVoiceNavigationActive 
+                                                  ? Icons.volume_off
+                                                  : Icons.volume_up,
+                                              color: _isVoiceNavigationActive 
+                                                  ? Colors.green
+                                                  : Colors.red,
+                                              size: 20,
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              _getNavigationStatus(),
+                                              style: TextStyle(
+                                                fontSize: 8,
+                                                color: _isVoiceNavigationActive 
+                                                    ? Colors.green
+                                                    : Colors.red,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ],
                                         ),
-                                      ],
-                                    ),
-                                  ),
+                                      ),
+                                    );
+                                  },
                                 ),
                               ],
                             ),
