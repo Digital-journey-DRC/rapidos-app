@@ -10,8 +10,10 @@ import 'package:immo/screens/home/home_livreur.dart';
 import 'package:immo/screens/home/home_marchant.dart';
 import 'package:immo/screens/home/new_home.dart';
 import 'package:immo/screens/home/voir_plus_produits.dart';
+import 'package:immo/screens/navigation_example.dart';
 
 import 'package:immo/screens/order_screen.dart';
+import 'package:immo/screens/tracking_map_box.dart';
 import 'package:immo/screens/tracking_map_page.dart';
 
 import '../constants.dart';
@@ -37,7 +39,6 @@ class _MainScreenState extends State<MainScreen> {
   late final StreamController<void> _cartStreamController;
 
   final List<Widget> _screens = [
-    // const DashboardScreen(),
     const NewHomeScreen(),
     const CartScreen(backNavigaton: false),
     const FavorisScreen(),
@@ -48,6 +49,7 @@ class _MainScreenState extends State<MainScreen> {
     const VoirPlusProduitsScreen(),
     const ExpressScreen(),
     const ExpressLivreur(),
+    const NavigationExample(),
   ];
 
   static Future<void> saveTokenToFirestore(
@@ -213,7 +215,8 @@ class _MainScreenState extends State<MainScreen> {
         _screens[1], // CartScreen
         _screens[2], // FavorisScreen
         _screens[4],
-        _screens[6]
+        // _screens[6]
+        _screens[10]
         // HomeMarchantScreen
       ];
     } else if (isVendeur) {
@@ -236,7 +239,8 @@ class _MainScreenState extends State<MainScreen> {
         _screens[5],
         _screens[6],
         _screens[4],
-        _screens[9],
+        // _screens[9],
+        _screens[10]
         // HomeLivreurScreen
         // CartScreen
         // HomeMarchantScreen

@@ -19,7 +19,6 @@ import 'package:immo/cubits/utility_bill/utility_bill_cubit.dart';
 import 'package:immo/screens/auth/login_screen.dart';
 import 'package:immo/screens/auth/register_screen.dart';
 import 'package:immo/screens/dashboard/Annonce_screen.dart';
-import 'package:immo/screens/dashboard/dashboard_screen.dart';
 import 'package:immo/screens/main_screen.dart';
 import 'package:immo/screens/messages_screen.dart';
 import 'package:immo/screens/order_details_screen.dart';
@@ -573,7 +572,6 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
             routes: {
               AppRoutes.login: (context) => const LoginScreen(),
               AppRoutes.register: (context) => const RegisterScreen(),
-              AppRoutes.profile: (context) => const DashboardScreen(),
               AppRoutes.main: (context) => const MainScreen(),
               AppRoutes.chat: (context) {
                 final Map<dynamic, dynamic> rawArgs = ModalRoute.of(context)!

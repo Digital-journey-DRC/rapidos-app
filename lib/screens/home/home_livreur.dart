@@ -6,7 +6,8 @@ import 'package:immo/screens/dashboard/setting_screen.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:immo/screens/tracking_map_page.dart';
+import 'package:immo/screens/navigation_example.dart';
+import 'package:immo/screens/tracking_map_box.dart';
 
 class HomeLivreurScreen extends StatefulWidget {
   const HomeLivreurScreen({Key? key}) : super(key: key);
@@ -402,7 +403,7 @@ class _HomeLivreurScreenState extends State<HomeLivreurScreen> {
               cursor: SystemMouseCursors.click,
               child: InkWell(
                 onTap: () {
-                  Navigator.push(context, MaterialPageRoute(builder: (context) => const TrackingMapPage()));
+                  Navigator.push(context, MaterialPageRoute(builder: (context) => const NavigationExample()));
                 },
                 child: Container(
                   height: 200,
@@ -448,7 +449,7 @@ class _HomeLivreurScreenState extends State<HomeLivreurScreen> {
                             color: Colors.transparent,
                             child: InkWell(
                               onTap: () {
-                                Navigator.push(context, MaterialPageRoute(builder: (context) => const TrackingMapPage()));
+                                Navigator.push(context, MaterialPageRoute(builder: (context) => const NavigationExample()));
                               },
                               child: Container(
                                 decoration: BoxDecoration(

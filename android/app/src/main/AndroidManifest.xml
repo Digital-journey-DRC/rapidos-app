@@ -20,6 +20,11 @@
             android:name="com.google.android.geo.API_KEY"
             android:value="AIzaSyCuLBjM3oTYfFSbJwXccj4xP8oynDV5JnM"/>
 
+        <!-- Mapbox Access Token -->
+        <meta-data
+            android:name="com.mapbox.token"
+            android:value="pk.eyJ1Ijoic3R5bm9zIiwiYSI6ImNtY21ncHRsZjAyemYyanNlM3lxd2R6d28ifQ.X2fT6wYbpn3QvTSdQCCYgw"/>
+
         <activity
             android:name=".MainActivity"
             android:exported="true"
