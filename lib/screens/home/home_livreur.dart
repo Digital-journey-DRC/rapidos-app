@@ -403,7 +403,7 @@ class _HomeLivreurScreenState extends State<HomeLivreurScreen> {
               cursor: SystemMouseCursors.click,
               child: InkWell(
                 onTap: () {
-                  Navigator.push(context, MaterialPageRoute(builder: (context) => const NavigationExample()));
+                  Navigator.push(context, MaterialPageRoute(builder: (context) => const NavigationExample(backNavigation: true)));
                 },
                 child: Container(
                   height: 200,
@@ -449,7 +449,7 @@ class _HomeLivreurScreenState extends State<HomeLivreurScreen> {
                             color: Colors.transparent,
                             child: InkWell(
                               onTap: () {
-                                Navigator.push(context, MaterialPageRoute(builder: (context) => const NavigationExample()));
+                                Navigator.push(context, MaterialPageRoute(builder: (context) => const NavigationExample(backNavigation: true)));
                               },
                               child: Container(
                                 decoration: BoxDecoration(

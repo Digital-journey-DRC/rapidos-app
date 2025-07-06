@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:immo/constants.dart';
 import 'package:immo/screens/home/all_merchants_screen.dart';
+import 'package:immo/screens/navigation_example.dart';
 import 'package:immo/screens/product/product_detail_screen.dart';
 import '../merchant/merchant_profile_screen.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -482,7 +483,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                           cursor: SystemMouseCursors.click,
                           child: InkWell(
                             onTap: () {
-                              Navigator.push(context, MaterialPageRoute(builder: (context) => const TrackingMapPage()));
+                              Navigator.push(context, MaterialPageRoute(builder: (context) => const NavigationExample(backNavigation: true)));
                             },
                             child: Container(
                               height: 200,
@@ -526,7 +527,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                                         color: Colors.transparent,
                                         child: InkWell(
                                           onTap: () {
-                                            Navigator.push(context, MaterialPageRoute(builder: (context) => const TrackingMapPage()));
+                                            Navigator.push(context, MaterialPageRoute(builder: (context) => const NavigationExample(backNavigation: true)));
                                           },
                                           child: Container(
                                             decoration: BoxDecoration(

@@ -45,11 +45,12 @@ class _MainScreenState extends State<MainScreen> {
     const HomeMarchantScreen(),
     const OrderScreen(backNavigation: false),
     const HomeLivreurScreen(),
-    const TrackingMapPage(),
+    // const TrackingMapPage(),
+    const NavigationExample(backNavigation: false),
     const VoirPlusProduitsScreen(),
     const ExpressScreen(),
     const ExpressLivreur(),
-    const NavigationExample(),
+    const NavigationExample(backNavigation: false),
   ];
 
   static Future<void> saveTokenToFirestore(
@@ -215,8 +216,8 @@ class _MainScreenState extends State<MainScreen> {
         _screens[1], // CartScreen
         _screens[2], // FavorisScreen
         _screens[4],
-        // _screens[6]
-        _screens[10]
+        _screens[6]
+        // _screens[10]
         // HomeMarchantScreen
       ];
     } else if (isVendeur) {
@@ -239,8 +240,8 @@ class _MainScreenState extends State<MainScreen> {
         _screens[5],
         _screens[6],
         _screens[4],
-        // _screens[9],
-        _screens[10]
+        _screens[9],
+        // _screens[10]
         // HomeLivreurScreen
         // CartScreen
         // HomeMarchantScreen

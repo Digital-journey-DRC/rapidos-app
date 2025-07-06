@@ -2,9 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_mapbox_navigation/flutter_mapbox_navigation.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:immo/constants.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:immo/cubit/auth_cubit.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'dart:async';
 
 class NavigationExample extends StatefulWidget {
-  const NavigationExample({Key? key}) : super(key: key);
+  final bool backNavigation;
+  const NavigationExample({Key? key, required this.backNavigation}) : super(key: key);
 
   @override
   State<NavigationExample> createState() => _NavigationExampleState();
@@ -17,11 +24,28 @@ class _NavigationExampleState extends State<NavigationExample> {
   String _instruction = "";
   double _distanceRemaining = 0.0;
   double _durationRemaining = 0.0;
+  
+  // Nouvelles variables pour le suivi en temps réel
+  Set<Marker> _markers = {};
+  Set<Polyline> _polylines = {};
+  bool _isLoading = true;
+  String? _currentOrderId;
+  MapType _currentMapType = MapType.normal;
+  String? _livreurPhone;
+  String? _acheteurPhone;
+  LatLng? _livreurPosition;
+  LatLng? _acheteurPosition;
+  String? _routeDistance;
+  String? _routeDuration;
+  bool _hasActiveOrders = false;
+  GoogleMapController? _mapController;
 
   @override
   void initState() {
     super.initState();
     _initializeNavigation();
+    _setupLocationUpdates();
+    _updateLivreurPosition();
   }
 
   Future<void> _initializeNavigation() async {
@@ -47,6 +71,320 @@ class _NavigationExampleState extends State<NavigationExample> {
       print("✅ Navigation initialized successfully");
     } catch (e) {
       print("❌ Error initializing navigation: $e");
+    }
+  }
+
+  // Mettre à jour la position du livreur connecté
+  Future<void> _updateLivreurPosition() async {
+    try {
+      final authState = context.read<AuthCubit>().state;
+      if (authState is! AuthSuccess || authState.user == null) return;
+
+      final userRole = authState.user!['role'];
+      final userId = authState.user!['id'].toString();
+      final userPhone = authState.user!['phone'] as String?;
+
+      // Vérifier si l'utilisateur est un livreur
+      if (userRole != 'livreur') {
+        print("ℹ️ Utilisateur n'est pas un livreur, pas de mise à jour de position");
+        return;
+      }
+
+      print("🚚 Mise à jour de la position du livreur connecté...");
+
+      // Obtenir la position actuelle
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+
+      print("📍 Position obtenue: ${position.latitude}, ${position.longitude}");
+
+      // Créer le document de position pour le livreur
+      Map<String, dynamic> positionData = {
+        'userId': userId,
+        'role': 'livreur',
+        'latitude': position.latitude,
+        'longitude': position.longitude,
+        'phone': userPhone,
+        'timestamp': FieldValue.serverTimestamp(),
+      };
+
+      // Sauvegarder la position dans Firestore
+      await FirebaseFirestore.instance
+          .collection('locations')
+          .doc(userId)
+          .set(positionData, SetOptions(merge: true));
+
+      print("✅ Position du livreur mise à jour avec succès");
+
+      // Mettre à jour la position locale pour l'affichage
+      setState(() {
+        _livreurPosition = LatLng(position.latitude, position.longitude);
+        _livreurPhone = userPhone;
+      });
+
+    } catch (e) {
+      print("❌ Erreur lors de la mise à jour de la position du livreur: $e");
+    }
+  }
+
+  void _setupLocationUpdates() {
+    final authState = context.read<AuthCubit>().state;
+    if (authState is! AuthSuccess || authState.user == null) return;
+
+    final userRole = authState.user!['role'];
+    final userId = authState.user!['id'].toString();
+
+    print('User Role: $userRole, User ID: $userId');
+
+    // Filtrer les commandes selon le rôle de l'utilisateur connecté
+    Query cartQuery = FirebaseFirestore.instance
+        .collection('carts')
+        .where('status', isEqualTo: 'en route pour livraison');
+
+    if (userRole == 'acheteur') {
+      cartQuery = cartQuery.where('idClient', isEqualTo: userId);
+    } else if (userRole == 'livreur') {
+      cartQuery = cartQuery.where('livreur', isEqualTo: userId);
+    }
+
+    // Écouter les commandes filtrées
+    cartQuery.snapshots().listen((cartSnapshot) {
+      print('Received ${cartSnapshot.docs.length} cart updates for user $userId with role $userRole');
+      
+      setState(() {
+        _hasActiveOrders = cartSnapshot.docs.isNotEmpty;
+        _isLoading = false;
+      });
+      
+      if (cartSnapshot.docs.isNotEmpty) {
+        print('Active orders found, setting up location tracking...');
+        
+        if (userRole == 'acheteur') {
+          // Pour un acheteur, récupérer l'ID du livreur depuis la commande
+          final livreurIds = cartSnapshot.docs
+              .map((doc) => (doc.data() as Map<String, dynamic>)['livreur'] as String?)
+              .where((id) => id != null && id!.isNotEmpty)
+              .map((id) => id!)
+              .toSet();
+          
+          if (livreurIds.isNotEmpty) {
+            FirebaseFirestore.instance
+                .collection('locations')
+                .where('userId', whereIn: livreurIds.toList())
+                .where('role', isEqualTo: 'livreur')
+                .snapshots()
+                .listen((locationSnapshot) {
+                  _updateMarkers(locationSnapshot.docs, userRole, cartSnapshot.docs);
+                });
+          }
+        } else if (userRole == 'livreur') {
+          // Pour un livreur, récupérer l'ID du client depuis la commande
+          final clientIds = cartSnapshot.docs
+              .map((doc) => (doc.data() as Map<String, dynamic>)['idClient'] as String?)
+              .where((id) => id != null && id!.isNotEmpty)
+              .map((id) => id!)
+              .toSet();
+          
+          if (clientIds.isNotEmpty) {
+            FirebaseFirestore.instance
+                .collection('locations')
+                .where('userId', whereIn: clientIds.toList())
+                .where('role', isEqualTo: 'acheteur')
+                .snapshots()
+                .listen((locationSnapshot) {
+                  _updateMarkers(locationSnapshot.docs, userRole, cartSnapshot.docs);
+                });
+          }
+        }
+      } else {
+        setState(() {
+          _markers.clear();
+          _polylines.clear();
+          _livreurPosition = null;
+          _acheteurPosition = null;
+          _routeDistance = null;
+          _routeDuration = null;
+        });
+        print('No active orders, cleared map data');
+      }
+    });
+  }
+
+  void _updateMarkers(List<QueryDocumentSnapshot> otherLocations, String userRole, List<QueryDocumentSnapshot> carts) {
+    final markers = <Marker>{};
+    final authState = context.read<AuthCubit>().state;
+    if (authState is! AuthSuccess || authState.user == null) return;
+    
+    final userId = authState.user!['id'].toString();
+    LatLng? myPosition;
+
+    // Filtrer les positions pour n'avoir qu'une seule position par utilisateur
+    final Map<String, QueryDocumentSnapshot> latestPositions = {};
+    for (var doc in otherLocations) {
+      final data = doc.data() as Map<String, dynamic>;
+      final locationUserId = data['userId'] as String;
+      latestPositions[locationUserId] = doc;
+    }
+
+    if (userRole == 'acheteur') {
+      // Pour un acheteur, afficher la position du livreur
+      for (var doc in latestPositions.values) {
+        final data = doc.data() as Map<String, dynamic>;
+        final locationUserId = data['userId'] as String;
+        final phone = data['phone'] as String?;
+        
+        _livreurPhone = phone;
+        
+        final livreurPosition = LatLng(
+          data['latitude'] as double,
+          data['longitude'] as double,
+        );
+
+        _livreurPosition = livreurPosition;
+
+        markers.add(
+          Marker(
+            markerId: MarkerId('livreur_$locationUserId'),
+            position: livreurPosition,
+            icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
+            infoWindow: InfoWindow(
+              title: 'Position du livreur',
+              snippet: phone != null ? 'Tél: $phone' : 'En route vers vous',
+            ),
+          ),
+        );
+      }
+
+      // Afficher la position de l'acheteur connecté
+      FirebaseFirestore.instance
+          .collection('locations')
+          .where('userId', isEqualTo: userId)
+          .where('role', isEqualTo: 'acheteur')
+          .limit(1)
+          .get()
+          .then((acheteurSnapshot) {
+            if (acheteurSnapshot.docs.isNotEmpty) {
+              final acheteurData = acheteurSnapshot.docs.first.data();
+              final acheteurPhone = acheteurData['phone'] as String?;
+              
+              _acheteurPhone = acheteurPhone;
+              
+              final acheteurPosition = LatLng(
+                acheteurData['latitude'] as double,
+                acheteurData['longitude'] as double,
+              );
+              
+              _acheteurPosition = acheteurPosition;
+              
+              markers.add(
+                Marker(
+                  markerId: const MarkerId('my_position'),
+                  position: acheteurPosition,
+                  icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+                  infoWindow: const InfoWindow(
+                    title: 'Ma position (Acheteur)',
+                    snippet: 'Position actuelle',
+                  ),
+                ),
+              );
+              
+              myPosition = acheteurPosition;
+            }
+          });
+    } else if (userRole == 'livreur') {
+      // Pour un livreur, afficher la position du client
+      for (var doc in latestPositions.values) {
+        final data = doc.data() as Map<String, dynamic>;
+        final locationUserId = data['userId'] as String;
+        final phone = data['phone'] as String?;
+        
+        _acheteurPhone = phone;
+        
+        final clientPosition = LatLng(
+          data['latitude'] as double,
+          data['longitude'] as double,
+        );
+
+        _acheteurPosition = clientPosition;
+
+        markers.add(
+          Marker(
+            markerId: MarkerId('client_$locationUserId'),
+            position: clientPosition,
+            icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+            infoWindow: InfoWindow(
+              title: 'Position du client',
+              snippet: phone != null ? 'Tél: $phone' : 'En attente de livraison',
+            ),
+          ),
+        );
+      }
+
+      // Afficher la position du livreur connecté
+      FirebaseFirestore.instance
+          .collection('locations')
+          .where('userId', isEqualTo: userId)
+          .where('role', isEqualTo: 'livreur')
+          .limit(1)
+          .get()
+          .then((livreurSnapshot) {
+            if (livreurSnapshot.docs.isNotEmpty) {
+              final livreurData = livreurSnapshot.docs.first.data();
+              final livreurPhone = livreurData['phone'] as String?;
+              
+              _livreurPhone = livreurPhone;
+              
+              final livreurPosition = LatLng(
+                livreurData['latitude'] as double,
+                livreurData['longitude'] as double,
+              );
+              
+              _livreurPosition = livreurPosition;
+              
+              markers.add(
+                Marker(
+                  markerId: const MarkerId('my_position'),
+                  position: livreurPosition,
+                  icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
+                  infoWindow: const InfoWindow(
+                    title: 'Ma position (Livreur)',
+                    snippet: 'Position actuelle',
+                  ),
+                ),
+              );
+              
+              myPosition = livreurPosition;
+            }
+          });
+    }
+
+    setState(() {
+      _markers = markers;
+      _isLoading = false;
+    });
+  }
+
+  Future<void> _makePhoneCall(String phoneNumber) async {
+    print('Attempting to call: $phoneNumber');
+    final Uri phoneUri = Uri(scheme: 'tel', path: phoneNumber);
+    try {
+      if (await canLaunchUrl(phoneUri)) {
+        await launchUrl(phoneUri);
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Impossible de lancer l\'appel')),
+          );
+        }
+      }
+    } catch (e) {
+      print('Error making phone call: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Erreur lors de l\'appel')),
+        );
+      }
     }
   }
 
@@ -100,27 +438,45 @@ class _NavigationExampleState extends State<NavigationExample> {
 
   Future<void> _startNavigation() async {
     try {
-      // Get current position
-      Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-      );
+      // Utiliser les positions réelles du livreur et du client si disponibles
+      if (_livreurPosition != null && _acheteurPosition != null) {
+        final wayPoints = [
+          WayPoint(
+            name: "Ma position",
+            latitude: _livreurPosition!.latitude,
+            longitude: _livreurPosition!.longitude,
+          ),
+          WayPoint(
+            name: "Destination",
+            latitude: _acheteurPosition!.latitude,
+            longitude: _acheteurPosition!.longitude,
+          ),
+        ];
 
-      // Create waypoints (example: navigate to a nearby location)
-      final wayPoints = [
-        WayPoint(
-          name: "Ma position",
-          latitude: position.latitude,
-          longitude: position.longitude,
-        ),
-        WayPoint(
-          name: "Destination",
-          latitude: position.latitude + 0.01, // 1km south
-          longitude: position.longitude + 0.01, // 1km east
-        ),
-      ];
+        await MapBoxNavigation.instance.startNavigation(wayPoints: wayPoints);
+        print("🚀 Navigation started with real positions");
+      } else {
+        // Fallback vers la méthode originale
+        Position position = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.high,
+        );
 
-      await MapBoxNavigation.instance.startNavigation(wayPoints: wayPoints);
-      print("🚀 Navigation started");
+        final wayPoints = [
+          WayPoint(
+            name: "Ma position",
+            latitude: position.latitude,
+            longitude: position.longitude,
+          ),
+          WayPoint(
+            name: "Destination",
+            latitude: position.latitude + 0.01,
+            longitude: position.longitude + 0.01,
+          ),
+        ];
+
+        await MapBoxNavigation.instance.startNavigation(wayPoints: wayPoints);
+        print("🚀 Navigation started with fallback positions");
+      }
     } catch (e) {
       print("❌ Error starting navigation: $e");
       ScaffoldMessenger.of(context).showSnackBar(
@@ -148,138 +504,278 @@ class _NavigationExampleState extends State<NavigationExample> {
 
   @override
   Widget build(BuildContext context) {
+    final authState = context.read<AuthCubit>().state;
+    String? userRole;
+    if (authState is AuthSuccess && authState.user != null) {
+      userRole = authState.user!['role'] as String?;
+    }
+    final bool isLivreur = userRole == 'livreur';
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Exemple de Navigation'),
-        backgroundColor: AppColors.primary,
+        leading: widget.backNavigation == true ? IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.black),
+          onPressed: () {
+            Navigator.pop(context);
+          },
+        ) : null,
+        title: const Text('Navigation Avancée', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),),
+        // backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh, color: Colors.black),
+            onPressed: () {
+              setState(() {
+                _isLoading = true;
+                _markers.clear();
+                _polylines.clear();
+                _livreurPosition = null;
+                _acheteurPosition = null;
+                _routeDistance = null;
+                _routeDuration = null;
+              });
+              _setupLocationUpdates();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Actualisation en cours...')),
+              );
+            },
+            tooltip: 'Actualiser',
+          ),
+        ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Status Card
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Statut de Navigation',
-                      style: Theme.of(context).textTheme.titleLarge,
+      body: _hasActiveOrders 
+          ? Column(
+              children: [
+                // Carte Google Maps pour le suivi en temps réel
+                Expanded(
+                  flex: 2,
+                  child: Container(
+                    margin: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 8),
-                    _buildStatusRow('Navigation active', _isNavigationActive),
-                    _buildStatusRow('Route construite', _isRouteBuilt),
-                    _buildStatusRow('Arrivé à destination', _arrived),
-                    if (_instruction.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      Text(
-                        'Instruction: $_instruction',
-                        style: const TextStyle(fontStyle: FontStyle.italic),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: GoogleMap(
+                        initialCameraPosition: const CameraPosition(
+                          target: LatLng(-4.325, 15.308),
+                          zoom: 12,
+                        ),
+                        onMapCreated: (GoogleMapController controller) {
+                          _mapController = controller;
+                        },
+                        markers: _markers,
+                        polylines: _polylines,
+                        myLocationEnabled: true,
+                        myLocationButtonEnabled: true,
+                        zoomControlsEnabled: true,
+                        mapToolbarEnabled: false,
+                        mapType: _currentMapType,
+                        compassEnabled: true,
+                        zoomGesturesEnabled: true,
+                        rotateGesturesEnabled: true,
+                        scrollGesturesEnabled: true,
+                        tiltGesturesEnabled: true,
                       ),
-                    ],
-                  ],
-                ),
-              ),
-            ),
-            
-            const SizedBox(height: 16),
-            
-            // Navigation Controls
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  children: [
-                    Text(
-                      'Contrôles',
-                      style: Theme.of(context).textTheme.titleLarge,
                     ),
-                    const SizedBox(height: 16),
-                    Row(
+                  ),
+                ),
+                
+                // Cartes d'information
+                Expanded(
+                  flex: 1,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Column(
                       children: [
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: _isNavigationActive ? null : _startNavigation,
-                            icon: const Icon(Icons.navigation),
-                            label: const Text('Démarrer Navigation'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.green,
-                              foregroundColor: Colors.white,
+                        // Carte d'appel
+                        Card(
+                          elevation: 4,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: isLivreur
+                                        ? Colors.green.withOpacity(0.1)
+                                        : Colors.red.withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Icon(
+                                    isLivreur
+                                        ? Icons.location_on
+                                        : Icons.delivery_dining,
+                                    color: isLivreur
+                                        ? Colors.green
+                                        : Colors.red,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    isLivreur
+                                        ? 'Position de l\'acheteur'
+                                        : 'Position du livreur',
+                                    style: const TextStyle(fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                                const SizedBox(width: 20),
+                                Expanded(
+                                  child: GestureDetector(
+                                    onTap: () {
+                                      final phoneToCall = isLivreur
+                                          ? _acheteurPhone
+                                          : _livreurPhone;
+                                      if (phoneToCall != null && phoneToCall.isNotEmpty) {
+                                        _makePhoneCall(phoneToCall);
+                                      } else {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(
+                                            content: Text('Numéro de téléphone non disponible'),
+                                          ),
+                                        );
+                                      }
+                                    },
+                                    child: Container(
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.primary,
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: const Text(
+                                        'Appeler',
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: _isNavigationActive ? _finishNavigation : null,
-                            icon: const Icon(Icons.stop),
-                            label: const Text('Arrêter Navigation'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.red,
-                              foregroundColor: Colors.white,
+                        
+                        const SizedBox(height: 8),
+                        
+                        // Contrôles de navigation Mapbox
+                        Card(
+                          elevation: 4,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Navigation',
+                                  style: Theme.of(context).textTheme.titleMedium,
+                                ),
+                                const SizedBox(height: 8),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: ElevatedButton.icon(
+                                        onPressed: _isNavigationActive ? null : _startNavigation,
+                                        icon: const Icon(Icons.navigation, color: Colors.white),
+                                        label: const Text('Démarrer'),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.green,
+                                          foregroundColor: Colors.white,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: ElevatedButton.icon(
+                                        onPressed: _isNavigationActive ? _finishNavigation : null,
+                                        icon: const Icon(Icons.stop),
+                                        label: const Text('Arrêter'),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.red,
+                                          foregroundColor: Colors.white,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                if (_instruction.isNotEmpty) ...[
+                                  const SizedBox(height: 8),
+                                  Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: Colors.blue.withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Text(
+                                      'Instruction: $_instruction',
+                                      style: const TextStyle(fontStyle: FontStyle.italic),
+                                    ),
+                                  ),
+                                ],
+                              ],
                             ),
                           ),
                         ),
                       ],
                     ),
-                  ],
+                  ),
                 ),
+              ],
+            )
+          : Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.delivery_dining,
+                    size: 80,
+                    color: Colors.grey[400],
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Aucune livraison en cours',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Vous n\'avez pas de commande\n en cours',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey[500],
+                    ),
+                  ),
+                ],
               ),
             ),
-            
-            const SizedBox(height: 16),
-            
-            // Instructions
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Instructions',
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      '1. Appuyez sur "Démarrer Navigation" pour commencer\n'
-                      '2. La navigation vous guidera vers la destination\n'
-                      '3. Suivez les instructions vocales et visuelles\n'
-                      '4. Appuyez sur "Arrêter Navigation" pour terminer',
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStatusRow(String label, bool value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2.0),
-      child: Row(
-        children: [
-          Icon(
-            value ? Icons.check_circle : Icons.cancel,
-            color: value ? Colors.green : Colors.red,
-            size: 16,
-          ),
-          const SizedBox(width: 8),
-          Text('$label: ${value ? "Oui" : "Non"}'),
-        ],
-      ),
     );
   }
 
   @override
   void dispose() {
+    _mapController?.dispose();
     super.dispose();
   }
 } 
