@@ -85,6 +85,7 @@ class _AllMerchantsScreenState extends State<AllMerchantsScreen> {
                               context,
                               MaterialPageRoute(
                                 builder: (context) => MerchantProfileScreen(
+                                  merchantId: vendeur['id'].toString(),
                                   name: name,
                                   rating: 4.5,
                                   category: products.isNotEmpty ? products[0]['description'] ?? '' : '',

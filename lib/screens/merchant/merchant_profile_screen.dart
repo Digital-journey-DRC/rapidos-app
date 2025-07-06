@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../constants.dart';
+import '../../cubit/auth_cubit.dart';
 import '../product/product_detail_screen.dart';
 
 class MerchantProfileScreen extends StatefulWidget {
@@ -10,6 +13,7 @@ class MerchantProfileScreen extends StatefulWidget {
   final double rating;
   final bool isVerified;
   final List<Map<String, dynamic>> products;
+  final String merchantId; // Ajout de l'ID du marchand
 
   const MerchantProfileScreen({
     Key? key,
@@ -19,6 +23,7 @@ class MerchantProfileScreen extends StatefulWidget {
     required this.rating,
     required this.isVerified,
     required this.products,
+    required this.merchantId, // Ajout du paramètre
   }) : super(key: key);
 
   @override
@@ -29,15 +34,214 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> with Sing
   late TabController _tabController;
   bool isFollowing = false;
   
-  // Dummy data for followers and products
-  final int followers = 12543;
-  final int following = 286;
-  final int likes = 45200;
+  // Variables pour les abonnés
+  int followersCount = 0;
+  List<Map<String, dynamic>> subscribersList = [];
+  bool isLoadingSubscribers = false;
+  
+  // Méthode pour gérer les abonnements
+  Future<void> _toggleSubscription() async {
+    try {
+      // Récupérer l'utilisateur connecté
+      final authState = context.read<AuthCubit>().state;
+      if (authState is! AuthSuccess || authState.user == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Vous devez être connecté pour vous abonner'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+      
+      final user = authState.user!;
+      final userId = user['id']?.toString() ?? '';
+      final userName = '${user['firstName'] ?? ''} ${user['lastName'] ?? ''}'.trim();
+      
+      // ID du marchand
+      final merchantId = widget.merchantId;
+      
+      if (isFollowing) {
+        // Se désabonner
+        await _unsubscribeFromMerchant(userId, merchantId);
+      } else {
+        // S'abonner
+        await _subscribeToMerchant(userId, userName, merchantId);
+      }
+      
+      setState(() {
+        isFollowing = !isFollowing;
+      });
+      
+      // Recharger les abonnés après le changement
+      await _loadSubscribers();
+      
+    } catch (e) {
+      print('Erreur lors de la gestion de l\'abonnement: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erreur: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+  
+  // Méthode pour s'abonner à un marchand
+  Future<void> _subscribeToMerchant(String userId, String userName, String merchantId) async {
+    try {
+      await FirebaseFirestore.instance.collection('abonnements').add({
+        'userId': userId,
+        'userName': userName,
+        'merchantId': merchantId, // Vrai ID du marchand
+        'merchantName': widget.name,
+        'merchantImage': widget.imagePath,
+        'merchantCategory': widget.category,
+        'isActive': true,
+        'timestamp': FieldValue.serverTimestamp(),
+      });
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Abonnement à ${widget.name} réussi !'),
+          backgroundColor: Colors.green,
+        ),
+      );
+      
+    } catch (e) {
+      print('Erreur lors de l\'abonnement: $e');
+      throw Exception('Erreur lors de l\'abonnement: $e');
+    }
+  }
+  
+  // Méthode pour se désabonner d'un marchand
+  Future<void> _unsubscribeFromMerchant(String userId, String merchantId) async {
+    try {
+      // Rechercher l'abonnement existant
+      final subscriptionQuery = await FirebaseFirestore.instance
+          .collection('abonnements')
+          .where('userId', isEqualTo: userId)
+          .where('merchantId', isEqualTo: merchantId)
+          .where('isActive', isEqualTo: true)
+          .get();
+      
+      if (subscriptionQuery.docs.isNotEmpty) {
+        // Désactiver l'abonnement
+        await subscriptionQuery.docs.first.reference.update({
+          'isActive': false,
+          'unsubscribedAt': FieldValue.serverTimestamp(),
+        });
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Désabonnement de ${widget.name} réussi !'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+      
+    } catch (e) {
+      print('Erreur lors du désabonnement: $e');
+      throw Exception('Erreur lors du désabonnement: $e');
+    }
+  }
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    print('🚀 MerchantProfileScreen initialisé pour: ${widget.name} (ID: ${widget.merchantId})');
+    _checkSubscriptionStatus();
+    _loadSubscribers();
+  }
+  
+  // Méthode pour vérifier le statut d'abonnement
+  Future<void> _checkSubscriptionStatus() async {
+    try {
+      final authState = context.read<AuthCubit>().state;
+      if (authState is AuthSuccess && authState.user != null) {
+        final userId = authState.user!['id']?.toString() ?? '';
+        final merchantId = widget.merchantId;
+        
+        // Vérifier si l'utilisateur est déjà abonné
+        final subscriptionQuery = await FirebaseFirestore.instance
+            .collection('abonnements')
+            .where('userId', isEqualTo: userId)
+            .where('merchantId', isEqualTo: merchantId)
+            .where('isActive', isEqualTo: true)
+            .get();
+        
+        if (mounted) {
+          setState(() {
+            isFollowing = subscriptionQuery.docs.isNotEmpty;
+          });
+        }
+      }
+    } catch (e) {
+      print('Erreur lors de la vérification du statut d\'abonnement: $e');
+    }
+  }
+  
+  // Méthode pour charger les abonnés
+  Future<void> _loadSubscribers() async {
+    try {
+      print('🔄 Début du chargement des abonnés...');
+      setState(() {
+        isLoadingSubscribers = true;
+      });
+      
+      final merchantId = widget.merchantId;
+      print('📍 MerchantId: $merchantId');
+      
+      // Récupérer tous les abonnements (requête simple pour éviter les problèmes d'index)
+      final subscribersQuery = await FirebaseFirestore.instance
+          .collection('abonnements')
+          .get();
+      
+      print('📊 Nombre total d\'abonnements: ${subscribersQuery.docs.length}');
+      
+      if (mounted) {
+        setState(() {
+          // Filtrer côté client
+          final filteredDocs = subscribersQuery.docs.where((doc) {
+            final data = doc.data();
+            return data['merchantId'] == merchantId && data['isActive'] == true;
+          }).toList();
+          
+          followersCount = filteredDocs.length;
+          subscribersList = filteredDocs.map((doc) {
+            final data = doc.data();
+            print('👤 Abonné: ${data['userName']} - ${data['userId']}');
+            return {
+              'id': doc.id,
+              'userId': data['userId'] ?? '',
+              'userName': data['userName'] ?? '',
+              'timestamp': data['timestamp'],
+            };
+          }).toList();
+          
+          // Trier côté client par timestamp (plus récent en premier)
+          subscribersList.sort((a, b) {
+            final timestampA = a['timestamp'] as Timestamp?;
+            final timestampB = b['timestamp'] as Timestamp?;
+            if (timestampA == null || timestampB == null) return 0;
+            return timestampB.compareTo(timestampA); // Ordre décroissant
+          });
+          
+          isLoadingSubscribers = false;
+        });
+        
+        print('✅ Abonnés chargés avec succès. Count: $followersCount');
+      }
+      
+    } catch (e) {
+      print('❌ Erreur lors du chargement des abonnés: $e');
+      if (mounted) {
+        setState(() {
+          isLoadingSubscribers = false;
+        });
+      }
+    }
   }
 
   @override
@@ -221,11 +425,21 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> with Sing
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
-                      _buildStatColumn(_formatCount(following), 'Abonnements'),
-                      Container(height: 24, width: 1, color: Colors.grey.shade300),
-                      _buildStatColumn(_formatCount(followers), 'Abonnés'),
-                      Container(height: 24, width: 1, color: Colors.grey.shade300),
-                      _buildStatColumn(_formatCount(likes), 'Likes'),
+                      _buildStatColumn(_formatCount(followersCount), 'Abonnés'),
+                      // Widget de débogage pour voir les valeurs
+                      if (isLoadingSubscribers)
+                        const Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                            SizedBox(height: 4),
+                            Text('Chargement...', style: TextStyle(fontSize: 12)),
+                          ],
+                        ),
                     ],
                   ),
                   
@@ -236,11 +450,7 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> with Sing
                     children: [
                       Expanded(
                         child: ElevatedButton(
-                          onPressed: () {
-                            setState(() {
-                              isFollowing = !isFollowing;
-                            });
-                          },
+                          onPressed: _toggleSubscription,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: isFollowing ? Colors.grey.shade200 : AppColors.primary,
                             foregroundColor: isFollowing ? Colors.black : Colors.white,
@@ -288,7 +498,7 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> with Sing
                 indicatorColor: AppColors.primary,
                 tabs: const [
                   Tab(icon: Icon(Icons.grid_on), text: 'Produits'),
-                  Tab(icon: Icon(Icons.favorite_border), text: 'Likes'),
+                  Tab(icon: Icon(Icons.favorite_border), text: 'Abonnés'),
                 ],
               ),
             ),
@@ -301,7 +511,7 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> with Sing
               controller: _tabController,
               children: [
                 _buildProductsGrid(),
-                Center(child: Text('Produits aimés', style: TextStyle(fontSize: 18, color: Colors.grey.shade600))),
+                _buildSubscribersList(),
               ],
             ),
           ),
@@ -330,6 +540,113 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> with Sing
           ),
         ),
       ],
+    );
+  }
+  
+  // Widget pour afficher la liste des abonnés
+  Widget _buildSubscribersList() {
+    print('🔍 _buildSubscribersList appelé - isLoading: $isLoadingSubscribers, count: ${subscribersList.length}');
+    
+    if (isLoadingSubscribers) {
+      return const Center(
+        child: CircularProgressIndicator(),
+      );
+    }
+    
+    if (subscribersList.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.people_outline,
+              size: 64,
+              color: Colors.grey.shade400,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Aucun abonné pour le moment',
+              style: TextStyle(
+                fontSize: 18,
+                color: Colors.grey.shade600,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Les abonnés apparaîtront ici',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey.shade500,
+              ),
+            ),
+            const SizedBox(height: 16),
+            // Widget de débogage
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                'Debug: MerchantId = ${widget.merchantId}',
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: subscribersList.length,
+      itemBuilder: (context, index) {
+        final subscriber = subscribersList[index];
+        final timestamp = subscriber['timestamp'] as Timestamp?;
+        final date = timestamp?.toDate();
+        
+        return Card(
+          margin: const EdgeInsets.only(bottom: 12),
+          elevation: 2,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: ListTile(
+            leading: CircleAvatar(
+              backgroundColor: AppColors.primary,
+              child: Text(
+                subscriber['userName']?.toString().substring(0, 1).toUpperCase() ?? 'U',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            title: Text(
+              subscriber['userName']?.toString() ?? 'Utilisateur inconnu',
+              style: const TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 16,
+              ),
+            ),
+            subtitle: Text(
+              date != null 
+                ? 'Abonné le ${date.day}/${date.month}/${date.year}'
+                : 'Abonné récemment',
+              style: TextStyle(
+                color: Colors.grey.shade600,
+                fontSize: 14,
+              ),
+            ),
+            trailing: Icon(
+              Icons.check_circle,
+              color: Colors.green.shade600,
+              size: 20,
+            ),
+          ),
+        );
+      },
     );
   }
 

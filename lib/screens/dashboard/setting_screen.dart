@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:http/http.dart' as http;
 import '../../constants.dart';
 import '../../cubit/auth_cubit.dart';
 import '../../cubits/profile/profile_cubit.dart';
@@ -290,6 +291,86 @@ class _SettingScreenState extends State<SettingScreen>
     );
   }
 
+  // Méthode pour uploader l'image au serveur
+  Future<void> _uploadImageToServer(File imageFile) async {
+    try {
+      // Récupérer le token de l'utilisateur connecté
+      final authState = context.read<AuthCubit>().state;
+      if (authState is! AuthSuccess || authState.token == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Erreur: Utilisateur non connecté'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
+      // Afficher un indicateur de chargement
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Upload de l\'image en cours...'),
+          backgroundColor: Colors.green,
+        ),
+      );
+
+      // Préparer la requête multipart
+      var headers = {
+        'Authorization': 'Bearer ${authState.token}',
+      };
+      
+      var request = http.MultipartRequest(
+        'POST', 
+        Uri.parse('http://24.144.87.127:3333/users/update-profil')
+      );
+      
+      // Ajouter le fichier image
+      request.files.add(
+        await http.MultipartFile.fromPath('avatar', imageFile.path)
+      );
+      
+      // Ajouter les headers
+      request.headers.addAll(headers);
+
+      // Envoyer la requête
+      http.StreamedResponse response = await request.send();
+
+      if (response.statusCode == 200) {
+        final responseBody = await response.stream.bytesToString();
+        print('Upload réussi: $responseBody');
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Image uploadée avec succès !'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        
+        // Mettre à jour l'interface si nécessaire
+        setState(() {
+          // L'image sera mise à jour via le ProfileCubit
+        });
+        
+      } else {
+        print('Erreur upload: ${response.reasonPhrase}');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur lors de l\'upload: ${response.reasonPhrase}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      print('Erreur lors de l\'upload: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erreur lors de l\'upload: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
   void _showImageSourceDialog() {
     showModalBottomSheet(
       context: context,
@@ -309,9 +390,11 @@ class _SettingScreenState extends State<SettingScreen>
                   setState(() {
                     _selectedImage = File(image.path);
                   });
+                  // Uploader l'image au serveur
+                  await _uploadImageToServer(File(image.path));
                 }
               },
-              child: Column(
+              child: const Column(
                 mainAxisSize: MainAxisSize.min,
                 children: const [
                   Icon(Icons.photo_library, size: 40, color: AppColors.buttonColor),
@@ -328,9 +411,11 @@ class _SettingScreenState extends State<SettingScreen>
                   setState(() {
                     _selectedImage = File(photo.path);
                   });
+                  // Uploader l'image au serveur
+                  await _uploadImageToServer(File(photo.path));
                 }
               },
-              child: Column(
+              child: const Column(
                 mainAxisSize: MainAxisSize.min,
                 children: const [
                   Icon(Icons.camera_alt, size: 40, color: AppColors.buttonColor),
@@ -537,7 +622,7 @@ class _SettingScreenState extends State<SettingScreen>
                     border: Border.all(color: AppColors.buttonColor, width: 2),
                   ),
                   child: const Icon(
-                    Icons.camera_alt,
+                    Icons.edit,
                     color: AppColors.buttonColor,
                     size: 20,
                   ),

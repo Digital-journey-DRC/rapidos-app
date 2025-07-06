@@ -433,6 +433,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                                     context,
                                     MaterialPageRoute(
                                       builder: (context) => MerchantProfileScreen(
+                                        merchantId: vendeur['id'],
                                         name: name,
                                         rating: 4.5,
                                         category: products.isNotEmpty ? products[0]['description'] ?? '' : '',
@@ -444,6 +445,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                                   );
                                 },
                                 child: _buildMerchantCard(
+                                  id: vendeur['id'].toString(), // Convertir en String
                                   name: name,
                                   rating: 4.5,
                                   category: products.isNotEmpty ? products[0]['description'] ?? '' : '',
@@ -813,6 +815,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
     required String category,
     required String imagePath,
     required bool isVerified,
+    required String id,
     required List<Map<String, dynamic>> products,
   }) {
     return Builder(
@@ -822,6 +825,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
             context,
             MaterialPageRoute(
               builder: (context) => MerchantProfileScreen(
+                merchantId: id,
                 name: name,
                 rating: rating,
                 category: category,
