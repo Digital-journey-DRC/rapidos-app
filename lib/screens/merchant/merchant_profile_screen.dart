@@ -57,6 +57,7 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> with Sing
       final user = authState.user!;
       final userId = user['id']?.toString() ?? '';
       final userName = '${user['firstName'] ?? ''} ${user['lastName'] ?? ''}'.trim();
+      final userImage = user['media'] ?? 'https://www.shutterstock.com/image-vector/vector-flat-illustration-grayscale-avatar-600nw-2281862025.jpg';
       
       // ID du marchand
       final merchantId = widget.merchantId;
@@ -66,7 +67,7 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> with Sing
         await _unsubscribeFromMerchant(userId, merchantId);
       } else {
         // S'abonner
-        await _subscribeToMerchant(userId, userName, merchantId);
+        await _subscribeToMerchant(userId, userName, merchantId, userImage);
       }
       
       setState(() {
@@ -88,11 +89,12 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> with Sing
   }
   
   // Méthode pour s'abonner à un marchand
-  Future<void> _subscribeToMerchant(String userId, String userName, String merchantId) async {
+  Future<void> _subscribeToMerchant(String userId, String userName, String merchantId, String userImage) async {
     try {
       await FirebaseFirestore.instance.collection('abonnements').add({
         'userId': userId,
         'userName': userName,
+        'userImage': userImage,
         'merchantId': merchantId, // Vrai ID du marchand
         'merchantName': widget.name,
         'merchantImage': widget.imagePath,
@@ -216,6 +218,7 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> with Sing
               'id': doc.id,
               'userId': data['userId'] ?? '',
               'userName': data['userName'] ?? '',
+              'userImage': data['userImage'] ?? '',
               'timestamp': data['timestamp'],
             };
           }).toList();
@@ -615,13 +618,14 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> with Sing
           child: ListTile(
             leading: CircleAvatar(
               backgroundColor: AppColors.primary,
-              child: Text(
-                subscriber['userName']?.toString().substring(0, 1).toUpperCase() ?? 'U',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
+              backgroundImage: NetworkImage(subscriber['userImage'] ?? 'https://www.shutterstock.com/image-vector/vector-flat-illustration-grayscale-avatar-600nw-2281862025.jpg'),
+              // child: Text(
+              //   subscriber['userName']?.toString().substring(0, 1).toUpperCase() ?? 'U',
+              //   style: const TextStyle(
+              //     color: Colors.white,
+              //     fontWeight: FontWeight.bold,
+              //   ),
+              // ),
             ),
             title: Text(
               subscriber['userName']?.toString() ?? 'Utilisateur inconnu',
