@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -48,27 +49,91 @@ class _SettingScreenState extends State<SettingScreen>
 
     // Get current user data from AuthCubit
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadUserData();
+      
+      // Écouter les changements de l'AuthCubit
+      context.read<AuthCubit>().stream.listen((authState) {
+        if (authState is AuthSuccess && authState.user != null) {
+          print('🔄 AuthCubit a changé, rechargement des données utilisateur');
+          _loadUserData();
+        }
+      });
+    });
+  }
+
+  // Méthode pour charger les données utilisateur
+  void _loadUserData() {
+    final authState = context.read<AuthCubit>().state;
+    if (authState is AuthSuccess && authState.user != null) {
+      print('🔄 Chargement des données utilisateur: ${authState.user}');
+      
+      // Mettre à jour les contrôleurs avec les données actuelles
+      _firstNameController.text = authState.user!['firstName'] ?? '';
+      _lastNameController.text = authState.user!['lastName'] ?? '';
+      _phoneController.text = authState.user!['phone'] ?? '';
+
+      // Injecter l'AuthCubit dans le ProfileCubit
+      _profileCubit.setAuthCubit(context.read<AuthCubit>());
+
+      // Set the correct number of tabs based on user role
+      final isProprietaire = authState.user!['role'] == 'proprietaire';
+      
+      // Only create TabController for proprietaire users
+      if (isProprietaire) {
+        _tabController = TabController(
+          length: 2,
+          vsync: this,
+        );
+        
+        // Load user financial data only for proprietaire
+        _loadUserFinancialData(authState.user!['id'], authState.token!);
+      }
+      
+      // Forcer la mise à jour de l'interface utilisateur
+      setState(() {});
+    }
+  }
+
+    Future<void> _fetchUserMedia() async {
+    try {
+      // Récupérer l'utilisateur connecté
       final authState = context.read<AuthCubit>().state;
       if (authState is AuthSuccess && authState.user != null) {
-        _firstNameController.text = authState.user!['firstName'] ?? '';
-        _lastNameController.text = authState.user!['lastName'] ?? '';
-        _phoneController.text = authState.user!['phone'] ?? '';
-
-        // Set the correct number of tabs based on user role
-        final isProprietaire = authState.user!['role'] == 'proprietaire';
+        final userId = authState.user!['id']?.toString() ?? '';
+        final token = authState.token;
         
-        // Only create TabController for proprietaire users
-        if (isProprietaire) {
-          _tabController = TabController(
-            length: 2,
-            vsync: this,
+        if (userId.isNotEmpty && token != null) {
+          print('🔄 Récupération des médias pour l\'utilisateur: $userId');
+          
+          // Requête pour récupérer les médias de l'utilisateur
+          final response = await http.get(
+            Uri.parse('http://24.144.87.127:3333/users/me'),
+            headers: {
+              'Authorization': 'Bearer $token',
+              'Content-Type': 'application/json',
+            },
           );
           
-          // Load user financial data only for proprietaire
-          _loadUserFinancialData(authState.user!['id'], authState.token!);
+          if (response.statusCode == 200) {
+            final data = jsonDecode(response.body);
+            print('✅ Médias récupérés: ${data['data']['media']}');
+            
+            // Mettre à jour les données utilisateur avec les médias
+            if (data['data']['media'] != null) {
+              final updatedUser = Map<String, dynamic>.from(authState.user!);
+              updatedUser['media'] = data['data']['media'];
+              
+              // Mettre à jour l'état de l'authentification
+              context.read<AuthCubit>().updateUser(updatedUser, token);
+            }
+          } else {
+            print('❌ Erreur lors de la récupération des médias: ${response.statusCode}');
+          }
         }
       }
-    });
+    } catch (e) {
+      print('❌ Erreur lors de la récupération des médias: $e');
+    }
   }
 
   @override
@@ -338,6 +403,7 @@ class _SettingScreenState extends State<SettingScreen>
       if (response.statusCode == 200) {
         final responseBody = await response.stream.bytesToString();
         print('Upload réussi: $responseBody');
+        _fetchUserMedia();
         
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -567,7 +633,7 @@ class _SettingScreenState extends State<SettingScreen>
   }
 
   Widget _buildProfileHeader(Map<String, dynamic> user) {
-    String profileImage = user['profileImage'] ?? '';
+    String profileImage = user['media'] ?? '';
     String fullName = '${user['firstName'] ?? ''} ${user['lastName'] ?? ''}';
     bool isProprietaire = user['role'] == 'proprietaire';
     return Container(
@@ -1189,28 +1255,81 @@ class _SettingScreenState extends State<SettingScreen>
   }
 
   Future<void> _updateProfile() async {
+    print('🔄 Début de la mise à jour du profil');
+    
     if (_formKey.currentState!.validate()) {
+      print('✅ Validation du formulaire réussie');
+      
       final authState = context.read<AuthCubit>().state;
       if (authState is AuthSuccess && authState.user != null) {
-        // Conserver les valeurs à mettre à jour pour confirmer qu'elles sont correctement sauvegardées
-        final String firstName = _firstNameController.text;
-        final String lastName = _lastNameController.text;
-        final String phone = _phoneController.text;
+        print('✅ Utilisateur authentifié trouvé');
         
-        // Appeler la mise à jour du profil
-        await _profileCubit.updateProfile(
-          userId: authState.user!['id'],
-          token: authState.token!,
-          firstName: firstName,
-          lastName: lastName,
-          phone: phone,
+        // Récupérer les valeurs des inputs
+        final String firstName = _firstNameController.text.trim();
+        final String lastName = _lastNameController.text.trim();
+        final String phone = _phoneController.text.trim();
+        final String email = authState.user!['email'] ?? ''; // Récupérer l'email depuis l'état actuel
+        final String userId = authState.user!['id'].toString();
+        final String token = authState.token!;
+        
+        print('📝 Données du formulaire:');
+        print('  - userId: $userId');
+        print('  - firstName: $firstName');
+        print('  - lastName: $lastName');
+        print('  - email: $email');
+        print('  - phone: $phone');
+        print('  - token: ${token.substring(0, 20)}...');
+        
+        try {
+          // Appeler la mise à jour du profil
+          print('🔄 Appel de _profileCubit.updateProfile...');
+          await _profileCubit.updateProfile(
+            userId: userId,
+            token: token,
+            firstName: firstName,
+            lastName: lastName,
+            email: email,
+            phone: phone,
+          );
+          print('✅ Mise à jour du profil terminée avec succès');
+          
+          // Recharger les données utilisateur pour refléter les changements
+          _loadUserData();
+          
+          // Afficher un message de succès
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Profil mis à jour avec succès'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          
+        } catch (e) {
+          print('❌ Erreur lors de la mise à jour du profil: $e');
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Erreur lors de la mise à jour: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      } else {
+        print('❌ Utilisateur non authentifié');
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Erreur: Utilisateur non connecté'),
+            backgroundColor: Colors.red,
+          ),
         );
-        
-        // Mettre à jour directement l'UI avec les nouvelles valeurs en attendant la confirmation API
-        setState(() {
-          // Les données seront officiellement mises à jour via le listener du ProfileCubit
-        });
       }
+    } else {
+      print('❌ Validation du formulaire échouée');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Veuillez corriger les erreurs dans le formulaire'),
+          backgroundColor: Colors.orange,
+        ),
+      );
     }
   }
 }

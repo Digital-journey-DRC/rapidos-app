@@ -18,6 +18,8 @@ import 'package:geolocator/geolocator.dart';
 import 'package:immo/cubit/order_cubit.dart';
 import 'package:immo/cubit/cart_cubit.dart';
 import 'package:immo/screens/tracking_map_page.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 class NewHomeScreen extends StatefulWidget {
   const NewHomeScreen({Key? key}) : super(key: key);
@@ -39,6 +41,49 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
     context.read<CategoryCubit>().fetchCategories();
     context.read<MerchantCubit>().fetchMerchants(context);
     _fetchOrdersAndLocation();
+    _fetchUserMedia();
+  }
+
+  Future<void> _fetchUserMedia() async {
+    try {
+      // Récupérer l'utilisateur connecté
+      final authState = context.read<AuthCubit>().state;
+      if (authState is AuthSuccess && authState.user != null) {
+        final userId = authState.user!['id']?.toString() ?? '';
+        final token = authState.token;
+        
+        if (userId.isNotEmpty && token != null) {
+          print('🔄 Récupération des médias pour l\'utilisateur: $userId');
+          
+          // Requête pour récupérer les médias de l'utilisateur
+          final response = await http.get(
+            Uri.parse('http://24.144.87.127:3333/users/me'),
+            headers: {
+              'Authorization': 'Bearer $token',
+              'Content-Type': 'application/json',
+            },
+          );
+          
+          if (response.statusCode == 200) {
+            final data = jsonDecode(response.body);
+            print('✅ Médias récupérés: ${data['data']['media']}');
+            
+            // Mettre à jour les données utilisateur avec les médias
+            if (data['data']['media'] != null) {
+              final updatedUser = Map<String, dynamic>.from(authState.user!);
+              updatedUser['media'] = data['data']['media'];
+              
+              // Mettre à jour l'état de l'authentification
+              context.read<AuthCubit>().updateUser(updatedUser, token);
+            }
+          } else {
+            print('❌ Erreur lors de la récupération des médias: ${response.statusCode}');
+          }
+        }
+      }
+    } catch (e) {
+      print('❌ Erreur lors de la récupération des médias: $e');
+    }
   }
 
   Future<void> _fetchOrdersAndLocation() async {
@@ -99,7 +144,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
               builder: (context, state) {
                 if (state is AuthSuccess &&
                     state.user != null &&
-                    state.user!['profileImage'] != null) {
+                    state.user!['media'] != null) {
                   return GestureDetector(
                     onTap: () {
                       Navigator.push(
@@ -115,7 +160,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                         radius: 17,
                         backgroundColor: AppColors.white,
                         backgroundImage:
-                            NetworkImage(state.user!['profileImage']),
+                            NetworkImage(state.user!['media']),
                       ),
                     ),
                   );
