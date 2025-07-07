@@ -315,7 +315,7 @@ class _HomeLivreurScreenState extends State<HomeLivreurScreen> {
             padding: const EdgeInsets.only(right: 12),
             child: BlocBuilder<AuthCubit, AuthState>(
               builder: (context, state) {
-                if (state is AuthSuccess && state.user != null && state.user!['profileImage'] != null) {
+                if (state is AuthSuccess && state.user != null && state.user!['media'] != null) {
                   return GestureDetector(
                     onTap: () {
                       Navigator.push(
@@ -329,7 +329,7 @@ class _HomeLivreurScreenState extends State<HomeLivreurScreen> {
                       child: CircleAvatar(
                         radius: 17,
                         backgroundColor: AppColors.white,
-                        backgroundImage: NetworkImage(state.user!['profileImage']),
+                        backgroundImage: NetworkImage(state.user!['media']),
                       ),
                     ),
                   );

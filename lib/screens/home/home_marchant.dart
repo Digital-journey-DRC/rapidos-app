@@ -448,7 +448,7 @@ void saveCommande() async {
             padding: const EdgeInsets.only(right: 12),
             child: BlocBuilder<AuthCubit, AuthState>(
               builder: (context, state) {
-                if (state is AuthSuccess && state.user != null && state.user!['profileImage'] != null) {
+                if (state is AuthSuccess && state.user != null && state.user!['media'] != null) {
                   return GestureDetector(
                     onTap: () {
                       Navigator.push(
@@ -462,7 +462,7 @@ void saveCommande() async {
                       child: CircleAvatar(
                         radius: 17,
                         backgroundColor: AppColors.white,
-                        backgroundImage: NetworkImage(state.user!['profileImage']),
+                        backgroundImage: NetworkImage(state.user!['media']),
                       ),
                     ),
                   );
