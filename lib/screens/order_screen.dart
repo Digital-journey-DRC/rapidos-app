@@ -4,7 +4,6 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:immo/constants.dart';
 import 'package:immo/cubit/auth_cubit.dart';
 import 'package:immo/cubit/order_cubit.dart';
@@ -60,8 +59,6 @@ class _CameraColisScreenState extends State<CameraColisScreen> {
     widget.onPictureTaken(file.path);
     Navigator.pop(context);
   }
-
-  
 
   @override
   Widget build(BuildContext context) {
@@ -547,7 +544,7 @@ class _OrderScreenState extends State<OrderScreen> {
             : null,
         backgroundColor: Colors.white,
         elevation: 0,
-        title: const Text('Commandes', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),),
+        title: const Text('Commandes'),
         centerTitle: true,
       ),
       body: Column(
@@ -556,30 +553,21 @@ class _OrderScreenState extends State<OrderScreen> {
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(16),
-                child: SizedBox(
-                  height: MediaQuery.of(context).size.height - 200,
-                  child: _buildLivreurOrders(),
-                ),
+                child: _buildLivreurOrders(),
               ),
             )
           else if (authState.user!['role'] == 'vendeur')
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(16),
-                child: SizedBox(
-                  height: MediaQuery.of(context).size.height - 200,
-                  child: _buildVendeurOrders(),
-                ),
+                child: _buildVendeurOrders(),
               ),
             )
           else
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(16),
-                child: SizedBox(
-                  height: MediaQuery.of(context).size.height - 200,
-                  child: _buildClientOrders(),
-                ),
+                child: _buildClientOrders(),
               ),
             ),
         ],
@@ -596,597 +584,441 @@ class _OrderScreenState extends State<OrderScreen> {
     }
 
     final userId = authState.user!['id']?.toString() ?? '';
-    String selectedStatus = 'Tous';
 
-    return StatefulBuilder(
-      builder: (context, setState) {
-        return Column(
-          children: [
-            // Filtre par statut pour le client
-            Container(
-              // margin: const EdgeInsets.all(16),
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.06),
-                    blurRadius: 10,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: DropdownButtonFormField<String>(
-                value: selectedStatus,
-                decoration: const InputDecoration(
-                  labelText: 'Filtrer par statut',
-                  border: InputBorder.none,
-                  prefixIcon: Icon(Icons.filter_list, color: AppColors.primary),
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('carts')
+          .where('idClient', isEqualTo: userId)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          print('Erreur Firestore: ${snapshot.error}');
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.error_outline, size: 50, color: Colors.red),
+                const SizedBox(height: 16),
+                Text(
+                  'Erreur: ${snapshot.error}',
+                  style: const TextStyle(color: Colors.red),
+                  textAlign: TextAlign.center,
                 ),
-                items: [
-                  'Tous',
-                  'pending',
-                  'colis en cours de préparation',
-                  'prêt à expédier',
-                  'en route pour livraison',
-                  'delivered',
-                  'cancelled',
-                  'rejected',
-                ].map((String status) {
-                  return DropdownMenuItem<String>(
-                    value: status,
-                    child: Text(
-                      status == 'Tous' ? 'Tous les statuts' : _translateStatus(status),
-                      style: TextStyle(
-                        color: status == 'Tous' ? Colors.grey : _statusColor(status),
-                      ),
-                    ),
-                  );
-                }).toList(),
-                onChanged: (String? newValue) {
-                  setState(() {
-                    selectedStatus = newValue ?? 'Tous';
-                  });
-                },
-              ),
+              ],
             ),
-            const SizedBox(height: 16),
-            // Liste des commandes
-            Expanded(
-              child: StreamBuilder<QuerySnapshot>(
-                stream: FirebaseFirestore.instance
-                    .collection('carts')
-                    .where('idClient', isEqualTo: userId)
-                    .snapshots(),
-                builder: (context, snapshot) {
-                  if (snapshot.hasError) {
-                    print('Erreur Firestore: ${snapshot.error}');
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(Icons.error_outline, size: 50, color: Colors.red),
-                          const SizedBox(height: 16),
-                          Text(
-                            'Erreur: ${snapshot.error}',
-                            style: const TextStyle(color: Colors.red),
-                            textAlign: TextAlign.center,
-                          ),
-                        ],
+          );
+        }
+
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return _buildLoadingShimmer();
+        }
+
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.inbox,
+                    size: 80, color: AppColors.buttonColor.withOpacity(0.3)),
+                const SizedBox(height: 18),
+                const Text(
+                  'Aucune commande trouvée',
+                  style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.primary),
+                ),
+              ],
+            ),
+          );
+        }
+
+        // Trier les documents côté client
+        final sortedDocs = snapshot.data!.docs.toList()
+          ..sort((a, b) {
+            final aData = a.data() as Map<String, dynamic>;
+            final bData = b.data() as Map<String, dynamic>;
+            final aTimestamp = aData['timestamp'] as Timestamp?;
+            final bTimestamp = bData['timestamp'] as Timestamp?;
+
+            if (aTimestamp == null && bTimestamp == null) return 0;
+            if (aTimestamp == null) return 1;
+            if (bTimestamp == null) return -1;
+
+            return bTimestamp.compareTo(aTimestamp); // Tri décroissant
+          });
+
+        return Column(
+          children: sortedDocs.map((doc) {
+            try {
+              final data = doc.data() as Map<String, dynamic>;
+
+              // Vérification et conversion sécurisée des items
+              List<Map<String, dynamic>> items = [];
+              if (data['items'] != null) {
+                if (data['items'] is List) {
+                  items = List<Map<String, dynamic>>.from(
+                    (data['items'] as List).map((item) {
+                      if (item is Map) {
+                        return Map<String, dynamic>.from(item);
+                      }
+                      return <String, dynamic>{};
+                    }),
+                  );
+                }
+              }
+
+              final firstItem = items.isNotEmpty ? items[0] : null;
+              final status = data['status']?.toString() ?? 'pending';
+              final timestamp = data['timestamp'] as Timestamp?;
+              final shortCode = data['shortCode']??"";
+              final adresse =
+                  data['adresse']?.toString() ?? 'Adresse non spécifiée';
+
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(18),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => OrderDetailsScreen(
+                          orderData: data,
+                          orderId: doc.id,
+                        ),
                       ),
                     );
-                  }
-
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return _buildLoadingShimmer();
-                  }
-
-                  if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.inbox,
-                              size: 80, color: AppColors.buttonColor.withOpacity(0.3)),
-                          const SizedBox(height: 18),
-                          const Text(
-                            'Aucune commande trouvée',
-                            style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.primary),
-                          ),
-                        ],
-                      ),
-                    );
-                  }
-
-                  // Trier et filtrer les documents côté client
-                  var filteredDocs = snapshot.data!.docs.toList()
-                    ..sort((a, b) {
-                      final aData = a.data() as Map<String, dynamic>;
-                      final bData = b.data() as Map<String, dynamic>;
-                      final aTimestamp = aData['timestamp'] as Timestamp?;
-                      final bTimestamp = bData['timestamp'] as Timestamp?;
-
-                      if (aTimestamp == null && bTimestamp == null) return 0;
-                      if (aTimestamp == null) return 1;
-                      if (bTimestamp == null) return -1;
-
-                      return bTimestamp.compareTo(aTimestamp); // Tri décroissant
-                    });
-
-                  // Appliquer le filtre par statut
-                  if (selectedStatus != 'Tous') {
-                    filteredDocs = filteredDocs.where((doc) {
-                      final data = doc.data() as Map<String, dynamic>;
-                      final status = data['status']?.toString() ?? 'pending';
-                      return status == selectedStatus;
-                    }).toList();
-                  }
-
-                  if (filteredDocs.isEmpty) {
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.inbox,
-                              size: 80, color: AppColors.buttonColor.withOpacity(0.3)),
-                          const SizedBox(height: 18),
-                          Text(
-                            selectedStatus == 'Tous' 
-                                ? 'Aucune commande trouvée'
-                                : 'Aucune commande avec le statut "${_translateStatus(selectedStatus)}"',
-                            style: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.primary),
-                          ),
-                        ],
-                      ),
-                    );
-                  }
-
-                  return ListView.separated(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                    separatorBuilder: (_, __) => const SizedBox(height: 8),
-                    itemCount: filteredDocs.length,
-                    shrinkWrap: true,
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    itemBuilder: (context, index) {
-                      try {
-                        final doc = filteredDocs[index];
-                        final data = doc.data() as Map<String, dynamic>;
-
-                        // Vérification et conversion sécurisée des items
-                        List<Map<String, dynamic>> items = [];
-                        if (data['items'] != null) {
-                          if (data['items'] is List) {
-                            items = List<Map<String, dynamic>>.from(
-                              (data['items'] as List).map((item) {
-                                if (item is Map) {
-                                  return Map<String, dynamic>.from(item);
-                                }
-                                return <String, dynamic>{};
-                              }),
-                            );
-                          }
-                        }
-
-                        final firstItem = items.isNotEmpty ? items[0] : null;
-                        final status = data['status']?.toString() ?? 'pending';
-                        final timestamp = data['timestamp'] as Timestamp?;
-                        final shortCode = data['shortCode']??"";
-                        final adresse =
-                            data['adresse']?.toString() ?? 'Adresse non spécifiée';
-
-                        return InkWell(
+                  },
+                  child: Stack(
+                    children: [
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white,
                           borderRadius: BorderRadius.circular(18),
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => OrderDetailsScreen(
-                                  orderData: data,
-                                  orderId: doc.id,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.06),
+                              blurRadius: 10,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          children: [
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Timeline
+                                Container(
+                                  width: 6,
+                                  height: 110,
+                                  margin: const EdgeInsets.only(
+                                      right: 10, top: 10, bottom: 10),
+                                  decoration: BoxDecoration(
+                                    color: _statusColor(status),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
                                 ),
-                              ),
-                            );
-                          },
-                          child: Stack(
-                            children: [
-                              Container(
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(18),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withOpacity(0.06),
-                                      blurRadius: 10,
-                                      offset: const Offset(0, 2),
-                                    ),
-                                  ],
+                                // Image produit
+                                Padding(
+                                  padding: const EdgeInsets.only(
+                                      top: 16, left: 0, right: 10),
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(14),
+                                    child: firstItem != null &&
+                                            firstItem['imagePath'] != null
+                                        ? Image.network(
+                                            firstItem['imagePath'],
+                                            width: 70,
+                                            height: 70,
+                                            fit: BoxFit.cover,
+                                            errorBuilder:
+                                                (context, error, stackTrace) {
+                                              print(
+                                                  'Erreur de chargement image: $error');
+                                              return Container(
+                                                width: 70,
+                                                height: 70,
+                                                color: Colors.grey.shade200,
+                                                child: const Icon(Icons.image,
+                                                    color: Colors.grey),
+                                              );
+                                            },
+                                          )
+                                        : Container(
+                                            width: 70,
+                                            height: 70,
+                                            color: Colors.grey.shade200,
+                                            child: const Icon(Icons.image,
+                                                color: Colors.grey),
+                                          ),
+                                  ),
                                 ),
-                                child: Column(
-                                  children: [
-                                    Row(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                // Détails commande
+                                Expanded(
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                        vertical: 16, horizontal: 0),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
-                                        // Timeline
-                                        Container(
-                                          width: 6,
-                                          height: 110,
-                                          margin: const EdgeInsets.only(
-                                              right: 10, top: 10, bottom: 10),
-                                          decoration: BoxDecoration(
-                                            color: _statusColor(status),
-                                            borderRadius: BorderRadius.circular(8),
-                                          ),
-                                        ),
-                                        // Image produit
-                                        Padding(
-                                          padding: const EdgeInsets.only(
-                                              top: 16, left: 0, right: 10),
-                                          child: ClipRRect(
-                                            borderRadius: BorderRadius.circular(14),
-                                            child: firstItem != null &&
-                                                    firstItem['imagePath'] != null
-                                                ? Image.network(
-                                                    firstItem['imagePath'],
-                                                    width: 70,
-                                                    height: 70,
-                                                    fit: BoxFit.cover,
-                                                    errorBuilder:
-                                                        (context, error, stackTrace) {
-                                                      print(
-                                                          'Erreur de chargement image: $error');
-                                                      return Container(
-                                                        width: 70,
-                                                        height: 70,
-                                                        color: Colors.grey.shade200,
-                                                        child: const Icon(Icons.image,
-                                                            color: Colors.grey),
-                                                      );
-                                                    },
-                                                  )
-                                                : Container(
-                                                    width: 70,
-                                                    height: 70,
-                                                    color: Colors.grey.shade200,
-                                                    child: const Icon(Icons.image,
-                                                        color: Colors.grey),
-                                                  ),
-                                          ),
-                                        ),
-                                        // Détails commande
-                                        Expanded(
-                                          child: Padding(
-                                            padding: const EdgeInsets.symmetric(
-                                                vertical: 16, horizontal: 0),
-                                            child: Column(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
-                                              children: [
-                                                Row(
-                                                  children: [
-                                                    Expanded(
-                                                      child: Text(
-                                                        data['items'] != null &&
-                                                                (data['items'] as List).isNotEmpty
-                                                            ? (data['items'] as List)[0]['name'] ??
-                                                                'Produit'
-                                                            : 'Produit',
-                                                        style: const TextStyle(
-                                                          fontWeight: FontWeight.bold,
-                                                          fontSize: 16,
-                                                        ),
-                                                        maxLines: 1,
-                                                        overflow: TextOverflow.ellipsis,
-                                                      ),
-                                                    ),
-                                                    const SizedBox(width: 8),
-                                                    Container(
-                                                      padding:
-                                                          const EdgeInsets.symmetric(
-                                                              horizontal: 12,
-                                                              vertical: 4),
-                                                      margin: const EdgeInsets.only(
-                                                          right: 8),
-                                                      decoration: BoxDecoration(
-                                                        color: _statusColor(status)
-                                                            .withOpacity(0.1),
-                                                        borderRadius:
-                                                            BorderRadius.circular(8),
-                                                      ),
-                                                      child: Text(
-                                                        _translateStatus(status),
-                                                        style: TextStyle(
-                                                          color: _statusColor(status),
-                                                          fontSize: 12,
-                                                          fontWeight: FontWeight.bold,
-                                                        ),
-                                                        textAlign: TextAlign.center,
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                                const SizedBox(height: 8),
-                                                Text(
-                                                  adresse,
-                                                  style: TextStyle(
-                                                    color: Colors.grey.shade600,
-                                                    fontSize: 14,
-                                                  ),
-                                                  maxLines: 2,
-                                                  overflow: TextOverflow.ellipsis,
-                                                ),
-                                                const SizedBox(height: 12),
-                                                Row(
-                                                  children: [
-                                                    const Icon(Icons.calendar_today,
-                                                        size: 14,
-                                                        color: AppColors.primary),
-                                                    const SizedBox(width: 4),
-                                                    Text(
-                                                      _formatDate(timestamp),
-                                                      style:
-                                                          const TextStyle(fontSize: 13),
-                                                    ),
-                                                    const SizedBox(width: 12),
-                                                    const Icon(Icons.shopping_cart,
-                                                        size: 14,
-                                                        color: AppColors.primary),
-                                                    const SizedBox(width: 4),
-                                                    Text(
-                                                      '${(data['items'] as List?)?.length ?? 0} article${((data['items'] as List?)?.length ?? 0) > 1 ? 's' : ''}',
-                                                      style: const TextStyle(fontSize: 13),
-                                                    ),
-                                                  ],
-                                                ),
-                                                const SizedBox(height: 20,),
-                                                Row(
-                                                  children: [
-                                                    const Text("Code commande: ", ),
-                                                    const SizedBox(width: 10,),
-                                                    Text(shortCode,style:
-                                                          const TextStyle(fontSize: 20, color: AppColors.primary),),
-                                                  ],
-                                                )
-                                                
-                                              ],
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    if (data['packagePhoto'] != null &&
-                                        (status.toLowerCase() == 'prêt à expédier' ||
-                                            status.toLowerCase() ==
-                                                'en route pour livraison' ||
-                                            status.toLowerCase() == 'delivered')) ...[
-                                      Padding(
-                                        padding: const EdgeInsets.all(16.0),
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                        Row(
                                           children: [
-                                            const Text(
-                                              'Photo du colis:',
-                                              style: TextStyle(
-                                                fontSize: 14,
-                                                fontWeight: FontWeight.bold,
-                                                color: AppColors.primary,
+                                            Expanded(
+                                              child: Text(
+                                                firstItem?['name'] ?? 'Produit',
+                                                style: const TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 16,
+                                                ),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
                                               ),
                                             ),
-                                            const SizedBox(height: 8),
-                                            GestureDetector(
-                                              onTap: () {
-                                                showDialog(
-                                                  context: context,
-                                                  builder: (BuildContext context) {
-                                                    return Dialog(
-                                                      insetPadding: EdgeInsets.zero,
-                                                      child: Stack(
-                                                        children: [
-                                                          InteractiveViewer(
-                                                            minScale: 0.5,
-                                                            maxScale: 4.0,
-                                                            child: Image.network(
-                                                              data['packagePhoto'],
-                                                              fit: BoxFit.contain,
-                                                              width:
-                                                                  MediaQuery.of(context)
-                                                                      .size
-                                                                      .width,
-                                                              height:
-                                                                  MediaQuery.of(context)
-                                                                      .size
-                                                                      .height,
-                                                            ),
-                                                          ),
-                                                          Positioned(
-                                                            top: 10,
-                                                            right: 10,
-                                                            child: IconButton(
-                                                              icon: const Icon(Icons.close,
-                                                                  color: Colors.white),
-                                                              onPressed: () =>
-                                                                  Navigator.pop(context),
-                                                            ),
-                                                          ),
-                                                        ],
-                                                      ),
-                                                    );
-                                                  },
-                                                );
-                                              },
-                                              child: ClipRRect(
-                                                borderRadius: BorderRadius.circular(8),
-                                                child: Image.network(
-                                                  data['packagePhoto'],
-                                                  width: double.infinity,
-                                                  height: 150,
-                                                  fit: BoxFit.cover,
-                                                  errorBuilder: (context, error, stackTrace) {
-                                                    return Container(
-                                                      width: double.infinity,
-                                                      height: 150,
-                                                      color: Colors.grey.shade200,
-                                                      child: const Icon(Icons.image,
-                                                          color: Colors.grey),
-                                                    );
-                                                  },
+                                            const SizedBox(width: 8),
+                                            Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      horizontal: 12,
+                                                      vertical: 4),
+                                              margin: const EdgeInsets.only(
+                                                  right: 8),
+                                              decoration: BoxDecoration(
+                                                color: _statusColor(status)
+                                                    .withOpacity(0.1),
+                                                borderRadius:
+                                                    BorderRadius.circular(8),
+                                              ),
+                                              child: Text(
+                                                _translateStatus(status),
+                                                style: TextStyle(
+                                                  color: _statusColor(status),
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.bold,
                                                 ),
+                                                textAlign: TextAlign.center,
                                               ),
                                             ),
                                           ],
                                         ),
-                                      ),
-                                    ],
-                                    if (status.toLowerCase() == 'pending')
-                                      Padding(
-                                        padding: const EdgeInsets.all(8.0),
-                                        child: ElevatedButton(
-                                          onPressed: () async {
-                                            try {
-                                              await FirebaseFirestore.instance
-                                                  .collection('carts')
-                                                  .doc(doc.id)
-                                                  .update({
-                                                'status': 'cancelled',
-                                                'timestamp':
-                                                    FieldValue.serverTimestamp(),
-                                              });
-
-                                              if (mounted) {
-                                                ScaffoldMessenger.of(context)
-                                                    .showSnackBar(
-                                                  const SnackBar(
-                                                    content: Text(
-                                                        'Commande annulée avec succès'),
-                                                    backgroundColor: Colors.green,
-                                                  ),
-                                                );
-                                              }
-                                            } catch (e) {
-                                              if (mounted) {
-                                                ScaffoldMessenger.of(context)
-                                                    .showSnackBar(
-                                                  SnackBar(
-                                                    content: Text('Erreur: $e'),
-                                                    backgroundColor: Colors.red,
-                                                  ),
-                                                );
-                                              }
-                                            }
-                                          },
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: Colors.red,
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius: BorderRadius.circular(8),
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          adresse,
+                                          style: TextStyle(
+                                            color: Colors.grey.shade600,
+                                            fontSize: 14,
+                                          ),
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        const SizedBox(height: 12),
+                                        Row(
+                                          children: [
+                                            const Icon(Icons.calendar_today,
+                                                size: 14,
+                                                color: AppColors.primary),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              _formatDate(timestamp),
+                                              style:
+                                                  const TextStyle(fontSize: 13),
                                             ),
-                                            minimumSize:
-                                                const Size(double.infinity, 40),
-                                          ),
-                                          child: const Text(
-                                            'Annuler la commande',
-                                            style: TextStyle(color: Colors.white),
-                                          ),
+                                            const SizedBox(width: 12),
+                                            const Icon(Icons.shopping_cart,
+                                                size: 14,
+                                                color: AppColors.primary),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              '${items.length} article${items.length > 1 ? 's' : ''}',
+                                              style:
+                                                  const TextStyle(fontSize: 13),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 20,),
+                                        Row(
+                                          children: [
+                                            const Text("Code commande: ", ),
+                                            const SizedBox(width: 10,),
+                                            Text(shortCode,style:
+                                                  const TextStyle(fontSize: 20, color: AppColors.primary),),
+                                          ],
+                                        )
+                                        
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            if (data['packagePhoto'] != null &&
+                                (status.toLowerCase() == 'prêt à expédier' ||
+                                    status.toLowerCase() ==
+                                        'en route pour livraison' ||
+                                    status.toLowerCase() == 'delivered')) ...[
+                              Padding(
+                                padding: const EdgeInsets.all(16.0),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'Photo du colis:',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.bold,
+                                        color: AppColors.primary,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    GestureDetector(
+                                      onTap: () {
+                                        showDialog(
+                                          context: context,
+                                          builder: (BuildContext context) {
+                                            return Dialog(
+                                              insetPadding: EdgeInsets.zero,
+                                              child: Stack(
+                                                children: [
+                                                  InteractiveViewer(
+                                                    minScale: 0.5,
+                                                    maxScale: 4.0,
+                                                    child: Image.network(
+                                                      data['packagePhoto'],
+                                                      fit: BoxFit.contain,
+                                                      width:
+                                                          MediaQuery.of(context)
+                                                              .size
+                                                              .width,
+                                                      height:
+                                                          MediaQuery.of(context)
+                                                              .size
+                                                              .height,
+                                                    ),
+                                                  ),
+                                                  Positioned(
+                                                    top: 10,
+                                                    right: 10,
+                                                    child: IconButton(
+                                                      icon: const Icon(
+                                                          Icons.close,
+                                                          color: Colors.white),
+                                                      onPressed: () =>
+                                                          Navigator.pop(
+                                                              context),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            );
+                                          },
+                                        );
+                                      },
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(8),
+                                        child: Image.network(
+                                          data['packagePhoto'],
+                                          width: double.infinity,
+                                          height: 150,
+                                          fit: BoxFit.cover,
+                                          errorBuilder:
+                                              (context, error, stackTrace) {
+                                            return Container(
+                                              width: double.infinity,
+                                              height: 150,
+                                              color: Colors.grey.shade200,
+                                              child: const Icon(Icons.image,
+                                                  color: Colors.grey),
+                                            );
+                                          },
                                         ),
                                       ),
+                                    ),
                                   ],
                                 ),
                               ),
                             ],
-                          ),
-                        );
-                      } catch (e) {
-                        print('Erreur lors de l\'affichage de la commande: $e');
-                        return Container(
-                          padding: const EdgeInsets.all(16),
-                          margin: const EdgeInsets.only(bottom: 10),
-                          decoration: BoxDecoration(
-                            color: Colors.red.shade50,
-                            borderRadius: BorderRadius.circular(18),
-                          ),
-                          child: const Text(
-                            'Erreur lors de l\'affichage de la commande',
-                            style: TextStyle(color: Colors.red),
-                          ),
-                        );
-                      }
-                    },
-                  );
-                },
-              ),
-            ),
-          ],
+                            if (status.toLowerCase() == 'pending')
+                              Padding(
+                                padding: const EdgeInsets.all(8.0),
+                                child: ElevatedButton(
+                                  onPressed: () async {
+                                    try {
+                                      await FirebaseFirestore.instance
+                                          .collection('carts')
+                                          .doc(doc.id)
+                                          .update({
+                                        'status': 'cancelled',
+                                        'timestamp':
+                                            FieldValue.serverTimestamp(),
+                                      });
+
+                                      if (mounted) {
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(
+                                          const SnackBar(
+                                            content: Text(
+                                                'Commande annulée avec succès'),
+                                            backgroundColor: Colors.green,
+                                          ),
+                                        );
+                                      }
+                                    } catch (e) {
+                                      if (mounted) {
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(
+                                          SnackBar(
+                                            content: Text('Erreur: $e'),
+                                            backgroundColor: Colors.red,
+                                          ),
+                                        );
+                                      }
+                                    }
+                                  },
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.red,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    minimumSize:
+                                        const Size(double.infinity, 40),
+                                  ),
+                                  child: const Text(
+                                    'Annuler la commande',
+                                    style: TextStyle(color: Colors.white),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            } catch (e) {
+              print('Erreur lors de l\'affichage de la commande: $e');
+              return Container(
+                padding: const EdgeInsets.all(16),
+                margin: const EdgeInsets.only(bottom: 10),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: const Text(
+                  'Erreur lors de l\'affichage de la commande',
+                  style: TextStyle(color: Colors.red),
+                ),
+              );
+            }
+          }).toList(),
         );
       },
     );
   }
 
   Widget _buildLivreurOrders() {
-
-      Future<void> getCurrentLocation() async {
-    try {
-      // Vérifier et demander les permissions de localisation
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) {
-          return;
-        }
-      }
-
-      if (permission == LocationPermission.deniedForever) {
-        return;
-      }
-
-      // Obtenir la position actuelle
-      Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-      );
-
-      // Récupérer l'utilisateur connecté
-      final authState = context.read<AuthCubit>().state;
-      if (authState is AuthSuccess && authState.user != null) {
-        final user = authState.user!;
-        final userId = user['id']?.toString() ?? '';
-        final userRole = user['role']?.toString() ?? '';
-        final phone = user['phone']?.toString() ?? '';
-
-        // Vérifier si un enregistrement existe déjà pour cet utilisateur
-        final locationQuery = await FirebaseFirestore.instance
-            .collection('locations')
-            .where('userId', isEqualTo: userId)
-            .get();
-
-        if (locationQuery.docs.isNotEmpty) {
-          // Mettre à jour l'enregistrement existant
-          await locationQuery.docs.first.reference.update({
-            'longitude': position.longitude,
-            'latitude': position.latitude,
-            'timestamp': FieldValue.serverTimestamp(),
-          });
-          print('✅ Position mise à jour avec succès');
-        } else {
-          // Créer un nouvel enregistrement
-          await FirebaseFirestore.instance.collection('locations').add({
-            'userId': userId,
-            'role': userRole,
-            'longitude': position.longitude,
-            'latitude': position.latitude,
-            'phone': phone,
-            'timestamp': FieldValue.serverTimestamp(),
-          });
-          print('✅ Nouvelle position enregistrée avec succès');
-        }
-      }
-    } catch (e) {
-      print('❌ Erreur lors de la récupération de la position: $e');
-    }
-  }
     String generate4DigitCode() {
       final random = Random();
       int code = (1000 + random.nextInt(9000))
@@ -1199,19 +1031,61 @@ class _OrderScreenState extends State<OrderScreen> {
       return const Center(child: Text('Non authentifié'));
     }
 
-    String selectedStatus = 'Tous';
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance.collection('carts').where('status',
+          whereIn: ['prêt à expédier', 'en route pour livraison', 'delivered']).snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return Center(child: Text('Erreur: ${snapshot.error}'));
+        }
 
-    return StatefulBuilder(
-      builder: (context, setState) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Column(
+            children: [
+              const OrderCardShimmer(),
+              const SizedBox(height: 10),
+              const OrderCardShimmer(),
+            ],
+          );
+        }
+
+        final orders = snapshot.data!.docs;
+
+        if (orders.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.local_shipping_outlined,
+                    size: 80, color: AppColors.buttonColor.withOpacity(0.3)),
+                const SizedBox(height: 18),
+                const Text(
+                  'Aucune commande en attente',
+                  style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.primary),
+                ),
+              ],
+            ),
+          );
+        }
+
         return Column(
-          children: [
-            // Filtre par statut pour le livreur
-            Container(
-              // margin: const EdgeInsets.all(16),
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+          children: orders.map((doc) {
+            final data = doc.data() as Map<String, dynamic>;
+            final items = data['items'] as List? ?? [];
+            final status = data['status']?.toString() ?? 'pending';
+            final timestamp = data['timestamp'] as Timestamp?;
+            final date = timestamp?.toDate().toString().substring(0, 10) ?? '';
+            final address =
+                data['address']?.toString() ?? 'Adresse non spécifiée';
+
+            return Container(
+              margin: const EdgeInsets.only(bottom: 10),
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(18),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withOpacity(0.06),
@@ -1220,165 +1094,225 @@ class _OrderScreenState extends State<OrderScreen> {
                   ),
                 ],
               ),
-              child: DropdownButtonFormField<String>(
-                value: selectedStatus,
-                decoration: const InputDecoration(
-                  labelText: 'Filtrer par statut',
-                  border: InputBorder.none,
-                  prefixIcon: Icon(Icons.filter_list, color: AppColors.primary),
-                ),
-                items: [
-                  'Tous',
-                  'prêt à expédier',
-                  'en route pour livraison',
-                  'delivered',
-                ].map((String status) {
-                  return DropdownMenuItem<String>(
-                    value: status,
-                    child: Text(
-                      status == 'Tous' ? 'Tous les statuts' : _translateStatus(status),
-                      style: TextStyle(
-                        color: status == 'Tous' ? Colors.grey : _statusColor(status),
-                      ),
-                    ),
-                  );
-                }).toList(),
-                onChanged: (String? newValue) {
-                  setState(() {
-                    selectedStatus = newValue ?? 'Tous';
-                  });
-                },
-              ),
-            ),
-            const SizedBox(height: 16),
-            // Liste des commandes
-            Expanded(
-              child: StreamBuilder<QuerySnapshot>(
-                stream: FirebaseFirestore.instance.collection('carts').where('status',
-                    whereIn: ['prêt à expédier', 'en route pour livraison', 'delivered']).snapshots(),
-                builder: (context, snapshot) {
-                  if (snapshot.hasError) {
-                    return Center(child: Text('Erreur: ${snapshot.error}'));
-                  }
-
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return Column(
-                      children: [
-                        const OrderCardShimmer(),
-                        const SizedBox(height: 10),
-                        const OrderCardShimmer(),
-                      ],
-                    );
-                  }
-
-                  var orders = snapshot.data!.docs;
-
-                  // Appliquer le filtre par statut
-                  if (selectedStatus != 'Tous') {
-                    orders = orders.where((doc) {
-                      final data = doc.data() as Map<String, dynamic>;
-                      final status = data['status']?.toString() ?? 'pending';
-                      return status == selectedStatus;
-                    }).toList();
-                  }
-
-                  if (orders.isEmpty) {
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.local_shipping_outlined,
-                              size: 80, color: AppColors.buttonColor.withOpacity(0.3)),
-                          const SizedBox(height: 18),
-                          Text(
-                            selectedStatus == 'Tous' 
-                                ? 'Aucune commande en attente'
-                                : 'Aucune commande avec le statut "${_translateStatus(selectedStatus)}"',
-                            style: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.primary),
-                          ),
-                        ],
-                      ),
-                    );
-                  }
-
-                  return Column(
-                    children: orders.map((doc) {
-                      final data = doc.data() as Map<String, dynamic>;
-                      final items = data['items'] as List? ?? [];
-                      final status = data['status']?.toString() ?? 'pending';
-                      final timestamp = data['timestamp'] as Timestamp?;
-                      final date = timestamp?.toDate().toString().substring(0, 10) ?? '';
-                      final address =
-                          data['address']?.toString() ?? 'Adresse non spécifiée';
-
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 10),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(18),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.06),
-                              blurRadius: 10,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
+              child: InkWell(
+                borderRadius: BorderRadius.circular(18),
+                onTap: () {
+                  if (authState.user!['role'] == 'acheteur') {
+                    print('acheteur');
+                  } else {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => OrderDetailsScreen(
+                          orderData: data,
+                          orderId: doc.id,
                         ),
-                        child: InkWell(
-                          borderRadius: BorderRadius.circular(18),
-                          onTap: () {
-                            if (authState.user!['role'] == 'acheteur') {
-                              print('acheteur');
-                            } else {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => OrderDetailsScreen(
-                                    orderData: data,
-                                    orderId: doc.id,
-                                  ),
+                      ),
+                    );
+                  }
+                },
+                child: Column(
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Timeline
+                        Container(
+                          width: 6,
+                          height: 110,
+                          margin: const EdgeInsets.only(
+                              right: 10, top: 10, bottom: 10),
+                          decoration: BoxDecoration(
+                            color: _statusColor(status),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        // Image produit
+                        Padding(
+                          padding: const EdgeInsets.only(
+                              top: 16, left: 0, right: 10),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(14),
+                            child: Image.network(
+                              items.isNotEmpty
+                                  ? (items[0]['imagePath'] ??
+                                      'https://via.placeholder.com/80')
+                                  : 'https://via.placeholder.com/80',
+                              width: 70,
+                              height: 70,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) {
+                                return Container(
+                                  width: 70,
+                                  height: 70,
+                                  color: Colors.grey.shade200,
+                                  child: const Icon(Icons.image,
+                                      color: Colors.grey),
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                        // Détails commande
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                                vertical: 16, horizontal: 0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Flexible(
+                                      child: Text(
+                                        items.isNotEmpty
+                                            ? (items[0]['name'] ?? 'Produit')
+                                            : 'Produit',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 16,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 10, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: _statusColor(status)
+                                            .withOpacity(0.15),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Text(
+                                        _translateStatus(status),
+                                        style: TextStyle(
+                                          color: _statusColor(status),
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                              );
-                            }
-                          },
-                          child: Column(
-                            children: [
-                              Row(
+                                const SizedBox(height: 8),
+                                Row(
+                                  children: [
+                                    const Icon(Icons.location_on,
+                                        size: 14, color: AppColors.primary),
+                                    const SizedBox(width: 4),
+                                    Expanded(
+                                      child: Text(
+                                        data['adresse'] ??
+                                            'Adresse non spécifiée',
+                                        style: const TextStyle(
+                                          fontSize: 13,
+                                          color: Colors.black87,
+                                        ),
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                Row(
+                                  children: [
+                                    const Icon(Icons.shopping_cart,
+                                        size: 14, color: AppColors.primary),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      '${items.length} article${items.length > 1 ? 's' : ''}',
+                                      style: const TextStyle(fontSize: 13),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    const Icon(Icons.calendar_today,
+                                        size: 14, color: AppColors.primary),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      _formatDate(timestamp),
+                                      style: const TextStyle(fontSize: 13),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    // Bouton pour accepter la livraison
+                    Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: Column(
+                        children: [
+                          if (status == 'prêt à expédier' &&
+                              data['packagePhoto'] != null) ...[
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 16.0),
+                              child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  // Timeline
-                                  Container(
-                                    width: 6,
-                                    height: 110,
-                                    margin: const EdgeInsets.only(
-                                        right: 10, top: 10, bottom: 10),
-                                    decoration: BoxDecoration(
-                                      color: _statusColor(status),
-                                      borderRadius: BorderRadius.circular(8),
+                                  const Text(
+                                    'Photo du colis:',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppColors.primary,
                                     ),
                                   ),
-                                  // Image produit
-                                  Padding(
-                                    padding: const EdgeInsets.only(
-                                        top: 16, left: 0, right: 10),
+                                  const SizedBox(height: 8),
+                                  GestureDetector(
+                                    onTap: () {
+                                      showDialog(
+                                        context: context,
+                                        builder: (BuildContext context) {
+                                          return Dialog(
+                                            insetPadding: EdgeInsets.zero,
+                                            child: Stack(
+                                              children: [
+                                                InteractiveViewer(
+                                                  minScale: 0.5,
+                                                  maxScale: 4.0,
+                                                  child: Image.network(
+                                                    data['packagePhoto'],
+                                                    fit: BoxFit.contain,
+                                                    width: MediaQuery.of(context)
+                                                        .size
+                                                        .width,
+                                                    height: MediaQuery.of(context)
+                                                        .size
+                                                        .height,
+                                                  ),
+                                                ),
+                                                Positioned(
+                                                  top: 10,
+                                                  right: 10,
+                                                  child: IconButton(
+                                                    icon: const Icon(Icons.close,
+                                                        color: Colors.white),
+                                                    onPressed: () =>
+                                                        Navigator.pop(context),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          );
+                                        },
+                                      );
+                                    },
                                     child: ClipRRect(
-                                      borderRadius: BorderRadius.circular(14),
+                                      borderRadius: BorderRadius.circular(8),
                                       child: Image.network(
-                                        data['items'] != null &&
-                                                (data['items'] as List).isNotEmpty
-                                            ? (data['items'] as List)[0]['imagePath'] ??
-                                                'https://via.placeholder.com/80'
-                                            : 'https://via.placeholder.com/80',
-                                        width: 70,
-                                        height: 70,
+                                        data['packagePhoto'],
+                                        width: double.infinity,
+                                        height: 150,
                                         fit: BoxFit.cover,
                                         errorBuilder: (context, error, stackTrace) {
                                           return Container(
-                                            width: 70,
-                                            height: 70,
+                                            width: double.infinity,
+                                            height: 150,
                                             color: Colors.grey.shade200,
                                             child: const Icon(Icons.image,
                                                 color: Colors.grey),
@@ -1387,244 +1321,77 @@ class _OrderScreenState extends State<OrderScreen> {
                                       ),
                                     ),
                                   ),
-                                  // Détails commande
-                                  Expanded(
-                                    child: Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                          vertical: 16, horizontal: 0),
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Row(
-                                            children: [
-                                              Expanded(
-                                                child: Text(
-                                                  data['items'] != null &&
-                                                          (data['items'] as List).isNotEmpty
-                                                      ? (data['items'] as List)[0]['name'] ??
-                                                          'Produit'
-                                                      : 'Produit',
-                                                  style: const TextStyle(
-                                                    fontWeight: FontWeight.bold,
-                                                    fontSize: 16,
-                                                  ),
-                                                  maxLines: 1,
-                                                  overflow: TextOverflow.ellipsis,
-                                                ),
-                                              ),
-                                              const SizedBox(width: 8),
-                                              Container(
-                                                padding: const EdgeInsets.symmetric(
-                                                    horizontal: 10, vertical: 4),
-                                                decoration: BoxDecoration(
-                                                  color: _statusColor(status)
-                                                      .withOpacity(0.15),
-                                                  borderRadius: BorderRadius.circular(8),
-                                                ),
-                                                child: Text(
-                                                  _translateStatus(status),
-                                                  style: TextStyle(
-                                                    color: _statusColor(status),
-                                                    fontWeight: FontWeight.bold,
-                                                    fontSize: 12,
-                                                  ),
-                                                  textAlign: TextAlign.center,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                          const SizedBox(height: 8),
-                                          Text(
-                                            address,
-                                            style: TextStyle(
-                                              color: Colors.grey.shade600,
-                                              fontSize: 14,
-                                            ),
-                                            maxLines: 2,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                          const SizedBox(height: 12),
-                                          Row(
-                                            children: [
-                                              const Icon(Icons.calendar_today,
-                                                  size: 14, color: AppColors.primary),
-                                              const SizedBox(width: 4),
-                                              Text(
-                                                _formatDate(timestamp),
-                                                style: const TextStyle(fontSize: 13),
-                                              ),
-                                              const SizedBox(width: 12),
-                                              const Icon(Icons.shopping_cart,
-                                                  size: 14, color: AppColors.primary),
-                                              const SizedBox(width: 4),
-                                              Text(
-                                                '${(data['items'] as List?)?.length ?? 0} article${((data['items'] as List?)?.length ?? 0) > 1 ? 's' : ''}',
-                                                style: const TextStyle(fontSize: 13),
-                                              ),
-                                            ],
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
                                 ],
                               ),
-                              // Bouton pour accepter la livraison
-                              Padding(
-                                padding: const EdgeInsets.all(8.0),
-                                child: Column(
-                                  children: [
-                                    if (data['packagePhoto'] != null) ...[
-                                      Padding(
-                                        padding: const EdgeInsets.only(bottom: 16.0),
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            const Text(
-                                              'Photo du colis:',
-                                              style: TextStyle(
-                                                fontSize: 14,
-                                                fontWeight: FontWeight.bold,
-                                                color: AppColors.primary,
-                                              ),
-                                            ),
-                                            const SizedBox(height: 8),
-                                            GestureDetector(
-                                              onTap: () {
-                                                showDialog(
-                                                  context: context,
-                                                  builder: (BuildContext context) {
-                                                    return Dialog(
-                                                      insetPadding: EdgeInsets.zero,
-                                                      child: Stack(
-                                                        children: [
-                                                          InteractiveViewer(
-                                                            minScale: 0.5,
-                                                            maxScale: 4.0,
-                                                            child: Image.network(
-                                                              data['packagePhoto'],
-                                                              fit: BoxFit.contain,
-                                                              width: MediaQuery.of(context)
-                                                                  .size
-                                                                  .width,
-                                                              height: MediaQuery.of(context)
-                                                                  .size
-                                                                  .height,
-                                                            ),
-                                                          ),
-                                                          Positioned(
-                                                            top: 10,
-                                                            right: 10,
-                                                            child: IconButton(
-                                                              icon: const Icon(Icons.close,
-                                                                  color: Colors.white),
-                                                              onPressed: () =>
-                                                                  Navigator.pop(context),
-                                                            ),
-                                                          ),
-                                                        ],
-                                                      ),
-                                                    );
-                                                  },
-                                                );
-                                              },
-                                              child: ClipRRect(
-                                                borderRadius: BorderRadius.circular(8),
-                                                child: Image.network(
-                                                  data['packagePhoto'],
-                                                  width: double.infinity,
-                                                  height: 150,
-                                                  fit: BoxFit.cover,
-                                                  errorBuilder: (context, error, stackTrace) {
-                                                    return Container(
-                                                      width: double.infinity,
-                                                      height: 150,
-                                                      color: Colors.grey.shade200,
-                                                      child: const Icon(Icons.image,
-                                                          color: Colors.grey),
-                                                    );
-                                                  },
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                    if (status != 'delivered') ...[
-                                      ElevatedButton(
-                                        onPressed: () async {
-                                          if (status == 'prêt à expédier') {
-                                            getCurrentLocation();
-                                            try {
-                                              await FirebaseFirestore.instance
-                                                  .collection('carts')
-                                                  .doc(doc.id)
-                                                  .update({
-                                                'status': 'en route pour livraison',
-                                                'livreur': authState.user!['id'].toString(),
-                                                'shortCode': generate4DigitCode(),
-                                                'timestamp': FieldValue.serverTimestamp(),
-                                              });
+                            ),
+                          ],
+                          if (status != 'delivered') ...[
+                            ElevatedButton(
+                              onPressed: () async {
+                                if (status == 'prêt à expédier') {
+                                  try {
+                                    await FirebaseFirestore.instance
+                                        .collection('carts')
+                                        .doc(doc.id)
+                                        .update({
+                                      'status': 'en route pour livraison',
+                                      'livreur': authState.user!['id'].toString(),
+                                      'shortCode': generate4DigitCode(),
+                                      'timestamp': FieldValue.serverTimestamp(),
+                                    });
 
-                                              if (mounted) {
-                                                ScaffoldMessenger.of(context).showSnackBar(
-                                                  const SnackBar(
-                                                    content: Text('Colis reçu avec succès'),
-                                                    backgroundColor: Colors.green,
-                                                  ),
-                                                );
-                                              }
-                                            } catch (e) {
-                                              if (mounted) {
-                                                ScaffoldMessenger.of(context).showSnackBar(
-                                                  SnackBar(
-                                                    content: Text('Erreur: $e'),
-                                                    backgroundColor: Colors.red,
-                                                  ),
-                                                );
-                                              }
-                                            }
-                                          } else if (status == 'en route pour livraison') {
-                                            final shortCode = data['shortCode']??"";
-                                            
-                                            _showCodeConfirmationDialog(
-                                              context,
-                                              doc.id,
-                                              shortCode,
-                                              authState.user!['id'].toString(),
-                                            );
-                                          }
-                                        },
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: AppColors.primary,
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(8),
-                                          ),
-                                          minimumSize: const Size(double.infinity, 40),
+                                    if (mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text('Colis reçu avec succès'),
+                                          backgroundColor: Colors.green,
                                         ),
-                                        child: Text(
-                                          status == 'prêt à expédier'
-                                              ? 'Recevoir colis'
-                                              : 'Confirmer la livraison',
-                                          style: const TextStyle(color: Colors.white),
+                                      );
+                                    }
+                                  } catch (e) {
+                                    if (mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text('Erreur: $e'),
+                                          backgroundColor: Colors.red,
                                         ),
-                                      ),
-                                    ],
-                                  ],
+                                      );
+                                    }
+                                  }
+                                } else if (status == 'en route pour livraison') {
+                                  final shortCode = data['shortCode']??"";
+                                  
+                                  _showCodeConfirmationDialog(
+                                    context,
+                                    doc.id,
+                                    shortCode,
+                                    authState.user!['id'].toString(),
+                                  );
+                                }
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.primary,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
                                 ),
+                                minimumSize: const Size(double.infinity, 40),
                               ),
-                            ],
-                          ),
-                        ),
-                      );
-                    }).toList(),
-                  );
-                },
+                              child: Text(
+                                status == 'prêt à expédier'
+                                    ? 'Recevoir colis'
+                                    : 'Confirmer la livraison',
+                                style: const TextStyle(color: Colors.white),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
+            );
+          }).toList(),
         );
       },
     );
@@ -1639,434 +1406,575 @@ class _OrderScreenState extends State<OrderScreen> {
     }
 
     final userId = authState.user!['id']?.toString() ?? '';
-    String selectedStatus = 'Tous';
 
-    return StatefulBuilder(
-      builder: (context, setState) {
-        return Column(
-          children: [
-            // Filtre par statut
-            Container(
-              // margin: const EdgeInsets.all(16),
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.06),
-                    blurRadius: 10,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: DropdownButtonFormField<String>(
-                value: selectedStatus,
-                decoration: const InputDecoration(
-                  labelText: 'Filtrer par statut',
-                  border: InputBorder.none,
-                  prefixIcon: Icon(Icons.filter_list, color: AppColors.primary),
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance.collection('carts').snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          print('Erreur Firestore: ${snapshot.error}');
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.error_outline, size: 50, color: Colors.red),
+                const SizedBox(height: 16),
+                Text(
+                  'Erreur: ${snapshot.error}',
+                  style: const TextStyle(color: Colors.red),
+                  textAlign: TextAlign.center,
                 ),
-                items: [
-                  'Tous',
-                  'pending',
-                  'colis en cours de préparation',
-                  'prêt à expédier',
-                  'en route pour livraison',
-                  'delivered',
-                  'cancelled',
-                  'rejected',
-                ].map((String status) {
-                  return DropdownMenuItem<String>(
-                    value: status,
-                    child: Text(
-                      status == 'Tous' ? 'Tous les statuts' : _translateStatus(status),
-                      style: TextStyle(
-                        color: status == 'Tous' ? Colors.grey : _statusColor(status),
-                      ),
-                    ),
-                  );
-                }).toList(),
-                onChanged: (String? newValue) {
-                  setState(() {
-                    selectedStatus = newValue ?? 'Tous';
-                  });
-                },
-              ),
+              ],
             ),
-            // Liste des commandes
-            Expanded(
-              child: StreamBuilder<QuerySnapshot>(
-                stream: FirebaseFirestore.instance.collection('carts').snapshots(),
-                builder: (context, snapshot) {
-                  if (snapshot.hasError) {
-                    print('Erreur Firestore: ${snapshot.error}');
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
+          );
+        }
+
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return _buildLoadingShimmer();
+        }
+
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.inbox,
+                    size: 80, color: AppColors.buttonColor.withOpacity(0.3)),
+                const SizedBox(height: 18),
+                const Text(
+                  'Aucune commande reçue',
+                  style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.primary),
+                ),
+              ],
+            ),
+          );
+        }
+
+        // Filtrer les commandes côté client
+        final filteredDocs = snapshot.data!.docs.where((doc) {
+          final data = doc.data() as Map<String, dynamic>;
+          if (data['items'] == null) return false;
+
+          final items = data['items'] as List;
+          return items.any((item) {
+            if (item is Map) {
+              return item['idVendeur'] == userId;
+            }
+            return false;
+          });
+        }).toList();
+
+        if (filteredDocs.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.inbox,
+                    size: 80, color: AppColors.buttonColor.withOpacity(0.3)),
+                const SizedBox(height: 18),
+                const Text(
+                  'Aucune commande reçue',
+                  style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.primary),
+                ),
+              ],
+            ),
+          );
+        }
+
+        // Trier les commandes par date
+        filteredDocs.sort((a, b) {
+          final aData = a.data() as Map<String, dynamic>;
+          final bData = b.data() as Map<String, dynamic>;
+          final aTimestamp = aData['timestamp'] as Timestamp?;
+          final bTimestamp = bData['timestamp'] as Timestamp?;
+
+          if (aTimestamp == null && bTimestamp == null) return 0;
+          if (aTimestamp == null) return 1;
+          if (bTimestamp == null) return -1;
+
+          return bTimestamp.compareTo(aTimestamp); // Tri décroissant
+        });
+
+        return ListView.separated(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+          separatorBuilder: (_, __) => const SizedBox(height: 8),
+          itemCount: filteredDocs.length,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemBuilder: (context, index) {
+            try {
+              final doc = filteredDocs[index];
+              final data = doc.data() as Map<String, dynamic>;
+              final status = data['status']?.toString() ?? 'pending';
+              final timestamp = data['timestamp'] as Timestamp?;
+              final adresse =
+                  data['adresse']?.toString() ?? 'Adresse non spécifiée';
+
+              return Container(
+                margin: const EdgeInsets.only(bottom: 10),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(18),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.06),
+                      blurRadius: 10,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(18),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => OrderDetailsScreen(
+                          orderData: data,
+                          orderId: doc.id,
+                        ),
+                      ),
+                    );
+                  },
+                  child: Column(
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Icon(Icons.error_outline, size: 50, color: Colors.red),
-                          const SizedBox(height: 16),
-                          Text(
-                            'Erreur: ${snapshot.error}',
-                            style: const TextStyle(color: Colors.red),
-                            textAlign: TextAlign.center,
+                          // Timeline
+                          Container(
+                            width: 6,
+                            height: 110,
+                            margin: const EdgeInsets.only(
+                                right: 10, top: 10, bottom: 10),
+                            decoration: BoxDecoration(
+                              color: _statusColor(status),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          // Image produit
+                          Padding(
+                            padding: const EdgeInsets.only(
+                                top: 16, left: 0, right: 10),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(14),
+                              child: data['items'] != null &&
+                                      (data['items'] as List).isNotEmpty
+                                  ? Image.network(
+                                      (data['items'] as List)[0]['imagePath'] ??
+                                          'https://via.placeholder.com/80',
+                                      width: 70,
+                                      height: 70,
+                                      fit: BoxFit.cover,
+                                      errorBuilder:
+                                          (context, error, stackTrace) {
+                                        return Container(
+                                          width: 70,
+                                          height: 70,
+                                          color: Colors.grey.shade200,
+                                          child: const Icon(Icons.image,
+                                              color: Colors.grey),
+                                        );
+                                      },
+                                    )
+                                  : Container(
+                                      width: 70,
+                                      height: 70,
+                                      color: Colors.grey.shade200,
+                                      child: const Icon(Icons.image,
+                                          color: Colors.grey),
+                                    ),
+                            ),
+                          ),
+                          // Détails commande
+                          Expanded(
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                  vertical: 16, horizontal: 0),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          data['items'] != null &&
+                                                  (data['items'] as List)
+                                                      .isNotEmpty
+                                              ? (data['items'] as List)[0]
+                                                      ['name'] ??
+                                                  'Produit'
+                                              : 'Produit',
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 16,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 12, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: _statusColor(status)
+                                              .withOpacity(0.1),
+                                          borderRadius:
+                                              BorderRadius.circular(8),
+                                        ),
+                                        child: Text(
+                                          _translateStatus(status),
+                                          style: TextStyle(
+                                            color: _statusColor(status),
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                          textAlign: TextAlign.center,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    adresse,
+                                    style: TextStyle(
+                                      color: Colors.grey.shade600,
+                                      fontSize: 14,
+                                    ),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  const SizedBox(height: 12),
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.calendar_today,
+                                          size: 14, color: AppColors.primary),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        _formatDate(timestamp),
+                                        style: const TextStyle(fontSize: 13),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      const Icon(Icons.shopping_cart,
+                                          size: 14, color: AppColors.primary),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        '${(data['items'] as List?)?.length ?? 0} article${((data['items'] as List?)?.length ?? 0) > 1 ? 's' : ''}',
+                                        style: const TextStyle(fontSize: 13),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
                         ],
                       ),
-                    );
-                  }
-
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return _buildLoadingShimmer();
-                  }
-
-                  if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.inbox,
-                              size: 80, color: AppColors.buttonColor.withOpacity(0.3)),
-                          const SizedBox(height: 18),
-                          const Text(
-                            'Aucune commande reçue',
-                            style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.primary),
-                          ),
-                        ],
-                      ),
-                    );
-                  }
-
-                  // Filtrer les commandes côté client
-                  var filteredDocs = snapshot.data!.docs.where((doc) {
-                    final data = doc.data() as Map<String, dynamic>;
-                    if (data['items'] == null) return false;
-
-                    final items = data['items'] as List;
-                    return items.any((item) {
-                      if (item is Map) {
-                        return item['idVendeur'] == userId;
-                      }
-                      return false;
-                    });
-                  }).toList();
-
-                  // Appliquer le filtre par statut
-                  if (selectedStatus != 'Tous') {
-                    filteredDocs = filteredDocs.where((doc) {
-                      final data = doc.data() as Map<String, dynamic>;
-                      final status = data['status']?.toString() ?? 'pending';
-                      return status == selectedStatus;
-                    }).toList();
-                  }
-
-                  if (filteredDocs.isEmpty) {
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.inbox,
-                              size: 80, color: AppColors.buttonColor.withOpacity(0.3)),
-                          const SizedBox(height: 18),
-                          Text(
-                            selectedStatus == 'Tous' 
-                                ? 'Aucune commande reçue'
-                                : 'Aucune commande avec le statut "${_translateStatus(selectedStatus)}"',
-                            style: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.primary),
-                          ),
-                        ],
-                      ),
-                    );
-                  }
-
-                  // Trier les commandes par date
-                  filteredDocs.sort((a, b) {
-                    final aData = a.data() as Map<String, dynamic>;
-                    final bData = b.data() as Map<String, dynamic>;
-                    final aTimestamp = aData['timestamp'] as Timestamp?;
-                    final bTimestamp = bData['timestamp'] as Timestamp?;
-
-                    if (aTimestamp == null && bTimestamp == null) return 0;
-                    if (aTimestamp == null) return 1;
-                    if (bTimestamp == null) return -1;
-
-                    return bTimestamp.compareTo(aTimestamp); // Tri décroissant
-                  });
-
-                  return ListView.separated(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                    separatorBuilder: (_, __) => const SizedBox(height: 8),
-                    itemCount: filteredDocs.length,
-                    shrinkWrap: true,
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    itemBuilder: (context, index) {
-                      try {
-                        final doc = filteredDocs[index];
-                        final data = doc.data() as Map<String, dynamic>;
-                        final status = data['status']?.toString() ?? 'pending';
-                        final timestamp = data['timestamp'] as Timestamp?;
-                        final adresse =
-                            data['adresse']?.toString() ?? 'Adresse non spécifiée';
-
-                        return InkWell(
-                          borderRadius: BorderRadius.circular(18),
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => OrderDetailsScreen(
-                                  orderData: data,
-                                  orderId: doc.id,
+                      // Contenu existant
+                      if (status == 'prêt à expédier' &&
+                          data['packagePhoto'] != null)
+                        Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Photo du colis:',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.primary,
                                 ),
                               ),
-                            );
-                          },
-                          child: Stack(
-                            children: [
-                              Container(
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(18),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withOpacity(0.06),
-                                      blurRadius: 10,
-                                      offset: const Offset(0, 2),
-                                    ),
-                                  ],
-                                ),
-                                child: Column(
-                                  children: [
-                                    Row(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        // Timeline
-                                        Container(
-                                          width: 6,
-                                          height: 110,
-                                          margin: const EdgeInsets.only(
-                                              right: 10, top: 10, bottom: 10),
-                                          decoration: BoxDecoration(
-                                            color: _statusColor(status),
-                                            borderRadius: BorderRadius.circular(8),
-                                          ),
-                                        ),
-                                        // Image produit
-                                        Padding(
-                                          padding: const EdgeInsets.only(
-                                              top: 16, left: 0, right: 10),
-                                          child: ClipRRect(
-                                            borderRadius: BorderRadius.circular(14),
-                                            child: Image.network(
-                                              data['items'] != null &&
-                                                      (data['items'] as List).isNotEmpty
-                                                  ? (data['items'] as List)[0]['imagePath'] ??
-                                                      'https://via.placeholder.com/80'
-                                                  : 'https://via.placeholder.com/80',
-                                              width: 70,
-                                              height: 70,
-                                              fit: BoxFit.cover,
-                                              errorBuilder: (context, error, stackTrace) {
-                                                return Container(
-                                                  width: 70,
-                                                  height: 70,
-                                                  color: Colors.grey.shade200,
-                                                  child: const Icon(Icons.image,
-                                                      color: Colors.grey),
-                                                );
-                                              },
-                                            ),
-                                          ),
-                                        ),
-                                        // Détails commande
-                                        Expanded(
-                                          child: Padding(
-                                            padding: const EdgeInsets.symmetric(
-                                                vertical: 16, horizontal: 0),
-                                            child: Column(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
-                                              children: [
-                                                Row(
-                                                  children: [
-                                                    Expanded(
-                                                      child: Text(
-                                                        data['items'] != null &&
-                                                                (data['items'] as List).isNotEmpty
-                                                            ? (data['items'] as List)[0]['name'] ??
-                                                                'Produit'
-                                                            : 'Produit',
-                                                        style: const TextStyle(
-                                                          fontWeight: FontWeight.bold,
-                                                          fontSize: 16,
-                                                        ),
-                                                        maxLines: 1,
-                                                        overflow: TextOverflow.ellipsis,
-                                                      ),
-                                                    ),
-                                                    const SizedBox(width: 8),
-                                                    Container(
-                                                      padding: const EdgeInsets.symmetric(
-                                                          horizontal: 12,
-                                                          vertical: 4),
-                                                      margin: const EdgeInsets.only(
-                                                          right: 8),
-                                                      decoration: BoxDecoration(
-                                                        color: _statusColor(status)
-                                                            .withOpacity(0.1),
-                                                        borderRadius:
-                                                            BorderRadius.circular(8),
-                                                      ),
-                                                      child: Text(
-                                                        _translateStatus(status),
-                                                        style: TextStyle(
-                                                          color: _statusColor(status),
-                                                          fontSize: 12,
-                                                          fontWeight: FontWeight.bold,
-                                                        ),
-                                                        textAlign: TextAlign.center,
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                                const SizedBox(height: 8),
-                                                Text(
-                                                  adresse,
-                                                  style: TextStyle(
-                                                    color: Colors.grey.shade600,
-                                                    fontSize: 14,
-                                                  ),
-                                                  maxLines: 2,
-                                                  overflow: TextOverflow.ellipsis,
-                                                ),
-                                                const SizedBox(height: 12),
-                                                Row(
-                                                  children: [
-                                                    const Icon(Icons.calendar_today,
-                                                        size: 14, color: AppColors.primary),
-                                                    const SizedBox(width: 4),
-                                                    Text(
-                                                      _formatDate(timestamp),
-                                                      style: const TextStyle(fontSize: 13),
-                                                    ),
-                                                    const SizedBox(width: 12),
-                                                    const Icon(Icons.shopping_cart,
-                                                        size: 14, color: AppColors.primary),
-                                                    const SizedBox(width: 4),
-                                                    Text(
-                                                      '${(data['items'] as List?)?.length ?? 0} article${((data['items'] as List?)?.length ?? 0) > 1 ? 's' : ''}',
-                                                      style: const TextStyle(fontSize: 13),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    if (data['packagePhoto'] != null &&
-                                        (status.toLowerCase() == 'prêt à expédier' ||
-                                            status.toLowerCase() ==
-                                                'en route pour livraison' ||
-                                            status.toLowerCase() == 'delivered')) ...[
-                                      Padding(
-                                        padding: const EdgeInsets.all(16.0),
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
+                              const SizedBox(height: 8),
+                              GestureDetector(
+                                onTap: () {
+                                  showDialog(
+                                    context: context,
+                                    builder: (BuildContext context) {
+                                      return Dialog(
+                                        insetPadding: EdgeInsets.zero,
+                                        child: Stack(
                                           children: [
-                                            const Text(
-                                              'Photo du colis:',
-                                              style: TextStyle(
-                                                fontSize: 14,
-                                                fontWeight: FontWeight.bold,
-                                                color: AppColors.primary,
+                                            InteractiveViewer(
+                                              minScale: 0.5,
+                                              maxScale: 4.0,
+                                              child: Image.network(
+                                                data['packagePhoto'],
+                                                fit: BoxFit.contain,
+                                                width: MediaQuery.of(context)
+                                                    .size
+                                                    .width,
+                                                height: MediaQuery.of(context)
+                                                    .size
+                                                    .height,
                                               ),
                                             ),
-                                            const SizedBox(height: 8),
-                                            GestureDetector(
-                                              onTap: () {
-                                                showDialog(
-                                                  context: context,
-                                                  builder: (BuildContext context) {
-                                                    return Dialog(
-                                                      insetPadding: EdgeInsets.zero,
-                                                      child: Stack(
-                                                        children: [
-                                                          InteractiveViewer(
-                                                            minScale: 0.5,
-                                                            maxScale: 4.0,
-                                                            child: Image.network(
-                                                              data['packagePhoto'],
-                                                              fit: BoxFit.contain,
-                                                              width: MediaQuery.of(context)
-                                                                  .size
-                                                                  .width,
-                                                              height: MediaQuery.of(context)
-                                                                  .size
-                                                                  .height,
-                                                            ),
-                                                          ),
-                                                          Positioned(
-                                                            top: 10,
-                                                            right: 10,
-                                                            child: IconButton(
-                                                              icon: const Icon(Icons.close,
-                                                                  color: Colors.white),
-                                                              onPressed: () =>
-                                                                  Navigator.pop(context),
-                                                            ),
-                                                          ),
-                                                        ],
-                                                      ),
-                                                    );
-                                                  },
-                                                );
-                                              },
-                                              child: ClipRRect(
-                                                borderRadius: BorderRadius.circular(8),
-                                                child: Image.network(
-                                                  data['packagePhoto'],
-                                                  width: double.infinity,
-                                                  height: 150,
-                                                  fit: BoxFit.cover,
-                                                  errorBuilder: (context, error, stackTrace) {
-                                                    return Container(
-                                                      width: double.infinity,
-                                                      height: 150,
-                                                      color: Colors.grey.shade200,
-                                                      child: const Icon(Icons.image,
-                                                          color: Colors.grey),
-                                                    );
-                                                  },
-                                                ),
+                                            Positioned(
+                                              top: 10,
+                                              right: 10,
+                                              child: IconButton(
+                                                icon: const Icon(Icons.close,
+                                                    color: Colors.white),
+                                                onPressed: () =>
+                                                    Navigator.pop(context),
                                               ),
                                             ),
                                           ],
                                         ),
+                                      );
+                                    },
+                                  );
+                                },
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Image.network(
+                                    data['packagePhoto'],
+                                    width: double.infinity,
+                                    height: 150,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) {
+                                      return Container(
+                                        width: double.infinity,
+                                        height: 150,
+                                        color: Colors.grey.shade200,
+                                        child: const Icon(Icons.image,
+                                            color: Colors.grey),
+                                      );
+                                    },
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      // Bouton pour accepter la livraison
+                      Padding(
+                        padding: const EdgeInsets.all(8.0),
+                        child: Column(
+                          children: [
+                            if (status.toLowerCase() == 'pending') ...[
+                              Padding(
+                                padding: const EdgeInsets.all(8.0),
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: ElevatedButton(
+                                        onPressed: () async {
+                                          try {
+                                            await FirebaseFirestore.instance
+                                                .collection('carts')
+                                                .doc(doc.id)
+                                                .update({
+                                              'status':
+                                                  'colis en cours de préparation',
+                                              'timestamp':
+                                                  FieldValue.serverTimestamp(),
+                                            });
+
+                                            if (mounted) {
+                                              ScaffoldMessenger.of(context)
+                                                  .showSnackBar(
+                                                const SnackBar(
+                                                  content: Text(
+                                                      'Commande acceptée avec succès'),
+                                                  backgroundColor: Colors.green,
+                                                ),
+                                              );
+                                            }
+                                          } catch (e) {
+                                            if (mounted) {
+                                              ScaffoldMessenger.of(context)
+                                                  .showSnackBar(
+                                                SnackBar(
+                                                  content: Text('Erreur: $e'),
+                                                  backgroundColor: Colors.red,
+                                                ),
+                                              );
+                                            }
+                                          }
+                                        },
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: AppColors.primary,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(8),
+                                          ),
+                                          minimumSize:
+                                              const Size(double.infinity, 40),
+                                        ),
+                                        child: const Text(
+                                          'Accepter',
+                                          style: TextStyle(color: Colors.white),
+                                        ),
                                       ),
-                                    ],
-                                    if (status.toLowerCase() == 'pending')
-                                      Padding(
-                                        padding: const EdgeInsets.all(8.0),
-                                        child: ElevatedButton(
-                                          onPressed: () async {
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: ElevatedButton(
+                                        onPressed: () async {
+                                          // Afficher la boîte de dialogue pour la raison du rejet
+                                          final TextEditingController
+                                              reasonController =
+                                              TextEditingController();
+                                          bool? confirmed =
+                                              await showDialog<bool>(
+                                            context: context,
+                                            builder: (BuildContext context) {
+                                              return StatefulBuilder(
+                                                builder: (context, setState) {
+                                                  return AlertDialog(
+                                                    shape:
+                                                        RoundedRectangleBorder(
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                              16),
+                                                    ),
+                                                    title: Row(
+                                                      children: [
+                                                        const Icon(
+                                                            Icons
+                                                                .warning_amber_rounded,
+                                                            color: Colors.red),
+                                                        const SizedBox(
+                                                            width: 8),
+                                                        const Text(
+                                                          'Rejeter la commande',
+                                                          style: TextStyle(
+                                                            fontSize: 18,
+                                                            fontWeight:
+                                                                FontWeight.bold,
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                    content: Column(
+                                                      mainAxisSize:
+                                                          MainAxisSize.min,
+                                                      crossAxisAlignment:
+                                                          CrossAxisAlignment
+                                                              .start,
+                                                      children: [
+                                                        const Text(
+                                                          'Veuillez indiquer la raison du rejet de cette commande.',
+                                                          style: TextStyle(
+                                                            color: Colors.grey,
+                                                            fontSize: 14,
+                                                          ),
+                                                        ),
+                                                        const SizedBox(
+                                                            height: 16),
+                                                        TextField(
+                                                          controller:
+                                                              reasonController,
+                                                          decoration:
+                                                              InputDecoration(
+                                                            hintText:
+                                                                'Entrez la raison du rejet',
+                                                            border:
+                                                                OutlineInputBorder(
+                                                              borderRadius:
+                                                                  BorderRadius
+                                                                      .circular(
+                                                                          8),
+                                                            ),
+                                                            filled: true,
+                                                            fillColor: Colors
+                                                                .grey.shade50,
+                                                            prefixIcon: const Icon(
+                                                                Icons.edit_note,
+                                                                color: Colors
+                                                                    .grey),
+                                                            errorText:
+                                                                reasonController
+                                                                        .text
+                                                                        .isEmpty
+                                                                    ? 'Ce champ est obligatoire'
+                                                                    : null,
+                                                          ),
+                                                          maxLines: 3,
+                                                          onChanged: (value) {
+                                                            setState(
+                                                                () {}); // Pour mettre à jour la validation en temps réel
+                                                          },
+                                                        ),
+                                                      ],
+                                                    ),
+                                                    actions: [
+                                                      TextButton(
+                                                        onPressed: () =>
+                                                            Navigator.pop(
+                                                                context, false),
+                                                        child: const Text(
+                                                          'ANNULER',
+                                                          style: TextStyle(
+                                                              color:
+                                                                  Colors.grey),
+                                                        ),
+                                                      ),
+                                                      ElevatedButton(
+                                                        onPressed:
+                                                            reasonController
+                                                                    .text
+                                                                    .trim()
+                                                                    .isEmpty
+                                                                ? null
+                                                                : () {
+                                                                    Navigator.pop(
+                                                                        context,
+                                                                        true);
+                                                                  },
+                                                        style: ElevatedButton
+                                                            .styleFrom(
+                                                          backgroundColor:
+                                                              Colors.red,
+                                                          disabledBackgroundColor:
+                                                              Colors.red
+                                                                  .withOpacity(
+                                                                      0.5),
+                                                          shape:
+                                                              RoundedRectangleBorder(
+                                                            borderRadius:
+                                                                BorderRadius
+                                                                    .circular(
+                                                                        8),
+                                                          ),
+                                                        ),
+                                                        child: const Text(
+                                                          'REJETER',
+                                                          style: TextStyle(
+                                                              color:
+                                                                  Colors.white),
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  );
+                                                },
+                                              );
+                                            },
+                                          );
+
+                                          if (confirmed == true &&
+                                              reasonController.text
+                                                  .trim()
+                                                  .isNotEmpty) {
                                             try {
                                               await FirebaseFirestore.instance
                                                   .collection('carts')
                                                   .doc(doc.id)
                                                   .update({
-                                                'status':
-                                                    'colis en cours de préparation',
-                                                'timestamp':
-                                                    FieldValue.serverTimestamp(),
+                                                'status': 'rejected',
+                                                'rejectionReason':
+                                                    reasonController.text
+                                                        .trim(),
+                                                'timestamp': FieldValue
+                                                    .serverTimestamp(),
                                               });
 
                                               if (mounted) {
@@ -2074,8 +1982,8 @@ class _OrderScreenState extends State<OrderScreen> {
                                                     .showSnackBar(
                                                   const SnackBar(
                                                     content: Text(
-                                                        'Commande acceptée avec succès'),
-                                                    backgroundColor: Colors.green,
+                                                        'Commande rejetée'),
+                                                    backgroundColor: Colors.red,
                                                   ),
                                                 );
                                               }
@@ -2090,48 +1998,259 @@ class _OrderScreenState extends State<OrderScreen> {
                                                 );
                                               }
                                             }
-                                          },
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: AppColors.primary,
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius: BorderRadius.circular(8),
-                                            ),
-                                            minimumSize:
-                                                const Size(double.infinity, 40),
+                                          }
+                                        },
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.red,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(8),
                                           ),
-                                          child: const Text(
-                                            'Accepter',
-                                            style: TextStyle(color: Colors.white),
-                                          ),
+                                          minimumSize:
+                                              const Size(double.infinity, 40),
+                                        ),
+                                        child: const Text(
+                                          'REJETER',
+                                          style: TextStyle(color: Colors.white),
                                         ),
                                       ),
+                                    ),
                                   ],
                                 ),
                               ),
+                              Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 8.0),
+                                child: ElevatedButton(
+                                  onPressed: () {
+                                    // Afficher le popup de contact
+                                    showDialog(
+                                      context: context,
+                                      builder: (BuildContext context) {
+                                        return Dialog(
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(16),
+                                          ),
+                                          child: Container(
+                                            padding: const EdgeInsets.all(20),
+                                            child: Column(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                const Text(
+                                                  'Contacter le client',
+                                                  style: TextStyle(
+                                                    fontSize: 18,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 8),
+                                                Text(
+                                                  data['client'] ?? 'Client',
+                                                  style: const TextStyle(
+                                                    fontSize: 16,
+                                                    color: AppColors.primary,
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 20),
+                                                Row(
+                                                  mainAxisAlignment:
+                                                      MainAxisAlignment
+                                                          .spaceEvenly,
+                                                  children: [
+                                                    // Bouton Appel normal
+                                                    ElevatedButton(
+                                                      onPressed: () {
+                                                        final phoneNumber =
+                                                            data['phone'] ?? '';
+                                                        if (phoneNumber
+                                                            .isNotEmpty) {
+                                                          launchUrl(Uri.parse(
+                                                              'tel:$phoneNumber'));
+                                                        } else {
+                                                          ScaffoldMessenger.of(
+                                                                  context)
+                                                              .showSnackBar(
+                                                            const SnackBar(
+                                                              content: Text(
+                                                                  'Numéro de téléphone non disponible'),
+                                                              backgroundColor:
+                                                                  Colors.red,
+                                                            ),
+                                                          );
+                                                        }
+                                                        Navigator.pop(context);
+                                                      },
+                                                      style: ElevatedButton
+                                                          .styleFrom(
+                                                        backgroundColor:
+                                                            AppColors.primary,
+                                                        shape:
+                                                            RoundedRectangleBorder(
+                                                          borderRadius:
+                                                              BorderRadius
+                                                                  .circular(8),
+                                                        ),
+                                                        padding:
+                                                            const EdgeInsets
+                                                                .symmetric(
+                                                                horizontal: 20,
+                                                                vertical: 12),
+                                                      ),
+                                                      child: const Row(
+                                                        mainAxisSize:
+                                                            MainAxisSize.min,
+                                                        children: [
+                                                          Icon(Icons.phone,
+                                                              color:
+                                                                  Colors.white),
+                                                          SizedBox(width: 8),
+                                                          Text(
+                                                            'Appeler',
+                                                            style: TextStyle(
+                                                                color: Colors
+                                                                    .white),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                    // Bouton WhatsApp
+                                                    ElevatedButton(
+                                                      onPressed: () {
+                                                        final phoneNumber =
+                                                            data['phone'] ?? '';
+                                                        if (phoneNumber
+                                                            .isNotEmpty) {
+                                                          final whatsappUrl =
+                                                              'https://wa.me/$phoneNumber';
+                                                          launchUrl(Uri.parse(
+                                                              whatsappUrl));
+                                                        } else {
+                                                          ScaffoldMessenger.of(
+                                                                  context)
+                                                              .showSnackBar(
+                                                            const SnackBar(
+                                                              content: Text(
+                                                                  'Numéro de téléphone non disponible'),
+                                                              backgroundColor:
+                                                                  Colors.red,
+                                                            ),
+                                                          );
+                                                        }
+                                                        Navigator.pop(context);
+                                                      },
+                                                      style: ElevatedButton
+                                                          .styleFrom(
+                                                        backgroundColor:
+                                                            Colors.green,
+                                                        shape:
+                                                            RoundedRectangleBorder(
+                                                          borderRadius:
+                                                              BorderRadius
+                                                                  .circular(8),
+                                                        ),
+                                                        padding:
+                                                            const EdgeInsets
+                                                                .symmetric(
+                                                                horizontal: 20,
+                                                                vertical: 12),
+                                                      ),
+                                                      child: const Row(
+                                                        mainAxisSize:
+                                                            MainAxisSize.min,
+                                                        children: [
+                                                          Icon(Icons.message,
+                                                              color:
+                                                                  Colors.white),
+                                                          SizedBox(width: 8),
+                                                          Text(
+                                                            'WhatsApp',
+                                                            style: TextStyle(
+                                                                color: Colors
+                                                                    .white),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                                const SizedBox(height: 16),
+                                                TextButton(
+                                                  onPressed: () =>
+                                                      Navigator.pop(context),
+                                                  child: const Text(
+                                                    'ANNULER',
+                                                    style: TextStyle(
+                                                        color: Colors.grey),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                    );
+                                  },
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.green,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    minimumSize:
+                                        const Size(double.infinity, 40),
+                                  ),
+                                  child: const Text(
+                                    'Contacter',
+                                    style: TextStyle(color: Colors.white),
+                                  ),
+                                ),
+                              ),
                             ],
-                          ),
-                        );
-                      } catch (e) {
-                        print('Erreur lors de l\'affichage de la commande: $e');
-                        return Container(
-                          padding: const EdgeInsets.all(16),
-                          margin: const EdgeInsets.only(bottom: 10),
-                          decoration: BoxDecoration(
-                            color: Colors.red.shade50,
-                            borderRadius: BorderRadius.circular(18),
-                          ),
-                          child: const Text(
-                            'Erreur lors de l\'affichage de la commande',
-                            style: TextStyle(color: Colors.red),
-                          ),
-                        );
-                      }
-                    },
-                  );
-                },
-              ),
-            ),
-          ],
+                            if (status == 'colis en cours de préparation') ...[
+                              Padding(
+                                padding: const EdgeInsets.all(8.0),
+                                child: ElevatedButton(
+                                  onPressed: () {
+                                    _showExpeditionDialog(context, doc.id);
+                                  },
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppColors.primary,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    minimumSize:
+                                        const Size(double.infinity, 40),
+                                  ),
+                                  child: const Text(
+                                    'Expédier',
+                                    style: TextStyle(color: Colors.white),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            } catch (e) {
+              print('Erreur lors de l\'affichage de la commande: $e');
+              return Container(
+                padding: const EdgeInsets.all(16),
+                margin: const EdgeInsets.only(bottom: 10),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: const Text(
+                  'Erreur lors de l\'affichage de la commande',
+                  style: TextStyle(color: Colors.red),
+                ),
+              );
+            }
+          },
         );
       },
     );
@@ -2264,8 +2383,7 @@ class OrderCardShimmer extends StatelessWidget {
           Container(
             width: 6,
             height: 110,
-            margin:
-                const EdgeInsets.only(right: 10, top: 10, bottom: 10),
+            margin: const EdgeInsets.only(right: 10, top: 10, bottom: 10),
             decoration: BoxDecoration(
               color: AppColors.buttonColor.withOpacity(0.3),
               borderRadius: BorderRadius.circular(8),
@@ -2283,8 +2401,7 @@ class OrderCardShimmer extends StatelessWidget {
           // Détails shimmer
           Expanded(
             child: Padding(
-              padding: const EdgeInsets.symmetric(
-                  vertical: 16, horizontal: 0),
+              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
