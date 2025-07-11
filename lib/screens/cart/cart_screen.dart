@@ -32,6 +32,7 @@ class _CartScreenState extends State<CartScreen> {
   List<Map<String, dynamic>> _searchResults = [];
   Timer? _searchDebounceTimer;
   bool _isSearching = false;
+  bool _isGettingCurrentLocation = false;
 
   // Variable pour suivre l'adresse sélectionnée depuis Google
   Map<String, dynamic>? _selectedGoogleAddress;
@@ -680,26 +681,35 @@ class _CartScreenState extends State<CartScreen> {
                           width: double.infinity,
                           height: 50,
                           child: OutlinedButton.icon(
-                            onPressed: () async {
-                              setState(() {});
-                              // Afficher un indicateur de chargement
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Row(
-                                    children: [
-                                      SizedBox(
-                                        width: 20,
-                                        height: 20,
-                                        child: CircularProgressIndicator(
-                                            strokeWidth: 2),
+                            onPressed: _isGettingCurrentLocation
+                                ? null
+                                : () async {
+                                    setState(() {
+                                      _isGettingCurrentLocation = true;
+                                    });
+                                    
+                                    // Désactiver le champ de recherche
+                                    _searchAddressController.clear();
+                                    _searchResults.clear();
+                                    
+                                    // Afficher un indicateur de chargement
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Row(
+                                          children: [
+                                            SizedBox(
+                                              width: 20,
+                                              height: 20,
+                                              child: CircularProgressIndicator(
+                                                  strokeWidth: 2),
+                                            ),
+                                            SizedBox(width: 16),
+                                            Text('Récupération de votre position...'),
+                                          ],
+                                        ),
+                                        duration: Duration(seconds: 3),
                                       ),
-                                      SizedBox(width: 16),
-                                      Text('Récupération de votre position...'),
-                                    ],
-                                  ),
-                                  duration: Duration(seconds: 3),
-                                ),
-                              );
+                                    );
 
                               try {
                                 // Vérifier et demander les permissions de localisation
@@ -708,20 +718,28 @@ class _CartScreenState extends State<CartScreen> {
                                 if (permission == LocationPermission.denied) {
                                   permission =
                                       await Geolocator.requestPermission();
-                                  if (permission == LocationPermission.denied) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text(
-                                            'Permission de localisation refusée'),
-                                        backgroundColor: Colors.red,
-                                      ),
-                                    );
-                                    return;
-                                  }
+                                                                  if (permission == LocationPermission.denied) {
+                                  setState(() {
+                                    _isGettingCurrentLocation = false;
+                                  });
+                                  
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                          'Permission de localisation refusée'),
+                                      backgroundColor: Colors.red,
+                                    ),
+                                  );
+                                  return;
+                                }
                                 }
 
                                 if (permission ==
                                     LocationPermission.deniedForever) {
+                                  setState(() {
+                                    _isGettingCurrentLocation = false;
+                                  });
+                                  
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(
                                       content: Text(
@@ -760,6 +778,10 @@ class _CartScreenState extends State<CartScreen> {
                                             true &&
                                         addressData['avenue']?.isEmpty ==
                                             true)) {
+                                  setState(() {
+                                    _isGettingCurrentLocation = false;
+                                  });
+                                  
                                   print('⚠️ Aucune donnée d\'adresse extraite');
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(
@@ -796,6 +818,10 @@ class _CartScreenState extends State<CartScreen> {
                                       ''; // Champ vide pour que l'utilisateur le remplisse
                                 });
 
+                                setState(() {
+                                  _isGettingCurrentLocation = false;
+                                });
+                                
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(
                                     content: Text(
@@ -804,6 +830,10 @@ class _CartScreenState extends State<CartScreen> {
                                   ),
                                 );
                               } catch (e) {
+                                setState(() {
+                                  _isGettingCurrentLocation = false;
+                                });
+                                
                                 print(
                                     '❌ Erreur lors de la récupération de la position: $e');
                                 ScaffoldMessenger.of(context).showSnackBar(
@@ -816,17 +846,34 @@ class _CartScreenState extends State<CartScreen> {
                               }
                             },
                             style: OutlinedButton.styleFrom(
-                              side: const BorderSide(color: AppColors.primary),
-                              backgroundColor: AppColors.primary,
+                              side: BorderSide(
+                                color: _isGettingCurrentLocation 
+                                    ? Colors.grey 
+                                    : AppColors.primary
+                              ),
+                              backgroundColor: _isGettingCurrentLocation 
+                                  ? Colors.grey 
+                                  : AppColors.primary,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
                               ),
                             ),
-                            icon: const Icon(Icons.location_on,
-                                color: Colors.white),
-                            label: const Text(
-                              'Utiliser ma position actuelle',
-                              style: TextStyle(
+                            icon: _isGettingCurrentLocation
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                    ),
+                                  )
+                                : const Icon(Icons.location_on,
+                                    color: Colors.white),
+                            label: Text(
+                              _isGettingCurrentLocation 
+                                  ? 'Récupération en cours...'
+                                  : 'Utiliser ma position actuelle',
+                              style: const TextStyle(
                                 color: Colors.white,
                                 fontWeight: FontWeight.bold,
                                 fontSize: 14,
@@ -852,39 +899,47 @@ class _CartScreenState extends State<CartScreen> {
                               'Kisangani',
                             ]
                                 .map((city) => GestureDetector(
-                                      onTap: () {
-                                        _searchAddressController.text =
-                                            '$city ';
-                                        // Mettre le focus sur le champ de recherche
-                                        FocusScope.of(context)
-                                            .requestFocus(FocusNode());
-                                        Future.delayed(
-                                            const Duration(milliseconds: 100),
-                                            () {
-                                          FocusScope.of(context)
-                                              .requestFocus(_searchFocusNode);
-                                        });
-                                        setState(() {
-                                          _isSearching = true;
-                                        });
-                                        _searchAddress('$city ');
-                                      },
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 12, vertical: 6),
-                                        decoration: BoxDecoration(
-                                          color: AppColors.primary
-                                              .withOpacity(0.1),
-                                          borderRadius:
-                                              BorderRadius.circular(20),
-                                          border: Border.all(
-                                              color: AppColors.primary
-                                                  .withOpacity(0.3)),
-                                        ),
+                                      onTap: _isGettingCurrentLocation
+                                          ? null
+                                          : () {
+                                              _searchAddressController.text =
+                                                  '$city ';
+                                              // Mettre le focus sur le champ de recherche
+                                              FocusScope.of(context)
+                                                  .requestFocus(FocusNode());
+                                              Future.delayed(
+                                                  const Duration(milliseconds: 100),
+                                                  () {
+                                                FocusScope.of(context)
+                                                    .requestFocus(_searchFocusNode);
+                                              });
+                                              setState(() {
+                                                _isSearching = true;
+                                              });
+                                              _searchAddress('$city ');
+                                            },
+                                                                              child: Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 12, vertical: 6),
+                                          decoration: BoxDecoration(
+                                            color: _isGettingCurrentLocation
+                                                ? Colors.grey.withOpacity(0.1)
+                                                : AppColors.primary
+                                                    .withOpacity(0.1),
+                                            borderRadius:
+                                                BorderRadius.circular(20),
+                                            border: Border.all(
+                                                color: _isGettingCurrentLocation
+                                                    ? Colors.grey.withOpacity(0.3)
+                                                    : AppColors.primary
+                                                        .withOpacity(0.3)),
+                                          ),
                                         child: Text(
                                           city,
-                                          style: const TextStyle(
-                                            color: AppColors.primary,
+                                          style: TextStyle(
+                                            color: _isGettingCurrentLocation
+                                                ? Colors.grey
+                                                : AppColors.primary,
                                             fontSize: 12,
                                             fontWeight: FontWeight.w500,
                                           ),
@@ -898,10 +953,12 @@ class _CartScreenState extends State<CartScreen> {
                         TextFormField(
                           controller: _searchAddressController,
                           focusNode: _searchFocusNode,
+                          enabled: !_isGettingCurrentLocation,
                           decoration: InputDecoration(
                             labelText: 'Rechercher une adresse',
-                            hintText:
-                                'Ex: Kinshasa, Lemba, Avenue du Commerce, Kinshasa...',
+                            hintText: _isGettingCurrentLocation
+                                ? 'Champ désactivé pendant la récupération de position...'
+                                : 'Ex: Kinshasa, Lemba, Avenue du Commerce, Kinshasa...',
                             prefixIcon: const Icon(Icons.search),
                             suffixIcon: _isSearching
                                 ? const Padding(
@@ -916,47 +973,55 @@ class _CartScreenState extends State<CartScreen> {
                                 : _searchResults.isNotEmpty
                                     ? IconButton(
                                         icon: const Icon(Icons.clear),
-                                        onPressed: () {
-                                          setState(() {
-                                            _searchResults.clear();
-                                            _searchAddressController.clear();
-                                            selectedAddress = null;
-                                            selectedAddressId = null;
-                                          });
-                                        },
+                                        onPressed: _isGettingCurrentLocation
+                                            ? null
+                                            : () {
+                                                setState(() {
+                                                  _searchResults.clear();
+                                                  _searchAddressController.clear();
+                                                  selectedAddress = null;
+                                                  selectedAddressId = null;
+                                                });
+                                              },
                                       )
                                     : null,
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
                             filled: true,
-                            fillColor: Colors.white,
+                            fillColor: _isGettingCurrentLocation 
+                                ? Colors.grey.shade100 
+                                : Colors.white,
                           ),
-                          onChanged: (value) {
-                            if (value.length > 1) {
-                              // Réduit à 1 caractère pour plus de réactivité
-                              setState(() {
-                                _isSearching = true;
-                              });
-                              _searchAddress(value);
-                            } else {
-                              setState(() {
-                                _searchResults.clear();
-                                _isSearching = false;
-                                selectedAddress = null;
-                                selectedAddressId = null;
-                              });
-                            }
-                          },
-                          onFieldSubmitted: (value) {
-                            // Recherche immédiate quand l'utilisateur appuie sur Entrée
-                            if (value.isNotEmpty) {
-                              setState(() {
-                                _isSearching = true;
-                              });
-                              _searchAddress(value);
-                            }
-                          },
+                          onChanged: _isGettingCurrentLocation
+                              ? null
+                              : (value) {
+                                  if (value.length > 1) {
+                                    // Réduit à 1 caractère pour plus de réactivité
+                                    setState(() {
+                                      _isSearching = true;
+                                    });
+                                    _searchAddress(value);
+                                  } else {
+                                    setState(() {
+                                      _searchResults.clear();
+                                      _isSearching = false;
+                                      selectedAddress = null;
+                                      selectedAddressId = null;
+                                    });
+                                  }
+                                },
+                          onFieldSubmitted: _isGettingCurrentLocation
+                              ? null
+                              : (value) {
+                                  // Recherche immédiate quand l'utilisateur appuie sur Entrée
+                                  if (value.isNotEmpty) {
+                                    setState(() {
+                                      _isSearching = true;
+                                    });
+                                    _searchAddress(value);
+                                  }
+                                },
                         ),
 
                         if (_searchResults.isNotEmpty)

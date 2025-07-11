@@ -1020,7 +1020,56 @@ class _OrderScreenState extends State<OrderScreen> {
   }
 
   Widget _buildLivreurOrders() {
+          Future<void> _updateClientLocation(double longitude, double latitude, idClient) async {
+
+
+    try {
+      // Vérifier et demander les permissions de localisation
+
+
+      // Récupérer l'utilisateur connecté
+      final authState = context.read<AuthCubit>().state;
+      if (authState is AuthSuccess && authState.user != null) {
+        final user = authState.user!;
+        final userId = user['id']?.toString() ?? '';
+        final userRole = user['role']?.toString() ?? '';
+        final phone = user['phone']?.toString() ?? '';
+
+        // Vérifier si un enregistrement existe déjà pour cet utilisateur
+        final locationQuery = await FirebaseFirestore.instance
+            .collection('locations')
+            .where('userId', isEqualTo: idClient)
+            .get();
+
+        if (locationQuery.docs.isNotEmpty) {
+          // Mettre à jour l'enregistrement existant
+          await locationQuery.docs.first.reference.update({
+            'longitude': longitude,
+            'latitude': latitude,
+            'timestamp': FieldValue.serverTimestamp(),
+          });
+          print('✅ Position mise à jour avec succès');
+        } else {
+          // Créer un nouvel enregistrement
+          await FirebaseFirestore.instance.collection('locations').add({
+            'userId': idClient,
+            'role': "acheteur",
+            'longitude': longitude,
+            'latitude': latitude,
+            'phone': "Pas de numéro",
+            'timestamp': FieldValue.serverTimestamp(),
+          });
+          print('✅ Nouvelle position enregistrée avec succès');
+        }
+      }
+    } catch (e) {
+      print('❌ Erreur lors de la récupération de la position: $e');
+    }
+  }
+
       Future<void> _saveCurrentLocation() async {
+
+
     try {
       // Vérifier et demander les permissions de localisation
       LocationPermission permission = await Geolocator.checkPermission();
@@ -1390,6 +1439,7 @@ class _OrderScreenState extends State<OrderScreen> {
                             ElevatedButton(
                               onPressed: () async {
                                 if (status == 'prêt à expédier') {
+                                  _updateClientLocation(data['longitude'], data['latitude'], data['idClient']);
                                   _saveCurrentLocation();
                                   try {
                                     await FirebaseFirestore.instance

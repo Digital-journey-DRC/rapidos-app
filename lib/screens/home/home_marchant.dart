@@ -177,7 +177,9 @@ void saveCommande() async {
                       ],
                       decoration: InputDecoration(
                         labelText: 'Prix',
-                        prefixIcon: const Icon(Icons.attach_money),
+                        // prefixIcon: const Icon(Icons.attach_money),
+                        // prefixIcon: const Text("FC", style: TextStyle(fontSize: 20),),
+                        prefixIcon: const Padding(padding: EdgeInsets.only(left:10), child: Text("FC", style: TextStyle(fontSize: 18),),),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
