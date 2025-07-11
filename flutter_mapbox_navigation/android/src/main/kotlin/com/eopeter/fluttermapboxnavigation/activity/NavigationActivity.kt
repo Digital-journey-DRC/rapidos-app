@@ -146,15 +146,27 @@ class NavigationActivity : AppCompatActivity() {
             }
         }
 
-        registerReceiver(
-            finishBroadcastReceiver,
-            IntentFilter(NavigationLauncher.KEY_STOP_NAVIGATION)
-        )
-
-        registerReceiver(
-            addWayPointsBroadcastReceiver,
-            IntentFilter(NavigationLauncher.KEY_ADD_WAYPOINTS)
-        )
+        // Register broadcast receivers with Android 12+ compatibility
+        val finishIntentFilter = IntentFilter(NavigationLauncher.KEY_STOP_NAVIGATION)
+        val addWayPointsIntentFilter = IntentFilter(NavigationLauncher.KEY_ADD_WAYPOINTS)
+        
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+            // Android 12+ (API 31+) requires explicit flags
+            registerReceiver(
+                finishBroadcastReceiver,
+                finishIntentFilter,
+                Context.RECEIVER_NOT_EXPORTED
+            )
+            registerReceiver(
+                addWayPointsBroadcastReceiver,
+                addWayPointsIntentFilter,
+                Context.RECEIVER_NOT_EXPORTED
+            )
+        } else {
+            // For Android 11 and below, use traditional registration
+            registerReceiver(finishBroadcastReceiver, finishIntentFilter)
+            registerReceiver(addWayPointsBroadcastReceiver, addWayPointsIntentFilter)
+        }
 
         // TODO set the style Uri
         var styleUrlDay = FlutterMapboxNavigationPlugin.mapStyleUrlDay
@@ -201,6 +213,10 @@ class NavigationActivity : AppCompatActivity() {
         MapboxNavigationApp.current()?.unregisterLocationObserver(locationObserver)
         MapboxNavigationApp.current()?.unregisterRouteProgressObserver(routeProgressObserver)
         MapboxNavigationApp.current()?.unregisterArrivalObserver(arrivalObserver)
+        
+        // Unregister broadcast receivers
+        finishBroadcastReceiver?.let { unregisterReceiver(it) }
+        addWayPointsBroadcastReceiver?.let { unregisterReceiver(it) }
     }
 
     fun tryCancelNavigation() {

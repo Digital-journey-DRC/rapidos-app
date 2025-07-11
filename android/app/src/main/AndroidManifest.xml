@@ -58,6 +58,46 @@
 
         </activity>
 
+        <!-- 🔒 Receivers avec attribut exported requis pour Android 12+ -->
+
+        <!-- Pour flutter_mapbox_navigation -->
+        <receiver
+            android:name="com.eopeter.fluttermapboxnavigation.broadcastReceiver"
+            android:enabled="true"
+            android:exported="false" />
+
+        <!-- Pour firebase_messaging -->
+        <receiver
+            android:name="com.google.firebase.iid.FirebaseInstanceIdReceiver"
+            android:exported="true"
+            android:enabled="true">
+            <intent-filter>
+                <action android:name="com.google.android.c2dm.intent.RECEIVE" />
+                <category android:name="${applicationId}" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Pour flutter_local_notifications -->
+        <receiver
+            android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver"
+            android:exported="false"
+            android:enabled="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
+            </intent-filter>
+        </receiver>
+
+        <receiver
+            android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver"
+            android:exported="false"
+            android:enabled="true" />
+
+        <receiver
+            android:name="com.dexterous.flutterlocalnotifications.NotificationPublisher"
+            android:exported="false"
+            android:enabled="true" />
+
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
@@ -69,7 +109,6 @@
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
         </intent>
-        <!-- Requis pour flutter_tts sur Android 11+ -->
         <intent>
             <action android:name="android.intent.action.TTS_SERVICE" />
         </intent>

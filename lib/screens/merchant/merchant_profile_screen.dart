@@ -712,7 +712,8 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> with Sing
         );
       },
       child: Card(
-        elevation: 2,
+        elevation: 1,
+        
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(8),
         ),
@@ -723,7 +724,7 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> with Sing
           Stack(
             children: [
               Container(
-                height: 140,
+                height: 130,
                 width: double.infinity,
                 decoration: BoxDecoration(
                   borderRadius: const BorderRadius.only(
@@ -819,20 +820,13 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> with Sing
                     ),
                     const SizedBox(width: 2),
                     Text(
-                      '4.5',
+                      '5',
                       style: TextStyle(
                         fontSize: 12,
                         color: Colors.grey.shade600,
                       ),
                     ),
                     const SizedBox(width: 4),
-                    Text(
-                      '(120)',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey.shade600,
-                      ),
-                    ),
                   ],
                 ),
               ],

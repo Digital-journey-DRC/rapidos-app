@@ -88,8 +88,8 @@ class _TwitterStyleProductCard extends StatelessWidget {
               name: product.name,
               price: product.price,
               imagePath: product.media?.mediaUrl != null
-                ? 'http://24.144.87.127:3333/${product.media!.mediaUrl}'
-                : 'https://via.placeholder.com/150',
+                                    ? product.media!.mediaUrl
+                                    : 'https://via.placeholder.com/150',
               goToCartTab: () {
                 Navigator.of(context).popUntil((route) => route.isFirst);
                 // Utilise un event, Provider, ou autre pour changer l'onglet si besoin
@@ -109,8 +109,8 @@ class _TwitterStyleProductCard extends StatelessWidget {
                 borderRadius: BorderRadius.circular(16),
                 child: Image.network(
                   product.media?.mediaUrl != null
-                    ? 'http://24.144.87.127:3333/${product.media!.mediaUrl}'
-                    : 'https://via.placeholder.com/150',
+                                    ? product.media!.mediaUrl
+                                    : 'https://via.placeholder.com/150',
                   height: 110,
                   width: 110,
                   fit: BoxFit.cover,

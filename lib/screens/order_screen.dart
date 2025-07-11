@@ -4,6 +4,7 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:immo/constants.dart';
 import 'package:immo/cubit/auth_cubit.dart';
 import 'package:immo/cubit/order_cubit.dart';
@@ -1019,6 +1020,66 @@ class _OrderScreenState extends State<OrderScreen> {
   }
 
   Widget _buildLivreurOrders() {
+      Future<void> _saveCurrentLocation() async {
+    try {
+      // Vérifier et demander les permissions de localisation
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          return;
+        }
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        return;
+      }
+
+      // Obtenir la position actuelle
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+
+      // Récupérer l'utilisateur connecté
+      final authState = context.read<AuthCubit>().state;
+      if (authState is AuthSuccess && authState.user != null) {
+        final user = authState.user!;
+        final userId = user['id']?.toString() ?? '';
+        final userRole = user['role']?.toString() ?? '';
+        final phone = user['phone']?.toString() ?? '';
+
+        // Vérifier si un enregistrement existe déjà pour cet utilisateur
+        final locationQuery = await FirebaseFirestore.instance
+            .collection('locations')
+            .where('userId', isEqualTo: userId)
+            .get();
+
+        if (locationQuery.docs.isNotEmpty) {
+          // Mettre à jour l'enregistrement existant
+          await locationQuery.docs.first.reference.update({
+            'longitude': position.longitude,
+            'latitude': position.latitude,
+            'timestamp': FieldValue.serverTimestamp(),
+          });
+          print('✅ Position mise à jour avec succès');
+        } else {
+          // Créer un nouvel enregistrement
+          await FirebaseFirestore.instance.collection('locations').add({
+            'userId': userId,
+            'role': userRole,
+            'longitude': position.longitude,
+            'latitude': position.latitude,
+            'phone': phone,
+            'timestamp': FieldValue.serverTimestamp(),
+          });
+          print('✅ Nouvelle position enregistrée avec succès');
+        }
+      }
+    } catch (e) {
+      print('❌ Erreur lors de la récupération de la position: $e');
+    }
+  }
+
     String generate4DigitCode() {
       final random = Random();
       int code = (1000 + random.nextInt(9000))
@@ -1040,7 +1101,7 @@ class _OrderScreenState extends State<OrderScreen> {
         }
 
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return Column(
+          return const Column(
             children: [
               const OrderCardShimmer(),
               const SizedBox(height: 10),
@@ -1329,6 +1390,7 @@ class _OrderScreenState extends State<OrderScreen> {
                             ElevatedButton(
                               onPressed: () async {
                                 if (status == 'prêt à expédier') {
+                                  _saveCurrentLocation();
                                   try {
                                     await FirebaseFirestore.instance
                                         .collection('carts')
