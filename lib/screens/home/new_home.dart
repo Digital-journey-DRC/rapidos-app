@@ -468,8 +468,9 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                             itemBuilder: (context, index) {
                               final vendeur = merchants[index]['vendeur'];
                               final products = (merchants[index]['products'] as List).cast<Map<String, dynamic>>();
-                              final image = products.isNotEmpty && products[0]['media'] != null
-                                  ? 'http://24.144.87.127:3333/${products[0]['media']['mediaUrl']}'
+                              final media = merchants[index]['media'];
+                              final image = media != null && media['mediaUrl'] != null
+                                  ? media['mediaUrl']
                                   : 'https://via.placeholder.com/150';
                               final name = '${vendeur['firstName']} ${vendeur['lastName']}';
                               return GestureDetector(
