@@ -5,6 +5,7 @@ import 'package:immo/screens/auth/forget_password_step1.dart';
 import '../../constants.dart';
 import '../../cubit/auth_cubit.dart';
 import 'package:immo/widgets/custom_skeletons.dart';
+import '../../services/version_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -29,6 +30,15 @@ class _LoginScreenState extends State<LoginScreen> {
     displayNameNoCountryCode: "CD",
     e164Key: "",
   );
+
+  @override
+  void initState() {
+    super.initState();
+    // Vérifier la version au démarrage
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      VersionService.checkForUpdate(context);
+    });
+  }
 
   @override
   void dispose() {

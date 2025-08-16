@@ -8,6 +8,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:immo/screens/navigation_example.dart';
 import 'package:immo/screens/tracking_map_box.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class HomeLivreurScreen extends StatefulWidget {
   const HomeLivreurScreen({Key? key}) : super(key: key);
@@ -202,7 +203,7 @@ class _HomeLivreurScreenState extends State<HomeLivreurScreen> {
                 
                 // Message
                 const Text(
-                  'Veuillez passer au bureau de Rapidos pour activer votre compte.',
+                  'Veuillez contacter Rapidos pour activer votre compte.',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 16,
@@ -223,18 +224,18 @@ class _HomeLivreurScreenState extends State<HomeLivreurScreen> {
                       width: 1,
                     ),
                   ),
-                  child: Column(
+                  child: const Column(
                     children: [
                       Row(
                         children: [
                           Icon(
-                            Icons.location_on,
+                            Icons.phone,
                             color: Colors.white,
                             size: 20,
                           ),
                           const SizedBox(width: 8),
                           const Text(
-                            'Adresse du bureau:',
+                            'Téléphone:',
                             style: TextStyle(
                               color: Colors.white,
                               fontSize: 14,
@@ -245,20 +246,57 @@ class _HomeLivreurScreenState extends State<HomeLivreurScreen> {
                       ),
                       const SizedBox(height: 8),
                       const Text(
-                        'Concession COTEX N° 63,\nAve Colonel Mondjiba,\nKinshasa',
+                        '+243 808 000 316',
                         style: TextStyle(
                           color: Colors.white,
                           fontSize: 14,
                           height: 1.3,
                         ),
-                        textAlign: TextAlign.center,
+                        textAlign: TextAlign.left,
                       ),
                     ],
                   ),
                 ),
                 const SizedBox(height: 24),
                 
-                // Bouton OK
+                // Bouton Appeler Rapidos
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      final Uri phoneUri = Uri(scheme: 'tel', path: '+243808000316');
+                      if (await canLaunchUrl(phoneUri)) {
+                        await launchUrl(phoneUri);
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Impossible de lancer l\'appel'),
+                          ),
+                        );
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: AppColors.primary,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: 0,
+                    ),
+                    child: const Text(
+                      'Appeler Rapidos',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+                
+                const SizedBox(height: 12),
+                
+                // Bouton Quitter l'application
                 SizedBox(
                   width: double.infinity,
                   height: 50,
@@ -272,15 +310,15 @@ class _HomeLivreurScreenState extends State<HomeLivreurScreen> {
                       print('🚪 Utilisateur déconnecté et redirigé vers l\'écran de connexion');
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      foregroundColor: AppColors.primary,
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
                       elevation: 0,
                     ),
                     child: const Text(
-                      'J\'ai compris',
+                      'Quitter l\'application',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,

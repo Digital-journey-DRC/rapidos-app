@@ -116,18 +116,27 @@ class _RessetPasswordScreenState extends State<RessetPasswordScreen> {
         _isLoading = false;
       });
 
-      // Afficher un message de succès
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Mot de passe réinitialisé avec succès'),
-            backgroundColor: AppColors.success,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+              // Afficher un message de succès
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Mot de passe réinitialisé avec succès. Redirection vers la page de connexion...'),
+              backgroundColor: AppColors.success,
+              behavior: SnackBarBehavior.floating,
+              duration: Duration(seconds: 2),
+            ),
+          );
 
-        // Rediriger vers la page de connexion
-        Navigator.of(context).popUntil((route) => route.isFirst);
+        // Rediriger vers la page de connexion après un court délai
+        Future.delayed(const Duration(seconds: 2), () {
+          if (mounted) {
+            // Naviguer vers l'écran de connexion
+            Navigator.of(context).pushNamedAndRemoveUntil(
+              AppRoutes.login, 
+              (route) => false,
+            );
+          }
+        });
       }
     } catch (e) {
       setState(() {

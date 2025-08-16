@@ -51,6 +51,9 @@ import 'dart:convert';
 import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:immo/cubits/express/express_cubit.dart';
+import 'package:immo/screens/test_firebase_screen.dart';
+import 'package:immo/screens/admin_version_screen.dart';
+import 'package:immo/screens/test_modal_screen.dart';
 
 final AudioPlayer player = AudioPlayer();
 
@@ -569,19 +572,22 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
             home: state is AuthSuccess && state.token != null
                 ? const MainScreen()
                 : const LoginScreen(),
-            routes: {
-              AppRoutes.login: (context) => const LoginScreen(),
-              AppRoutes.register: (context) => const RegisterScreen(),
-              AppRoutes.main: (context) => const MainScreen(),
-              AppRoutes.chat: (context) {
-                final Map<dynamic, dynamic> rawArgs = ModalRoute.of(context)!
-                    .settings
-                    .arguments as Map<dynamic, dynamic>;
-                final Map<String, dynamic> args =
-                    Map<String, dynamic>.from(rawArgs);
-                return ChatScreen(conversation: args);
+                          routes: {
+                AppRoutes.login: (context) => const LoginScreen(),
+                AppRoutes.register: (context) => const RegisterScreen(),
+                AppRoutes.main: (context) => const MainScreen(),
+                AppRoutes.chat: (context) {
+                  final Map<dynamic, dynamic> rawArgs = ModalRoute.of(context)!
+                      .settings
+                      .arguments as Map<dynamic, dynamic>;
+                  final Map<String, dynamic> args =
+                      Map<String, dynamic>.from(rawArgs);
+                  return ChatScreen(conversation: args);
+                },
+                '/test-firebase': (context) => const TestFirebaseScreen(),
+                '/admin-version': (context) => const AdminVersionScreen(),
+                '/test-modals': (context) => const TestModalScreen(),
               },
-            },
           );
         },
       ),

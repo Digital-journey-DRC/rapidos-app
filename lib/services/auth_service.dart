@@ -99,7 +99,7 @@ class AuthService {
       }
 
       print(data);
-      envoyerSms(phone, "Votre code de vérification est : ${data['otp']}");
+      // envoyerSms(phone, "Votre code de vérification est : ${data['otp']}");
 
       return data;
     } catch (e) {

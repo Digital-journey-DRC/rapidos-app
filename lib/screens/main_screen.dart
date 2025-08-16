@@ -25,6 +25,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:io';
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../services/version_service.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -151,6 +152,11 @@ class _MainScreenState extends State<MainScreen> {
     // Charger les données au démarrage
     context.read<ListingCubit>().getListings();
     _initializeFirebaseMessaging();
+    
+    // Vérifier la version après l'initialisation
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      VersionService.checkForUpdate(context);
+    });
   }
 
   @override

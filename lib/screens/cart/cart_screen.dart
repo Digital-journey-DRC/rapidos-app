@@ -1351,7 +1351,7 @@ class _CartScreenState extends State<CartScreen> {
                           controller: _numeroController,
                           maxLines: 3,
                           decoration: InputDecoration(
-                            labelText: 'Détail adresse',
+                            labelText: "Référence de l'adresse",
                             hintText:
                                 'Ex : N°7A, 2ème étage, Appartement 15, Référence: près du marché, etc.',
                             prefixIcon: const Icon(Icons.info_outline),
@@ -1409,7 +1409,7 @@ class _CartScreenState extends State<CartScreen> {
                                             title:
                                                 const Text('Champ obligatoire'),
                                             content: const Text(
-                                                'Le champ "Détail adresse" est obligatoire. Veuillez entrer un numéro, étage, référence ou autre détail pour que le livreur puisse vous trouver.'),
+                                                'Le champ "Référence de l\'adresse" est obligatoire. Veuillez entrer un numéro, étage, référence ou autre détail pour que le livreur puisse vous trouver.'),
                                             actions: [
                                               TextButton(
                                                 onPressed: () {
