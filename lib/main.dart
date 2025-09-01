@@ -510,6 +510,67 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     }
   }
 
+  Future<bool> _checkUserSession() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token');
+      final userDataStr = prefs.getString('user_data');
+      final lastLoginStr = prefs.getString('last_login');
+
+      print('🔍 Vérification de session - Token: ${token != null ? "Présent" : "Absent"}');
+      print('🔍 Vérification de session - UserData: ${userDataStr != null ? "Présent" : "Absent"}');
+      print('🔍 Vérification de session - LastLogin: $lastLoginStr');
+
+      // Vérifier si toutes les données nécessaires sont présentes
+      if (token == null || userDataStr == null) {
+        print('❌ Données de session manquantes');
+        return false;
+      }
+
+      // Vérifier si la session n'a pas expiré (24 heures)
+      if (lastLoginStr != null) {
+        try {
+          final lastLogin = DateTime.parse(lastLoginStr);
+          final now = DateTime.now();
+          final difference = now.difference(lastLogin);
+          final hoursSinceLastLogin = difference.inHours;
+          
+          print('⏰ Heures depuis la dernière connexion: $hoursSinceLastLogin');
+          
+          // Session expire après 24 heures
+          if (hoursSinceLastLogin >= 24) {
+            print('⏰ Session expirée, nettoyage des données');
+            await prefs.clear();
+            return false;
+          }
+        } catch (e) {
+          print('❌ Erreur lors du parsing de la date de connexion: $e');
+          await prefs.clear();
+          return false;
+        }
+      }
+
+      // Vérifier que les données utilisateur sont valides
+      try {
+        final userData = jsonDecode(userDataStr);
+        if (userData['id'] == null) {
+          print('❌ Données utilisateur invalides');
+          await prefs.clear();
+          return false;
+        }
+        print('✅ Session valide trouvée pour l\'utilisateur: ${userData['firstName']} ${userData['lastName']}');
+        return true;
+      } catch (e) {
+        print('❌ Erreur lors du parsing des données utilisateur: $e');
+        await prefs.clear();
+        return false;
+      }
+    } catch (e) {
+      print('❌ Erreur lors de la vérification de session: $e');
+      return false;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return MultiBlocProvider(
@@ -540,8 +601,54 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         BlocProvider(create: (context) => FavoritesCubit()),
         BlocProvider(create: (context) => ExpressCubit()),
       ],
-      child: BlocBuilder<AuthCubit, AuthState>(
-        builder: (context, state) {
+      child: FutureBuilder<bool>(
+        future: _checkUserSession(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            // Afficher un écran de chargement pendant la vérification
+            return MaterialApp(
+              debugShowCheckedModeBanner: false,
+              title: 'Immo App',
+              theme: ThemeData(
+                useMaterial3: true,
+                scaffoldBackgroundColor: AppColors.background,
+                textTheme: GoogleFonts.plusJakartaSansTextTheme(
+                  Theme.of(context).textTheme,
+                ),
+                colorScheme: ColorScheme.fromSeed(
+                  seedColor: AppColors.primary,
+                  primary: AppColors.primary,
+                  secondary: AppColors.secondary,
+                  background: AppColors.background,
+                ),
+              ),
+              home: const Scaffold(
+                backgroundColor: AppColors.background,
+                body: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      CircularProgressIndicator(
+                        color: AppColors.primary,
+                      ),
+                      SizedBox(height: 16),
+                      Text(
+                        'Chargement...',
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: AppColors.text,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }
+
+          // Si l'utilisateur est connecté, afficher MainScreen, sinon LoginScreen
+          final isLoggedIn = snapshot.data ?? false;
+          
           return MaterialApp(
             navigatorKey: navigatorKey,
             debugShowCheckedModeBanner: false,
@@ -569,25 +676,23 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
                 background: AppColors.background,
               ),
             ),
-            home: state is AuthSuccess && state.token != null
-                ? const MainScreen()
-                : const LoginScreen(),
-                          routes: {
-                AppRoutes.login: (context) => const LoginScreen(),
-                AppRoutes.register: (context) => const RegisterScreen(),
-                AppRoutes.main: (context) => const MainScreen(),
-                AppRoutes.chat: (context) {
-                  final Map<dynamic, dynamic> rawArgs = ModalRoute.of(context)!
-                      .settings
-                      .arguments as Map<dynamic, dynamic>;
-                  final Map<String, dynamic> args =
-                      Map<String, dynamic>.from(rawArgs);
-                  return ChatScreen(conversation: args);
-                },
-                '/test-firebase': (context) => const TestFirebaseScreen(),
-                '/admin-version': (context) => const AdminVersionScreen(),
-                '/test-modals': (context) => const TestModalScreen(),
+            home: isLoggedIn ? const MainScreen() : const LoginScreen(),
+            routes: {
+              AppRoutes.login: (context) => const LoginScreen(),
+              AppRoutes.register: (context) => const RegisterScreen(),
+              AppRoutes.main: (context) => const MainScreen(),
+              AppRoutes.chat: (context) {
+                final Map<dynamic, dynamic> rawArgs = ModalRoute.of(context)!
+                    .settings
+                    .arguments as Map<dynamic, dynamic>;
+                final Map<String, dynamic> args =
+                    Map<String, dynamic>.from(rawArgs);
+                return ChatScreen(conversation: args);
               },
+              '/test-firebase': (context) => const TestFirebaseScreen(),
+              '/admin-version': (context) => const AdminVersionScreen(),
+              '/test-modals': (context) => const TestModalScreen(),
+            },
           );
         },
       ),
