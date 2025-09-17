@@ -14,10 +14,7 @@ buildscript {
             }
             credentials {
                 username = "mapbox"
-                password = project.hasProperty('MAPBOX_DOWNLOADS_TOKEN') ? project.property('MAPBOX_DOWNLOADS_TOKEN') : System.getenv('MAPBOX_DOWNLOADS_TOKEN')
-                if (password == null || password == "") {
-                    throw new GradleException("MAPBOX_DOWNLOADS_TOKEN isn't set. Set it to the project properties or to the enviroment variables.")
-                }
+                password = "sk.eyJ1Ijoic3R5bm9zIiwiYSI6ImNtY25lZmNsMDAyMGIybXFvMDlnOHUyb3YifQ.BiPyYbmaArUl8iHecmWY2g"
             }
         }
     }
@@ -41,10 +38,7 @@ rootProject.allprojects {
             }
             credentials {
                 username = "mapbox"
-                password = project.hasProperty('MAPBOX_DOWNLOADS_TOKEN') ? project.property('MAPBOX_DOWNLOADS_TOKEN') : System.getenv('MAPBOX_DOWNLOADS_TOKEN')
-                if (password == null || password == "") {
-                    throw new GradleException("MAPBOX_DOWNLOADS_TOKEN isn't set. Set it to the project properties or to the enviroment variables.")
-                }
+                password = "sk.eyJ1Ijoic3R5bm9zIiwiYSI6ImNtY25lZmNsMDAyMGIybXFvMDlnOHUyb3YifQ.BiPyYbmaArUl8iHecmWY2g"
             }
         }
     }
