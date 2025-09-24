@@ -675,7 +675,6 @@ class _OrderScreenState extends State<OrderScreen> {
               final shortCode = data['shortCode']??"";
               final adresse =
                   data['adresse']?.toString() ?? 'Adresse non spécifiée';
-
               return Padding(
                 padding: const EdgeInsets.only(bottom: 8),
                 child: InkWell(
