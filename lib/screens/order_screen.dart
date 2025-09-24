@@ -149,7 +149,7 @@ class _OrderScreenState extends State<OrderScreen> {
       case 'cancelled':
         return Colors.red;
       case 'en route pour livraison':
-        return Colors.green;
+        return Colors.orangeAccent;
       case 'prêt à expédier':
         return Colors.blue;
       case 'colis en cours de préparation':
@@ -697,6 +697,7 @@ class _OrderScreenState extends State<OrderScreen> {
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(18),
+                          border: Border.all(width: 1,color: _statusColor(status)),
                           boxShadow: [
                             BoxShadow(
                               color: Colors.black.withOpacity(0.06),
@@ -1159,7 +1160,20 @@ class _OrderScreenState extends State<OrderScreen> {
           );
         }
 
-        final orders = snapshot.data!.docs;
+        // Trier les documents par timestamp descendant
+        final orders = snapshot.data!.docs.toList()
+          ..sort((a, b) {
+            final aData = a.data() as Map<String, dynamic>;
+            final bData = b.data() as Map<String, dynamic>;
+            final aTimestamp = aData['timestamp'] as Timestamp?;
+            final bTimestamp = bData['timestamp'] as Timestamp?;
+
+            if (aTimestamp == null && bTimestamp == null) return 0;
+            if (aTimestamp == null) return 1;
+            if (bTimestamp == null) return -1;
+
+            return bTimestamp.compareTo(aTimestamp); // Tri décroissant
+          });
 
         if (orders.isEmpty) {
           return Center(
@@ -1195,6 +1209,7 @@ class _OrderScreenState extends State<OrderScreen> {
               margin: const EdgeInsets.only(bottom: 10),
               decoration: BoxDecoration(
                 color: Colors.white,
+                border: Border.all(width: 3,color: _statusColor(status)),
                 borderRadius: BorderRadius.circular(18),
                 boxShadow: [
                   BoxShadow(
@@ -1578,7 +1593,22 @@ class _OrderScreenState extends State<OrderScreen> {
           });
         }).toList();
 
-        if (filteredDocs.isEmpty) {
+        // Trier les documents filtrés par timestamp descendant
+        final sortedDocs = filteredDocs
+          ..sort((a, b) {
+            final aData = a.data() as Map<String, dynamic>;
+            final bData = b.data() as Map<String, dynamic>;
+            final aTimestamp = aData['timestamp'] as Timestamp?;
+            final bTimestamp = bData['timestamp'] as Timestamp?;
+
+            if (aTimestamp == null && bTimestamp == null) return 0;
+            if (aTimestamp == null) return 1;
+            if (bTimestamp == null) return -1;
+
+            return bTimestamp.compareTo(aTimestamp); // Tri décroissant
+          });
+
+        if (sortedDocs.isEmpty) {
           return Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -1598,29 +1628,17 @@ class _OrderScreenState extends State<OrderScreen> {
           );
         }
 
-        // Trier les commandes par date
-        filteredDocs.sort((a, b) {
-          final aData = a.data() as Map<String, dynamic>;
-          final bData = b.data() as Map<String, dynamic>;
-          final aTimestamp = aData['timestamp'] as Timestamp?;
-          final bTimestamp = bData['timestamp'] as Timestamp?;
-
-          if (aTimestamp == null && bTimestamp == null) return 0;
-          if (aTimestamp == null) return 1;
-          if (bTimestamp == null) return -1;
-
-          return bTimestamp.compareTo(aTimestamp); // Tri décroissant
-        });
+        // Les documents sont déjà triés par timestamp descendant dans sortedDocs
 
         return ListView.separated(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
           separatorBuilder: (_, __) => const SizedBox(height: 8),
-          itemCount: filteredDocs.length,
+          itemCount: sortedDocs.length,
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           itemBuilder: (context, index) {
             try {
-              final doc = filteredDocs[index];
+              final doc = sortedDocs[index];
               final data = doc.data() as Map<String, dynamic>;
               final status = data['status']?.toString() ?? 'pending';
               final timestamp = data['timestamp'] as Timestamp?;

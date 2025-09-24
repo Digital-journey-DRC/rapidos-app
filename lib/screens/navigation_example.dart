@@ -19,17 +19,12 @@ class NavigationExample extends StatefulWidget {
 
 class _NavigationExampleState extends State<NavigationExample> {
   bool _isNavigationActive = false;
-  bool _isRouteBuilt = false;
-  bool _arrived = false;
   String _instruction = "";
-  double _distanceRemaining = 0.0;
-  double _durationRemaining = 0.0;
   
   // Nouvelles variables pour le suivi en temps réel
   Set<Marker> _markers = {};
   Set<Polyline> _polylines = {};
   bool _isLoading = true;
-  String? _currentOrderId;
   MapType _currentMapType = MapType.normal;
   String? _livreurPhone;
   String? _acheteurPhone;
@@ -39,6 +34,7 @@ class _NavigationExampleState extends State<NavigationExample> {
   String? _routeDuration;
   bool _hasActiveOrders = false;
   GoogleMapController? _mapController;
+  StreamSubscription<Position>? _positionStreamSubscription;
 
   @override
   void initState() {
@@ -46,6 +42,7 @@ class _NavigationExampleState extends State<NavigationExample> {
     _initializeNavigation();
     _setupLocationUpdates();
     _updateLivreurPosition();
+    _startLocationTracking();
   }
 
   Future<void> _initializeNavigation() async {
@@ -128,6 +125,143 @@ class _NavigationExampleState extends State<NavigationExample> {
     }
   }
 
+  // Démarrer le suivi de position en temps réel
+  void _startLocationTracking() {
+    final authState = context.read<AuthCubit>().state;
+    if (authState is! AuthSuccess || authState.user == null) return;
+
+    final userRole = authState.user!['role'];
+    final userId = authState.user!['id'].toString();
+
+    // Seuls les livreurs ont besoin du suivi de position en temps réel
+    if (userRole != 'livreur') return;
+
+    _positionStreamSubscription = Geolocator.getPositionStream(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 10, // Mettre à jour toutes les 10 mètres
+      ),
+    ).listen((Position position) {
+      _updateLivreurPositionInFirestore(position, userId);
+    });
+  }
+
+  // Mettre à jour la position du livreur dans Firestore
+  Future<void> _updateLivreurPositionInFirestore(Position position, String userId) async {
+    try {
+      final authState = context.read<AuthCubit>().state;
+      if (authState is! AuthSuccess || authState.user == null) return;
+
+      final userPhone = authState.user!['phone'] as String?;
+
+      Map<String, dynamic> positionData = {
+        'userId': userId,
+        'role': 'livreur',
+        'latitude': position.latitude,
+        'longitude': position.longitude,
+        'phone': userPhone,
+        'timestamp': FieldValue.serverTimestamp(),
+      };
+
+      await FirebaseFirestore.instance
+          .collection('locations')
+          .doc(userId)
+          .set(positionData, SetOptions(merge: true));
+
+      setState(() {
+        _livreurPosition = LatLng(position.latitude, position.longitude);
+      });
+
+    } catch (e) {
+      print("❌ Erreur lors de la mise à jour de position: $e");
+    }
+  }
+
+  // Calculer la distance et la durée entre deux points
+  Future<void> _calculateRouteInfo(LatLng start, LatLng end) async {
+    try {
+      // Calculer la distance en ligne droite
+      double distance = Geolocator.distanceBetween(
+        start.latitude,
+        start.longitude,
+        end.latitude,
+        end.longitude,
+      );
+
+      // Convertir en kilomètres
+      double distanceKm = distance / 1000;
+
+      // Estimation de la durée (vitesse moyenne de 30 km/h en ville)
+      double durationHours = distanceKm / 30;
+      int durationMinutes = (durationHours * 60).round();
+
+      setState(() {
+        _routeDistance = '${distanceKm.toStringAsFixed(1)} km';
+        _routeDuration = '${durationMinutes} min';
+      });
+
+      // Créer la polyline entre les deux points
+      _createPolyline(start, end);
+
+    } catch (e) {
+      print("❌ Erreur lors du calcul de la route: $e");
+    }
+  }
+
+  // Créer une polyline entre deux points
+  void _createPolyline(LatLng start, LatLng end) {
+    setState(() {
+      _polylines = {
+        Polyline(
+          polylineId: const PolylineId('route'),
+          points: [start, end],
+          color: Colors.blue,
+          width: 4,
+          patterns: [PatternItem.dash(20), PatternItem.gap(10)],
+        ),
+      };
+    });
+
+    // Centrer la carte sur les deux positions
+    _centerMapOnPositions(start, end);
+  }
+
+  // Centrer la carte sur les deux positions
+  void _centerMapOnPositions(LatLng start, LatLng end) {
+    if (_mapController == null) return;
+
+    // Calculer le centre entre les deux points
+    double centerLat = (start.latitude + end.latitude) / 2;
+    double centerLng = (start.longitude + end.longitude) / 2;
+
+    // Calculer la distance pour déterminer le zoom approprié
+    double distance = Geolocator.distanceBetween(
+      start.latitude,
+      start.longitude,
+      end.latitude,
+      end.longitude,
+    );
+
+    // Ajuster le niveau de zoom selon la distance
+    double zoom = 12.0;
+    if (distance < 1000) {
+      zoom = 15.0; // Zoom élevé pour les courtes distances
+    } else if (distance < 5000) {
+      zoom = 13.0; // Zoom moyen pour les distances moyennes
+    } else {
+      zoom = 11.0; // Zoom faible pour les longues distances
+    }
+
+    _mapController!.animateCamera(
+      CameraUpdate.newCameraPosition(
+        CameraPosition(
+          target: LatLng(centerLat, centerLng),
+          zoom: zoom,
+        ),
+      ),
+    );
+  }
+
   void _setupLocationUpdates() {
     final authState = context.read<AuthCubit>().state;
     if (authState is! AuthSuccess || authState.user == null) return;
@@ -164,8 +298,8 @@ class _NavigationExampleState extends State<NavigationExample> {
           // Pour un acheteur, récupérer l'ID du livreur depuis la commande
           final livreurIds = cartSnapshot.docs
               .map((doc) => (doc.data() as Map<String, dynamic>)['livreur'] as String?)
-              .where((id) => id != null && id!.isNotEmpty)
-              .map((id) => id!)
+              .where((id) => id != null && id.isNotEmpty)
+              .map((id) => id)
               .toSet();
           
           if (livreurIds.isNotEmpty) {
@@ -182,8 +316,8 @@ class _NavigationExampleState extends State<NavigationExample> {
           // Pour un livreur, récupérer l'ID du client depuis la commande
           final clientIds = cartSnapshot.docs
               .map((doc) => (doc.data() as Map<String, dynamic>)['idClient'] as String?)
-              .where((id) => id != null && id!.isNotEmpty)
-              .map((id) => id!)
+              .where((id) => id != null && id.isNotEmpty)
+              .map((id) => id)
               .toSet();
           
           if (clientIds.isNotEmpty) {
@@ -217,7 +351,6 @@ class _NavigationExampleState extends State<NavigationExample> {
     if (authState is! AuthSuccess || authState.user == null) return;
     
     final userId = authState.user!['id'].toString();
-    LatLng? myPosition;
 
     // Filtrer les positions pour n'avoir qu'une seule position par utilisateur
     final Map<String, QueryDocumentSnapshot> latestPositions = {};
@@ -288,8 +421,6 @@ class _NavigationExampleState extends State<NavigationExample> {
                   ),
                 ),
               );
-              
-              myPosition = acheteurPosition;
             }
           });
     } else if (userRole == 'livreur') {
@@ -353,8 +484,6 @@ class _NavigationExampleState extends State<NavigationExample> {
                   ),
                 ),
               );
-              
-              myPosition = livreurPosition;
             }
           });
     }
@@ -363,6 +492,11 @@ class _NavigationExampleState extends State<NavigationExample> {
       _markers = markers;
       _isLoading = false;
     });
+
+    // Calculer la route si on a les deux positions
+    if (_livreurPosition != null && _acheteurPosition != null) {
+      _calculateRouteInfo(_livreurPosition!, _acheteurPosition!);
+    }
   }
 
   Future<void> _makePhoneCall(String phoneNumber) async {
@@ -393,7 +527,6 @@ class _NavigationExampleState extends State<NavigationExample> {
       case MapBoxEvent.progress_change:
         var progressEvent = e.data as RouteProgressEvent;
         setState(() {
-          _arrived = progressEvent.arrived ?? false;
           if (progressEvent.currentStepInstruction != null) {
             _instruction = progressEvent.currentStepInstruction ?? "";
           }
@@ -401,14 +534,9 @@ class _NavigationExampleState extends State<NavigationExample> {
         break;
       case MapBoxEvent.route_building:
       case MapBoxEvent.route_built:
-        setState(() {
-          _isRouteBuilt = true;
-        });
+        print("✅ Route built successfully");
         break;
       case MapBoxEvent.route_build_failed:
-        setState(() {
-          _isRouteBuilt = false;
-        });
         print("❌ Route build failed");
         break;
       case MapBoxEvent.navigation_running:
@@ -417,17 +545,12 @@ class _NavigationExampleState extends State<NavigationExample> {
         });
         break;
       case MapBoxEvent.on_arrival:
-        setState(() {
-          _arrived = true;
-        });
         print("🎯 Arrived at destination");
         break;
       case MapBoxEvent.navigation_finished:
       case MapBoxEvent.navigation_cancelled:
         setState(() {
-          _isRouteBuilt = false;
           _isNavigationActive = false;
-          _arrived = false;
         });
         print("🏁 Navigation finished or cancelled");
         break;
@@ -493,8 +616,6 @@ class _NavigationExampleState extends State<NavigationExample> {
       await MapBoxNavigation.instance.finishNavigation();
       setState(() {
         _isNavigationActive = false;
-        _isRouteBuilt = false;
-        _arrived = false;
       });
       print("🏁 Navigation finished");
     } catch (e) {
@@ -544,50 +665,61 @@ class _NavigationExampleState extends State<NavigationExample> {
           ),
         ],
       ),
-      body: _hasActiveOrders 
-          ? Column(
-              children: [
-                // Carte Google Maps pour le suivi en temps réel
-                Expanded(
-                  flex: 2,
-                  child: Container(
-                    margin: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
+      body: _isLoading
+          ? const Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 16),
+                  Text('Chargement des positions...'),
+                ],
+              ),
+            )
+          : _hasActiveOrders 
+              ? Column(
+                  children: [
+                    // Carte Google Maps pour le suivi en temps réel
+                    Expanded(
+                      flex: 2,
+                      child: Container(
+                        margin: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.1),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: GoogleMap(
-                        initialCameraPosition: const CameraPosition(
-                          target: LatLng(-4.325, 15.308),
-                          zoom: 12,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: GoogleMap(
+                            initialCameraPosition: const CameraPosition(
+                              target: LatLng(-4.325, 15.308),
+                              zoom: 12,
+                            ),
+                            onMapCreated: (GoogleMapController controller) {
+                              _mapController = controller;
+                            },
+                            markers: _markers,
+                            polylines: _polylines,
+                            myLocationEnabled: true,
+                            myLocationButtonEnabled: true,
+                            zoomControlsEnabled: true,
+                            mapToolbarEnabled: false,
+                            mapType: _currentMapType,
+                            compassEnabled: true,
+                            zoomGesturesEnabled: true,
+                            rotateGesturesEnabled: true,
+                            scrollGesturesEnabled: true,
+                            tiltGesturesEnabled: true,
+                          ),
                         ),
-                        onMapCreated: (GoogleMapController controller) {
-                          _mapController = controller;
-                        },
-                        markers: _markers,
-                        polylines: _polylines,
-                        myLocationEnabled: true,
-                        myLocationButtonEnabled: true,
-                        zoomControlsEnabled: true,
-                        mapToolbarEnabled: false,
-                        mapType: _currentMapType,
-                        compassEnabled: true,
-                        zoomGesturesEnabled: true,
-                        rotateGesturesEnabled: true,
-                        scrollGesturesEnabled: true,
-                        tiltGesturesEnabled: true,
                       ),
                     ),
-                  ),
-                ),
                 
                 // Cartes d'information
                 Expanded(
@@ -672,6 +804,57 @@ class _NavigationExampleState extends State<NavigationExample> {
                         ),
                         
                         const SizedBox(height: 8),
+                        
+                        // Carte d'information sur la route
+                        if (_routeDistance != null && _routeDuration != null)
+                          Card(
+                            elevation: 4,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: Colors.blue.withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: const Icon(
+                                      Icons.route,
+                                      color: Colors.blue,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        const Text(
+                                          'Informations du trajet',
+                                          style: TextStyle(fontWeight: FontWeight.bold),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          'Distance: $_routeDistance',
+                                          style: const TextStyle(fontSize: 14),
+                                        ),
+                                        Text(
+                                          'Durée estimée: $_routeDuration',
+                                          style: const TextStyle(fontSize: 14),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        
+                        if (_routeDistance != null && _routeDuration != null)
+                          const SizedBox(height: 8),
                         
                         // Contrôles de navigation Mapbox
                         Card(
@@ -775,6 +958,7 @@ class _NavigationExampleState extends State<NavigationExample> {
 
   @override
   void dispose() {
+    _positionStreamSubscription?.cancel();
     _mapController?.dispose();
     super.dispose();
   }
