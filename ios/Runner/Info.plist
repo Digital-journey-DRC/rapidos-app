@@ -43,10 +43,15 @@
 	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>Cette application a besoin d'accéder à votre caméra pour prendre des photos</string>
-	<key>NSLocationAlwaysUsageDescription</key>
-	<string>Cette application nécessite l'accès à la localisation pour afficher votre position sur la carte.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Rapidos utilise votre position en arrière-plan uniquement pendant une livraison active afin d'assurer le suivi en temps réel et des ETA précis, même si l'app n'est pas à l'écran. Par exemple, le client voit l'avancement du livreur après avoir quitté l'app.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Cette application nécessite l'accès à la localisation pour afficher votre position sur la carte.</string>
+	<string>Rapidos utilise votre position pour afficher les boutiques proches, calculer l'itinéraire et estimer l'heure d'arrivée. Par exemple, nous affichons les vendeurs autour de vous et le suivi en direct de la commande quand l'app est ouverte.</string>
+	<key>NSLocationTemporaryUsageDescriptionDictionary</key>
+	<dict>
+		<key>DeliveryTracking</key>
+		<string>Rapidos demande temporairement la position précise pour améliorer l'itinéraire et l'ETA pendant une livraison en cours.</string>
+	</dict>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Cette application a besoin d'accéder à votre microphone pour les vidéos</string>
 	<key>NSPhotoLibraryUsageDescription</key>

@@ -1,0 +1,13 @@
+/* 
+  InfoPlist.strings
+  Rapidos
+
+  Créé pour la localisation de l'application iOS.
+*/
+
+/* Permissions de localisation */
+"NSLocationWhenInUseUsageDescription" = "Rapidos utilise votre position pour afficher les boutiques proches, calculer l'itinéraire et estimer l'heure d'arrivée. Par exemple, nous affichons les vendeurs autour de vous et le suivi en direct de la commande quand l'app est ouverte.";
+
+"NSLocationAlwaysAndWhenInUseUsageDescription" = "Rapidos utilise votre position en arrière-plan uniquement pendant une livraison active afin d'assurer le suivi en temps réel et des ETA précis, même si l'app n'est pas à l'écran. Par exemple, le client voit l'avancement du livreur après avoir quitté l'app.";
+
+"NSLocationTemporaryUsageDescriptionDictionary.DeliveryTracking" = "Rapidos demande temporairement la position précise pour améliorer l'itinéraire et l'ETA pendant une livraison en cours.";
