@@ -1,4 +1,4 @@
-package com.rapidoscdkin.app
+package com.rapidosdrc.app
 
 import io.flutter.embedding.android.FlutterFragmentActivity
 
