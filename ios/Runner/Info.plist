@@ -42,7 +42,7 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
-	<string>Cette application a besoin d'accéder à votre caméra pour prendre des photos</string>
+	<string>Rapidos uses the camera for your profile photo, product photos, and to scan QR codes during deliveries (e.g., proof of handoff).</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>Rapidos utilise votre position en arrière-plan uniquement pendant une livraison active afin d'assurer le suivi en temps réel et des ETA précis, même si l'app n'est pas à l'écran. Par exemple, le client voit l'avancement du livreur après avoir quitté l'app.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
