@@ -1648,6 +1648,7 @@ class _OrderScreenState extends State<OrderScreen> {
                 margin: const EdgeInsets.only(bottom: 10),
                 decoration: BoxDecoration(
                   color: Colors.white,
+                  border: Border.all(width: 1,color: _statusColor(status)),
                   borderRadius: BorderRadius.circular(18),
                   boxShadow: [
                     BoxShadow(

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:immo/screens/auth/otp_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../services/auth_service.dart';
 import '../services/storage_service.dart';
 
@@ -139,6 +140,34 @@ class AuthCubit extends Cubit<AuthState> {
   }) async {
     try {
       emit(AuthLoading());
+      
+      // VÉRIFIER D'ABORD si le compte a été supprimé AVANT d'appeler l'API
+      final prefs = await SharedPreferences.getInstance();
+      final removeAccountStr = prefs.getString('removeAccount');
+      
+      print('🔍 AuthCubit: Vérification removeAccount AVANT connexion: $removeAccountStr');
+      
+      if (removeAccountStr != null) {
+        try {
+          final removeAccountData = jsonDecode(removeAccountStr);
+          final isRemove = removeAccountData['isRemove'] ?? false;
+          final phone = removeAccountData['phone'] ?? '';
+          
+          print('🔍 AuthCubit: isRemove: $isRemove, phone: $phone, uid: $uid');
+          
+          if (isRemove == true && phone == uid) {
+            print('🚫 AuthCubit: Compte supprimé détecté pour ce numéro, refus de connexion');
+            // Effacer la variable removeAccount après vérification
+            await prefs.remove('removeAccount');
+            emit(AuthError('Mot de passe ou identifiant incorrect'));
+            return;
+          }
+        } catch (e) {
+          print('⚠️ AuthCubit: Erreur lors du parsing removeAccount: $e');
+        }
+      }
+      
+      // Si pas de blocage, procéder à la connexion
       final response = await _authService.login(
         uid: uid,
         password: password,
@@ -146,8 +175,9 @@ class AuthCubit extends Cubit<AuthState> {
 
       print(response);
 
-      // Sauvegarder le token et les données utilisateur
+      // Vérifier si la connexion a réussi (status 200 ou équivalent)
       if (response['token'] != null) {
+        // Sauvegarder le token et les données utilisateur
         await _storageService.saveToken(response['token']['token']);
         await _storageService.saveUserData(jsonEncode(response['user']));
       }

@@ -1,6 +1,8 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:country_picker/country_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:immo/screens/auth/forget_password_step1.dart';
 import '../../constants.dart';
 import '../../cubit/auth_cubit.dart';
@@ -200,9 +202,36 @@ class _LoginScreenState extends State<LoginScreen> {
                             child: ElevatedButton(
                               onPressed: state is AuthLoading
                                   ? null
-                                  : () {
+                                  : () async {
                                       final phoneNumber =
                                           '+${_selectedCountry.phoneCode}${_phoneController.text}';
+                                      
+                                      // Vérifier si le compte a été supprimé AVANT de tenter la connexion
+                                      final prefs = await SharedPreferences.getInstance();
+                                      final removeAccountStr = prefs.getString('removeAccount');
+                                      
+                                      if (removeAccountStr != null) {
+                                        try {
+                                          final removeAccountData = jsonDecode(removeAccountStr);
+                                          final isRemove = removeAccountData['isRemove'] ?? false;
+                                          final phone = removeAccountData['phone'] ?? '';
+                                          
+                                          if (isRemove == true && phone == phoneNumber) {
+                                            // Afficher un message d'erreur
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              const SnackBar(
+                                                content: Text('Numéro de téléphone ou mot de passe incorrect'),
+                                                backgroundColor: Colors.red,
+                                              ),
+                                            );
+                                            return; // Arrêter ici, ne pas faire la connexion
+                                          }
+                                        } catch (e) {
+                                          print('Erreur lors du parsing removeAccount: $e');
+                                        }
+                                      }
+                                      
+                                      // Si pas de blocage, procéder à la connexion
                                       context.read<AuthCubit>().login(
                                             uid: phoneNumber,
                                             password: _passwordController.text,

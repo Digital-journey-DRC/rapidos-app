@@ -8,7 +8,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:immo/cubit/auth_cubit.dart';
 import 'package:immo/screens/dashboard/setting_screen.dart';
 import 'package:immo/cubit/featured_product_cubit.dart';
-import 'package:immo/widgets/image_viewer.dart' as img_viewer;
 import 'package:immo/screens/product/all_products_screen.dart';
 import 'package:immo/cubit/category_cubit.dart';
 import 'package:immo/widgets/shimmer_loading.dart';
@@ -17,9 +16,10 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:immo/cubit/order_cubit.dart';
 import 'package:immo/cubit/cart_cubit.dart';
-import 'package:immo/screens/tracking_map_page.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:immo/services/auth_gate_service.dart';
+import 'package:immo/screens/auth/login_screen.dart';
 
 class NewHomeScreen extends StatefulWidget {
   const NewHomeScreen({Key? key}) : super(key: key);
@@ -29,7 +29,6 @@ class NewHomeScreen extends StatefulWidget {
 }
 
 class _NewHomeScreenState extends State<NewHomeScreen> {
-  GoogleMapController? _mapController;
   Position? _currentPosition;
   bool _isLoading = false;
   List<dynamic> _commandes = [];
@@ -37,24 +36,57 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
   @override
   void initState() {
     super.initState();
-    context.read<FeaturedProductCubit>().fetchFeaturedProducts();
-    context.read<CategoryCubit>().fetchCategories();
-    context.read<MerchantCubit>().fetchMerchants(context);
-    _fetchOrdersAndLocation();
-    _fetchUserMedia();
+    // Attendre que l'AuthCubit soit initialisé avant de charger les données
+    _initializeData();
+  }
+
+  Future<void> _initializeData() async {
+    try {
+      print('🔄 NewHomeScreen: Initialisation des données...');
+      
+      // Attendre que l'AuthCubit soit initialisé
+      int attempts = 0;
+      while (attempts < 10) {
+        final authState = context.read<AuthCubit>().state;
+        print('🔍 NewHomeScreen: État AuthCubit (tentative ${attempts + 1}): ${authState.runtimeType}');
+        
+        if (authState is AuthSuccess && authState.token != null) {
+          print('✅ NewHomeScreen: AuthCubit initialisé, chargement des données...');
+          break;
+        }
+        
+        await Future.delayed(const Duration(milliseconds: 500));
+        attempts++;
+      }
+      
+      // Charger les données
+      context.read<FeaturedProductCubit>().fetchFeaturedProducts();
+      context.read<CategoryCubit>().fetchCategories();
+      context.read<MerchantCubit>().fetchMerchants(context);
+      _fetchOrdersAndLocation();
+      _fetchUserMedia();
+      
+      print('✅ NewHomeScreen: Données initialisées');
+    } catch (e) {
+      print('❌ NewHomeScreen: Erreur lors de l\'initialisation: $e');
+    }
   }
 
   Future<void> _fetchUserMedia() async {
     try {
+      print('🔄 NewHomeScreen: Récupération des médias utilisateur...');
+      
       // Récupérer l'utilisateur connecté
       final authState = context.read<AuthCubit>().state;
+      print('🔍 NewHomeScreen: État AuthCubit: ${authState.runtimeType}');
+      
       if (authState is AuthSuccess && authState.user != null) {
         final userId = authState.user!['id']?.toString() ?? '';
         final token = authState.token;
         
+        print('🔄 NewHomeScreen: Récupération des médias pour l\'utilisateur: $userId');
+        
         if (userId.isNotEmpty && token != null) {
-          print('🔄 Récupération des médias pour l\'utilisateur: $userId');
-          
           // Requête pour récupérer les médias de l'utilisateur
           final response = await http.get(
             Uri.parse('http://24.144.87.127:3333/users/me'),
@@ -66,7 +98,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
           
           if (response.statusCode == 200) {
             final data = jsonDecode(response.body);
-            print('✅ Médias récupérés: ${data['data']['media']}');
+            print('✅ NewHomeScreen: Médias récupérés: ${data['data']['media']}');
             
             // Mettre à jour les données utilisateur avec les médias
             if (data['data']['media'] != null) {
@@ -75,29 +107,44 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
               
               // Mettre à jour l'état de l'authentification
               context.read<AuthCubit>().updateUser(updatedUser, token);
+              print('✅ NewHomeScreen: Données utilisateur mises à jour');
             }
           } else {
-            print('❌ Erreur lors de la récupération des médias: ${response.statusCode}');
+            print('❌ NewHomeScreen: Erreur lors de la récupération des médias: ${response.statusCode}');
+            print('❌ NewHomeScreen: Réponse: ${response.body}');
           }
+        } else {
+          print('❌ NewHomeScreen: Token ou userId manquant pour la récupération des médias');
+          print('❌ NewHomeScreen: userId: $userId, token: ${token != null ? "présent" : "absent"}');
         }
+      } else {
+        print('❌ NewHomeScreen: Utilisateur non connecté ou AuthCubit non initialisé');
+        print('❌ NewHomeScreen: authState: $authState');
       }
     } catch (e) {
-      print('❌ Erreur lors de la récupération des médias: $e');
+      print('❌ NewHomeScreen: Erreur lors de la récupération des médias: $e');
     }
   }
 
   Future<void> _fetchOrdersAndLocation() async {
-    setState(() { _isLoading = true; });
     try {
+      print('🔄 NewHomeScreen: Récupération des commandes et localisation...');
+      setState(() { _isLoading = true; });
+      
       // Récupérer les commandes via OrderCubit
       final orderCubit = context.read<OrderCubit>();
       await orderCubit.fetchOrders();
       final commandes = orderCubit.orderListState.commandes;
       setState(() { _commandes = commandes; });
+      
+      print('📦 NewHomeScreen: Commandes récupérées: ${commandes.length}');
+      
       if (commandes.isNotEmpty) {
         // Si au moins une commande, récupérer la position
+        print('📍 NewHomeScreen: Récupération de la position...');
         bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
         if (!serviceEnabled) {
+          print('❌ NewHomeScreen: Service de localisation désactivé');
           setState(() { _isLoading = false; });
           return;
         }
@@ -105,11 +152,13 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
         if (permission == LocationPermission.denied) {
           permission = await Geolocator.requestPermission();
           if (permission == LocationPermission.denied) {
+            print('❌ NewHomeScreen: Permission de localisation refusée');
             setState(() { _isLoading = false; });
             return;
           }
         }
         if (permission == LocationPermission.deniedForever) {
+          print('❌ NewHomeScreen: Permission de localisation refusée définitivement');
           setState(() { _isLoading = false; });
           return;
         }
@@ -120,11 +169,111 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
           _currentPosition = position;
           _isLoading = false;
         });
+        print('✅ NewHomeScreen: Position récupérée: ${position.latitude}, ${position.longitude}');
       } else {
         setState(() { _isLoading = false; });
+        print('ℹ️ NewHomeScreen: Aucune commande trouvée');
       }
     } catch (e) {
+      print('❌ NewHomeScreen: Erreur lors de la récupération des commandes: $e');
       setState(() { _isLoading = false; });
+    }
+  }
+
+  /// Affiche une boîte de dialogue de confirmation pour la déconnexion
+  void _showLogoutDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Déconnexion'),
+          content: const Text('Êtes-vous sûr de vouloir vous déconnecter ?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Annuler'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _logout();
+              },
+              child: const Text(
+                'Déconnexion',
+                style: TextStyle(color: Colors.red),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  /// Vérifie si l'utilisateur est autorisé à effectuer des actions
+  bool _isAuthorizedUser() {
+    try {
+      final authState = context.read<AuthCubit>().state;
+      if (authState is AuthSuccess && authState.user != null) {
+        final userPhone = authState.user!['phone']?.toString() ?? '';
+        print('🔍 Vérification autorisation - Téléphone utilisateur: $userPhone');
+        
+        // Si le numéro est +243842613999, l'utilisateur n'est PAS autorisé
+        final isAuthorized = userPhone != '+243842613999';
+        print('🔍 Utilisateur autorisé: $isAuthorized');
+        
+        return isAuthorized;
+      }
+      print('❌ Utilisateur non connecté');
+      return false;
+    } catch (e) {
+      print('❌ Erreur lors de la vérification d\'autorisation: $e');
+      return false;
+    }
+  }
+
+  /// Redirige vers le login si l'utilisateur n'est pas autorisé
+  void _checkAuthorizationAndRedirect() {
+    if (!_isAuthorizedUser()) {
+      print('🚫 Utilisateur non autorisé, redirection vers login...');
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+        (route) => false,
+      );
+    }
+  }
+
+  /// Effectue la déconnexion et redirige vers l'écran de login
+  Future<void> _logout() async {
+    try {
+      print('🔄 Déconnexion en cours...');
+      
+      // Effacer la session via AuthGateService
+      final authGateService = AuthGateService();
+      await authGateService.clearSession();
+      
+      // Effacer la session via AuthCubit
+      if (mounted) {
+        context.read<AuthCubit>().logout();
+      }
+      
+      print('✅ Session effacée avec succès');
+      
+      // Rediriger vers l'écran de login
+      if (mounted) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const LoginScreen()),
+          (route) => false,
+        );
+      }
+    } catch (e) {
+      print('❌ Erreur lors de la déconnexion: $e');
+      // Rediriger quand même vers l'écran de login
+      if (mounted) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const LoginScreen()),
+          (route) => false,
+        );
+      }
     }
   }
 
@@ -138,6 +287,15 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
         automaticallyImplyLeading: false,
         title: Image.asset(AppAssets.logo, width: 100, height: 100),
         actions: [
+          // Bouton Logout
+          // IconButton(
+          //   onPressed: () => _showLogoutDialog(context),
+          //   icon: const Icon(
+          //     Icons.logout,
+          //     color: AppColors.primary,
+          //   ),
+          //   tooltip: 'Déconnexion',
+          // ),
           Padding(
             padding: const EdgeInsets.only(right: 12),
             child: BlocBuilder<AuthCubit, AuthState>(
@@ -147,11 +305,14 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                     state.user!['media'] != null) {
                   return GestureDetector(
                     onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (context) => const SettingScreen()),
-                      );
+                      _checkAuthorizationAndRedirect();
+                      if (_isAuthorizedUser()) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (context) => const SettingScreen()),
+                        );
+                      }
                     },
                     child: CircleAvatar(
                       radius: 20,
@@ -167,11 +328,14 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                 } else {
                   return GestureDetector(
                     onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (context) => const SettingScreen()),
-                      );
+                      _checkAuthorizationAndRedirect();
+                      if (_isAuthorizedUser()) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (context) => const SettingScreen()),
+                        );
+                      }
                     },
                     child: const CircleAvatar(
                       radius: 20,
@@ -208,12 +372,15 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                     ),
                     child: GestureDetector(
                       onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const AllMerchantsScreen(),
-                          ),
-                        );
+                        _checkAuthorizationAndRedirect();
+                        if (_isAuthorizedUser()) {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const AllMerchantsScreen(),
+                            ),
+                          );
+                        }
                       },
                       child: Row(
                         children: [
@@ -346,13 +513,16 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                               state.products.isNotEmpty) {
                             return TextButton(
                               onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => AllProductsScreen(
-                                        products: state.products.reversed.toList()),
-                                  ),
-                                );
+                                _checkAuthorizationAndRedirect();
+                                if (_isAuthorizedUser()) {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => AllProductsScreen(
+                                          products: state.products.reversed.toList()),
+                                    ),
+                                  );
+                                }
                               },
                               child: const Text('Voir tout',
                                   style: TextStyle(color: AppColors.primary)),
@@ -434,12 +604,15 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                       ),
                       TextButton(
                         onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const AllMerchantsScreen(),
-                            ),
-                          );
+                          _checkAuthorizationAndRedirect();
+                          if (_isAuthorizedUser()) {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const AllMerchantsScreen(),
+                              ),
+                            );
+                          }
                         },
                         child: const Text('Voir tout', style: TextStyle(color: AppColors.primary)),
                       ),
@@ -475,11 +648,13 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                               final name = '${vendeur['firstName']} ${vendeur['lastName']}';
                               return GestureDetector(
                                 onTap: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => MerchantProfileScreen(
-                                        merchantId: vendeur['id'],
+                                  _checkAuthorizationAndRedirect();
+                                  if (_isAuthorizedUser()) {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => MerchantProfileScreen(
+                                          merchantId: vendeur['id'],
                                         name: name,
                                         rating: 4.5,
                                         category: products.isNotEmpty ? products[0]['description'] ?? '' : '',
@@ -489,6 +664,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                                       ),
                                     ),
                                   );
+                                  }
                                 },
                                 child: _buildMerchantCard(
                                   id: vendeur['id'].toString(), // Convertir en String
@@ -531,7 +707,10 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                           cursor: SystemMouseCursors.click,
                           child: InkWell(
                             onTap: () {
-                              Navigator.push(context, MaterialPageRoute(builder: (context) => const NavigationExample(backNavigation: true)));
+                              _checkAuthorizationAndRedirect();
+                              if (_isAuthorizedUser()) {
+                                Navigator.push(context, MaterialPageRoute(builder: (context) => const NavigationExample(backNavigation: true)));
+                              }
                             },
                             child: Container(
                               height: 200,
@@ -562,7 +741,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                                               zoom: 15,
                                             ),
                                             onMapCreated: (GoogleMapController controller) {
-                                              _mapController = controller;
+                                              // Map controller initialized
                                             },
                                             myLocationEnabled: true,
                                             myLocationButtonEnabled: true,
@@ -575,7 +754,10 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                                         color: Colors.transparent,
                                         child: InkWell(
                                           onTap: () {
-                                            Navigator.push(context, MaterialPageRoute(builder: (context) => const NavigationExample(backNavigation: true)));
+                                            _checkAuthorizationAndRedirect();
+                                            if (_isAuthorizedUser()) {
+                                              Navigator.push(context, MaterialPageRoute(builder: (context) => const NavigationExample(backNavigation: true)));
+                                            }
                                           },
                                           child: Container(
                                             decoration: BoxDecoration(
@@ -677,21 +859,24 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
       builder: (context) {
         return GestureDetector(
           onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => ProductDetailScreen(
-                  idVendeur: idVendeur,
-                  id: id,
-                  tag: tag,
-                  category: category,
-                  stock: stock,
-                  name: name,
-                  price: price,
-                  imagePath: imagePath,
+            _checkAuthorizationAndRedirect();
+            if (_isAuthorizedUser()) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ProductDetailScreen(
+                    idVendeur: idVendeur,
+                    id: id,
+                    tag: tag,
+                    category: category,
+                    stock: stock,
+                    name: name,
+                    price: price,
+                    imagePath: imagePath,
+                  ),
                 ),
-              ),
-            );
+              );
+            }
           },
           child: Container(
             width: 150,
@@ -762,6 +947,9 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                       right: 8,
                       child: GestureDetector(
                         onTap: () async {
+                          _checkAuthorizationAndRedirect();
+                          if (!_isAuthorizedUser()) return;
+                          
                           final newItem = {
                             'id': id,
                             'name': name,
@@ -867,20 +1055,23 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
     return Builder(
       builder: (context) => GestureDetector(
         onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => MerchantProfileScreen(
-                merchantId: id,
-                name: name,
-                rating: rating,
-                category: category,
-                imagePath: imagePath,
-                isVerified: isVerified,
-                products: products,
+          _checkAuthorizationAndRedirect();
+          if (_isAuthorizedUser()) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => MerchantProfileScreen(
+                  merchantId: id,
+                  name: name,
+                  rating: rating,
+                  category: category,
+                  imagePath: imagePath,
+                  isVerified: isVerified,
+                  products: products,
+                ),
               ),
-            ),
-          );
+            );
+          }
         },
         child: Container(
           width: 180,
@@ -991,39 +1182,6 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
     );
   }
 
-  Widget _buildReviewCard(String name, int rating, String comment) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade200,
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              CircleAvatar(
-                backgroundColor: Colors.grey.shade300,
-                radius: 12,
-              ),
-              const SizedBox(width: 8),
-              Text(name, style: const TextStyle(fontSize: 13)),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Row(
-            children: List.generate(
-              rating,
-              (index) => const Icon(Icons.star, color: Colors.amber, size: 14),
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(comment, style: const TextStyle(fontSize: 13)),
-        ],
-      ),
-    );
-  }
 }
 
 // Custom painter to draw a grid pattern for the map background

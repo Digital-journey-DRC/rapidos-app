@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:immo/cubit/listing_cubit.dart';
 import 'package:immo/screens/cart/cart_screen.dart';
 import 'package:immo/screens/express_livreur.dart';
@@ -11,10 +10,7 @@ import 'package:immo/screens/home/home_marchant.dart';
 import 'package:immo/screens/home/new_home.dart';
 import 'package:immo/screens/home/voir_plus_produits.dart';
 import 'package:immo/screens/navigation_example.dart';
-
 import 'package:immo/screens/order_screen.dart';
-import 'package:immo/screens/tracking_map_box.dart';
-import 'package:immo/screens/tracking_map_page.dart';
 
 import '../constants.dart';
 import '../cubit/auth_cubit.dart';
@@ -166,6 +162,25 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   void _onItemTapped(int index) {
+    final authState = context.read<AuthCubit>().state;
+    
+    // Vérifier si l'utilisateur a le numéro spécifique
+    if (authState is AuthSuccess && authState.user != null) {
+      final userPhone = authState.user!['phone']?.toString();
+      print('🔍 MainScreen: Vérification du numéro - $userPhone');
+      
+      if (userPhone == "+243842613999") {
+        print('🚫 MainScreen: Utilisateur avec numéro restreint détecté, redirection vers login');
+        // Rediriger vers le login
+        context.read<AuthCubit>().logout();
+        Navigator.of(context).pushNamedAndRemoveUntil(
+          AppRoutes.login,
+          (route) => false,
+        );
+        return;
+      }
+    }
+
     setState(() {
       _previousIndex = _currentIndex;
       _currentIndex = index;
@@ -189,6 +204,11 @@ class _MainScreenState extends State<MainScreen> {
     final bool isLivreur = authState is AuthSuccess &&
         authState.user != null &&
         authState.user!['role'] == 'livreur';
+    
+    // Vérifier si l'utilisateur a le numéro restreint
+    final bool isRestrictedUser = authState is AuthSuccess &&
+        authState.user != null &&
+        authState.user!['phone']?.toString() == "+243842613999";
 
     List<BottomNavigationBarItem> navigationItems = [
       const BottomNavigationBarItem(
@@ -271,7 +291,8 @@ class _MainScreenState extends State<MainScreen> {
         index: _currentIndex,
         children: filteredScreens,
       ),
-      bottomNavigationBar: BottomNavigationBar(
+      // Cacher la barre de navigation pour l'utilisateur restreint
+      bottomNavigationBar: isRestrictedUser ? null : BottomNavigationBar(
         backgroundColor: const Color.fromARGB(255, 250, 250, 250),
         currentIndex: _currentIndex,
         onTap: _onItemTapped,
@@ -283,34 +304,4 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
-  // Afficher une boîte de dialogue de confirmation avant la déconnexion
-  void _confirmLogout(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Déconnexion'),
-          content: const Text('Êtes-vous sûr de vouloir vous déconnecter ?'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Annuler'),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                context.read<AuthCubit>().logout();
-                Navigator.of(context).pushNamedAndRemoveUntil(
-                  AppRoutes.login,
-                  (route) => false,
-                );
-              },
-              child: const Text('Déconnexion',
-                  style: TextStyle(color: Colors.red)),
-            ),
-          ],
-        );
-      },
-    );
-  }
 }

@@ -5,10 +5,12 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../constants.dart';
 import '../../cubit/auth_cubit.dart';
 import '../../cubits/profile/profile_cubit.dart';
 import '../../services/profile_service.dart';
+import '../auth/login_screen.dart';
 
 class SettingScreen extends StatefulWidget {
   const SettingScreen({super.key});
@@ -871,6 +873,61 @@ class _SettingScreenState extends State<SettingScreen>
                 );
               },
             ),
+            const SizedBox(height: 8),
+            ListTile(
+              leading: const Icon(Icons.delete_forever, color: Colors.red),
+              title: const Text(
+                'Supprimer le compte',
+                style: TextStyle(
+                  color: Colors.red,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              onTap: () {
+                // Show confirmation dialog before account deletion
+                showDialog(
+                  context: context,
+                  builder: (BuildContext context) {
+                    return AlertDialog(
+                      title: const Text('Suppression du compte'),
+                      content: const Text(
+                        'Êtes-vous sûr de vouloir supprimer votre compte ? Cette action est irréversible.',
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () {
+                            Navigator.of(context).pop(); // Close dialog
+                          },
+                          child: const Text(
+                            'Annuler',
+                            style: TextStyle(
+                              color: Colors.grey,
+                            ),
+                          ),
+                        ),
+                        ElevatedButton(
+                          onPressed: () {
+                            Navigator.of(context).pop(); // Close dialog
+                            _deleteAccount();
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.red,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          child: const Text('Supprimer'),
+                        ),
+                      ],
+                    );
+                  },
+                );
+              },
+            ),
           ],
         ),
       ),
@@ -1252,6 +1309,60 @@ class _SettingScreenState extends State<SettingScreen>
         ],
       ),
     );
+  }
+
+  /// Supprime le compte et redirige vers LoginScreen
+  Future<void> _deleteAccount() async {
+    try {
+      print('🗑️ Suppression du compte en cours...');
+      
+      // Récupérer les données utilisateur actuelles
+      final authState = context.read<AuthCubit>().state;
+      Map<String, dynamic> user = {};
+      
+      if (authState is AuthSuccess && authState.user != null) {
+        user = authState.user!;
+      }
+      
+      // Effacer toutes les données de session D'ABORD
+      context.read<AuthCubit>().logout();
+      
+      // PUIS enregistrer dans SharedPreferences la marque de suppression de compte
+      final prefs = await SharedPreferences.getInstance();
+      final removeAccountData = {
+        'phone': user['phone'] ?? '',
+        'isRemove': true,
+      };
+      
+      await prefs.setString('removeAccount', jsonEncode(removeAccountData));
+      print('✅ removeAccount enregistré: $removeAccountData');
+      
+      // Afficher un message de confirmation
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Compte supprimé avec succès'),
+          backgroundColor: Colors.green,
+        ),
+      );
+      
+      // Rediriger vers LoginScreen
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(
+          builder: (context) => const LoginScreen(),
+        ),
+        (route) => false,
+      );
+      
+      print('✅ Redirection vers LoginScreen effectuée');
+    } catch (e) {
+      print('❌ Erreur lors de la suppression du compte: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erreur lors de la suppression: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   Future<void> _updateProfile() async {
