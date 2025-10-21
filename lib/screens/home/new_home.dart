@@ -479,8 +479,38 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                     }
                     if (state is CategoryError) {
                       return Center(
-                          child: Text(state.message,
-                              style: const TextStyle(color: Colors.red)));
+                        child: Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade100,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.grey.shade300),
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.info_outline, color: Colors.grey.shade600, size: 24),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Impossible de charger les catégories',
+                                style: TextStyle(
+                                  color: Colors.grey.shade700,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Vérifiez votre connexion internet',
+                                style: TextStyle(
+                                  color: Colors.grey.shade500,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
                     }
                     return const SizedBox.shrink();
                   },
@@ -681,7 +711,39 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                         );
                       }
                       if (state is MerchantError) {
-                        return Center(child: Text(state.message, style: const TextStyle(color: Colors.red)));
+                        return Center(
+                          child: Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade100,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.grey.shade300),
+                            ),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.store_outlined, color: Colors.grey.shade600, size: 24),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Impossible de charger les boutiques',
+                                  style: TextStyle(
+                                    color: Colors.grey.shade700,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Vérifiez votre connexion internet',
+                                  style: TextStyle(
+                                    color: Colors.grey.shade500,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
                       }
                       return const SizedBox.shrink();
                     },
