@@ -807,7 +807,7 @@ class _TrackingMapPageState extends State<TrackingMapPage> {
       PolylinePoints polylinePoints = PolylinePoints();
       
       PolylineResult result = await polylinePoints.getRouteBetweenCoordinates(
-        googleApiKey: 'AIzaSyCuLBjM3oTYfFSbJwXccj4xP8oynDV5JnM',
+        googleApiKey: 'AIzaSyCpJzuEa7jLAcP8ub8AVM8flT2aK5cPdh0',
         request: PolylineRequest(
           origin: PointLatLng(origin.latitude, origin.longitude),
           destination: PointLatLng(destination.latitude, destination.longitude),
@@ -946,7 +946,7 @@ class _TrackingMapPageState extends State<TrackingMapPage> {
   // Obtenir les instructions de navigation de manière asynchrone et sécurisée
   Future<void> _getNavigationInstructionsAsync(LatLng origin, LatLng destination) async {
     try {
-      final String apiKey = 'AIzaSyCuLBjM3oTYfFSbJwXccj4xP8oynDV5JnM';
+      final String apiKey = 'AIzaSyCpJzuEa7jLAcP8ub8AVM8flT2aK5cPdh0';
       final String url = 'https://maps.googleapis.com/maps/api/directions/json?'
           'origin=${origin.latitude},${origin.longitude}'
           '&destination=${destination.latitude},${destination.longitude}'

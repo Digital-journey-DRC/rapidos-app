@@ -224,7 +224,7 @@ void saveCommande() async {
                             ),
                             items: state.categories
                                 .map((cat) => DropdownMenuItem(
-                                      value: cat.name,
+                                      value: cat.id.toString(),
                                       child: Text(cat.name),
                                     ))
                                 .toList(),

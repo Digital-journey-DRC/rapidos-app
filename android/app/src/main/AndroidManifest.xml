@@ -18,7 +18,7 @@
         <!-- Google Maps API Key -->
         <meta-data
             android:name="com.google.android.geo.API_KEY"
-            android:value="AIzaSyCuLBjM3oTYfFSbJwXccj4xP8oynDV5JnM"/>
+            android:value="AIzaSyCpJzuEa7jLAcP8ub8AVM8flT2aK5cPdh0"/>
 
         <!-- Mapbox Access Token -->
         <meta-data

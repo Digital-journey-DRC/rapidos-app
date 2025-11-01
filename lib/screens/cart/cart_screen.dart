@@ -1559,7 +1559,7 @@ class _CartScreenState extends State<CartScreen> {
   }
 
   Future<Map<String, double>> getCoordinatesFromGoogle(String address) async {
-    const apiKey = 'AIzaSyCuLBjM3oTYfFSbJwXccj4xP8oynDV5JnM';
+    const apiKey = 'AIzaSyCpJzuEa7jLAcP8ub8AVM8flT2aK5cPdh0';
     final url =
         'https://maps.googleapis.com/maps/api/geocode/json?address=${Uri.encodeComponent(address)}&key=$apiKey';
 
@@ -1596,7 +1596,7 @@ class _CartScreenState extends State<CartScreen> {
 
   Future<Map<String, String>> getAddressFromGoogleAPI(
       double lat, double lng) async {
-    const apiKey = 'AIzaSyCuLBjM3oTYfFSbJwXccj4xP8oynDV5JnM';
+    const apiKey = 'AIzaSyCpJzuEa7jLAcP8ub8AVM8flT2aK5cPdh0';
     final url =
         'https://maps.googleapis.com/maps/api/geocode/json?latlng=$lat,$lng&key=$apiKey&language=fr';
 
@@ -1688,7 +1688,7 @@ class _CartScreenState extends State<CartScreen> {
 
     _searchDebounceTimer =
         Timer(Duration(milliseconds: debounceTime), () async {
-      const apiKey = 'AIzaSyCuLBjM3oTYfFSbJwXccj4xP8oynDV5JnM';
+      const apiKey = 'AIzaSyCpJzuEa7jLAcP8ub8AVM8flT2aK5cPdh0';
 
       // Recherche plus intelligente avec plusieurs types de résultats
       final List<String> searchUrls = [
@@ -1874,7 +1874,7 @@ class _CartScreenState extends State<CartScreen> {
   Future<void> _selectAddress(Map<String, dynamic> place) async {
     print('🎯 Sélection d\'adresse: ${place['description']}');
 
-    const apiKey = 'AIzaSyCuLBjM3oTYfFSbJwXccj4xP8oynDV5JnM';
+    const apiKey = 'AIzaSyCpJzuEa7jLAcP8ub8AVM8flT2aK5cPdh0';
     final placeId = place['place_id'];
     final url = 'https://maps.googleapis.com/maps/api/place/details/json'
         '?place_id=$placeId'
