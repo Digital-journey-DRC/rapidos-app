@@ -11,6 +11,7 @@ class MerchantProfileScreen extends StatefulWidget {
   final String imagePath;
   final String category;
   final double rating;
+  final String description;
   final bool isVerified;
   final List<Map<String, dynamic>> products;
   final String merchantId; // Ajout de l'ID du marchand
@@ -23,6 +24,7 @@ class MerchantProfileScreen extends StatefulWidget {
     required this.rating,
     required this.isVerified,
     required this.products,
+    required this.description,
     required this.merchantId, // Ajout du paramètre
   }) : super(key: key);
 
@@ -385,44 +387,22 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> with Sing
                             const SizedBox(height: 4),
                             Text(
                               '@${widget.name.toLowerCase().replaceAll(' ', '_')}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                               style: TextStyle(
                                 fontSize: 16,
                                 color: Colors.grey.shade600,
                               ),
                             ),
-                            const SizedBox(height: 4),
-                            Row(
-                              children: [
-                                const Icon(
-                                  Icons.star,
-                                  color: Colors.amber,
-                                  size: 16,
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  widget.rating.toString(),
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: Colors.grey.shade700,
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  widget.category,
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: Colors.grey.shade700,
-                                  ),
-                                ),
-                              ],
-                            ),
+                            
+                  
                           ],
                         ),
                       ),
                     ],
                   ),
                   
-                  const SizedBox(height: 24),
+                  
                   
                   // Followers, Following, Likes
                   Row(
@@ -585,17 +565,7 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> with Sing
             ),
             const SizedBox(height: 16),
             // Widget de débogage
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade100,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                'Debug: MerchantId = ${widget.merchantId}',
-                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-              ),
-            ),
+    
           ],
         ),
       );
@@ -669,6 +639,7 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> with Sing
         final product = products[index];
         return _buildProductItem(
           idVendeur: product['vendeurId']?.toString() ?? '',
+          description: product['description']?.toString() ?? '',
           stock: int.tryParse(product['stock']?.toString() ?? '0') ?? 0,
           id: int.tryParse(product['id']?.toString() ?? index.toString()) ?? index,
           name: product['name']?.toString() ?? '',
@@ -685,6 +656,7 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> with Sing
 
   Widget _buildProductItem({
     required String idVendeur,
+    required String description,
     required int id,
     required String name,
     required double price,
@@ -699,6 +671,7 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> with Sing
           context,
           MaterialPageRoute(
             builder: (context) => ProductDetailScreen(
+              description: description,
               idVendeur: idVendeur,
               stock: stock,
               id: id,
@@ -706,7 +679,7 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> with Sing
               category: category,
               name: name,
               price: price,
-              imagePath: imagePath,
+              imagePath: imagePath
             ),
           ),
         );

@@ -17,12 +17,14 @@ class ProductDetailScreen extends StatefulWidget {
   final String category;
   final String name;
   final double price;
+  final String description;
   final String imagePath;
   final void Function()? goToCartTab;
   final String idVendeur;
   const ProductDetailScreen({
     Key? key,
     required this.id,
+    required this.description,
     required this.idVendeur,
     required this.stock,
     required this.tag,
@@ -283,7 +285,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Ce produit est un excellent choix pour tous ceux qui recherchent qualité et style. Fabriqué avec des matériaux de haute qualité, il est conçu pour durer et apporter satisfaction.',
+                    widget.description,
+                    // 'Ce produit est un excellent choix pour tous ceux qui recherchent qualité et style. Fabriqué avec des matériaux de haute qualité, il est conçu pour durer et apporter satisfaction.',
                     style: TextStyle(
                       fontSize: 14,
                       color: Colors.grey.shade700,
@@ -474,55 +477,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   
                   const SizedBox(height: 24),
                   
-                  // Customer Reviews Section
-                  const Text(
-                    'Avis des clients',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 18,
-                      color: AppColors.primary,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  
-                  // Reviews - Horizontal scrollable
-                  SizedBox(
-                    height: 120,
-                    child: ListView(
-                      scrollDirection: Axis.horizontal,
-                      children: [
-                        SizedBox(
-                          width: 220,
-                          child: _buildReviewCard('Alice', 5, 'Excellent produit, je recommande!'),
-                        ),
-                        const SizedBox(width: 12),
-                        SizedBox(
-                          width: 220,
-                          child: _buildReviewCard('Bob', 4, 'Très satisfait de mon achat'),
-                        ),
-                        const SizedBox(width: 12),
-                        SizedBox(
-                          width: 220,
-                          child: _buildReviewCard('Marie', 5, 'Livraison rapide, qualité au top'),
-                        ),
-                        const SizedBox(width: 12),
-                        SizedBox(
-                          width: 220,
-                          child: _buildReviewCard('Thomas', 4, 'Bon rapport qualité/prix'),
-                        ),
-                        const SizedBox(width: 12),
-                        SizedBox(
-                          width: 220,
-                          child: _buildReviewCard('Julie', 5, 'Produit conforme à la description, très contente!'),
-                        ),
-                        const SizedBox(width: 12),
-                        SizedBox(
-                          width: 220,
-                          child: _buildReviewCard('Marc', 4, 'Bonne qualité et livraison rapide'),
-                        ),
-                      ],
-                    ),
-                  ),
                   
                   const SizedBox(height: 24),
                   

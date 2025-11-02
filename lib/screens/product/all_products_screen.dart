@@ -80,11 +80,12 @@ class _TwitterStyleProductCard extends StatelessWidget {
           context,
           MaterialPageRoute(
             builder: (context) => ProductDetailScreen(
+              description: product.description,
               idVendeur: product.vendeurId.toString(),
               id: product.id,
-              tag: 'Nouveau',
+              tag: product.category?.name ?? '',
               stock: product.stock,
-              category: 'Catégorie',
+              category: product.category?.name ?? '',
               name: product.name,
               price: product.price,
               imagePath: product.media?.mediaUrl != null
@@ -104,26 +105,26 @@ class _TwitterStyleProductCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Center(
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(16),
-                child: Image.network(
-                  product.media?.mediaUrl != null
-                                    ? product.media!.mediaUrl
-                                    : 'https://via.placeholder.com/150',
-                  height: 110,
-                  width: 110,
-                  fit: BoxFit.cover,
-                  alignment: Alignment.center,
-                  errorBuilder: (context, error, stackTrace) => Container(
-                    height: 110,
-                    width: MediaQuery.of(context).size.width,
-                    decoration: BoxDecoration(
-                      color: Colors.grey[200],
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: const Icon(Icons.image, color: Colors.grey, size: 40),
+            ClipRRect(
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(16),
+                topRight: Radius.circular(16),
+              ),
+              child: Image.network(
+                product.media?.mediaUrl != null
+                                  ? product.media!.mediaUrl
+                                  : 'https://via.placeholder.com/150',
+                width: double.infinity,
+                height: 100,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) => Container(
+                  width: double.infinity,
+                  height: 100,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[200],
+                    borderRadius: BorderRadius.circular(16),
                   ),
+                  child: const Icon(Icons.image, color: Colors.grey, size: 40),
                 ),
               ),
             ),
@@ -135,21 +136,32 @@ class _TwitterStyleProductCard extends StatelessWidget {
                   Row(
                     children: [
                       Container(
+                        width: 100,
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                         decoration: BoxDecoration(
                           color: AppColors.primary,
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: const Text('Nouveau', style: TextStyle(color: Colors.white, fontSize: 11)),
+                        child: Text(
+                          product.category?.name ?? '',
+                          style: TextStyle(color: Colors.white, fontSize: 11),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
                       const Spacer(),
                       const Icon(Icons.star, color: AppColors.primary, size: 18),
                     ],
                   ),
                   const SizedBox(height: 8),
-                  Text(product.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                  Text(
+                    product.name,
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                   const SizedBox(height: 4),
-                  Text(product.description, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13)),
+                  // Text(product.description, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13)),
                   const SizedBox(height: 4),
                   Text('${product.price} FC', style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
                 ],

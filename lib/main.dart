@@ -37,6 +37,7 @@ import 'services/payment_storage_service.dart';
 import 'package:immo/cubit/product_cubit.dart';
 import 'package:immo/cubit/featured_product_cubit.dart';
 import 'package:immo/cubit/category_cubit.dart';
+import 'package:immo/cubit/category_products_cubit.dart';
 import 'package:immo/cubit/cart_cubit.dart';
 import 'package:immo/cubit/order_cubit.dart';
 import 'package:immo/cubit/merchant_cubit.dart';
@@ -535,6 +536,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         BlocProvider(create: (context) => ProductCubit()),
         BlocProvider(create: (context) => FeaturedProductCubit()),
         BlocProvider(create: (context) => CategoryCubit()),
+        BlocProvider(create: (context) => CategoryProductsCubit()),
         BlocProvider(create: (context) => CartCubit()),
         BlocProvider(create: (context) => OrderCubit()),
         BlocProvider(create: (context) => MerchantCubit()),

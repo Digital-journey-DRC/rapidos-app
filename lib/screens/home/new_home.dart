@@ -9,6 +9,7 @@ import 'package:immo/cubit/auth_cubit.dart';
 import 'package:immo/screens/dashboard/setting_screen.dart';
 import 'package:immo/cubit/featured_product_cubit.dart';
 import 'package:immo/screens/product/all_products_screen.dart';
+import 'package:immo/screens/product/category_products_screen.dart';
 import 'package:immo/cubit/category_cubit.dart';
 import 'package:immo/widgets/shimmer_loading.dart';
 import 'package:immo/cubit/merchant_cubit.dart';
@@ -446,32 +447,42 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                         separatorBuilder: (_, __) => const SizedBox(width: 16),
                         itemBuilder: (context, index) {
                           final cat = state.categories[index];
-                          return Container(
-                            padding: const EdgeInsets.only(
-                                right: 12, left: 3, top: 3, bottom: 3),
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(60),
-                              border: Border.all(color: AppColors.primary),
-                            ),
-                            child: Row(
-                              children: [
-                                Container(
-                                  decoration: BoxDecoration(
-                                    color: AppColors.primary,
-                                    border:
-                                        Border.all(color: AppColors.primary),
-                                    borderRadius: BorderRadius.circular(60),
-                                  ),
-                                  padding: const EdgeInsets.all(12),
-                                  child: Icon(Icons.category,
-                                      color: Colors.grey.shade100, size: 10),
+                          return GestureDetector(
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => CategoryProductsScreen(category: cat),
                                 ),
-                                const SizedBox(width: 4),
-                                Text(cat.name,
-                                    style: const TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.bold)),
-                              ],
+                              );
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.only(
+                                  right: 12, left: 3, top: 3, bottom: 3),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(60),
+                                border: Border.all(color: AppColors.primary),
+                              ),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    decoration: BoxDecoration(
+                                      color: AppColors.primary,
+                                      border:
+                                          Border.all(color: AppColors.primary),
+                                      borderRadius: BorderRadius.circular(60),
+                                    ),
+                                    padding: const EdgeInsets.all(12),
+                                    child: Icon(Icons.category,
+                                        color: Colors.grey.shade100, size: 10),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(cat.name,
+                                      style: const TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold)),
+                                ],
+                              ),
                             ),
                           );
                         },
@@ -592,10 +603,11 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                               final product = products.reversed.toList()[index];
                               return _buildProductCard(
                                 idVendeur: product.vendeurId.toString(),
+                                description: product.description,
                                 stock: product.stock,
                                 id: product.id,
-                                tag: 'Nouveau',
-                                category: 'Catégorie',
+                                tag: product.category?.name ?? '',
+                                category: product.category?.name ?? '',
                                 name: product.name,
                                 price: product.price,
                                 imagePath: product.media?.mediaUrl != null
@@ -684,6 +696,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                                       context,
                                       MaterialPageRoute(
                                         builder: (context) => MerchantProfileScreen(
+                                          description: products.isNotEmpty ? products[0]['description'] ?? '' : '',
                                           merchantId: vendeur['id'],
                                         name: name,
                                         rating: 4.5,
@@ -910,6 +923,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
   Widget _buildProductCard({
     required String idVendeur,
     required int id,
+    required String description,
     required String tag,
     required String category,
     required int stock,
@@ -927,6 +941,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                 context,
                 MaterialPageRoute(
                   builder: (context) => ProductDetailScreen(
+                    description: description,
                     idVendeur: idVendeur,
                     id: id,
                     tag: tag,
@@ -983,6 +998,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                       top: 8,
                       left: 8,
                       child: Container(
+                        // width: 110,
                         padding: const EdgeInsets.symmetric(
                             horizontal: 8, vertical: 2),
                         decoration: BoxDecoration(
@@ -998,8 +1014,10 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                         ),
                         child: Text(
                           tag,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
-                              fontSize: 10, color: Colors.white),
+                              fontSize: 9, color: Colors.white),
                         ),
                       ),
                     ),
@@ -1021,6 +1039,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                             'quantity': 1,
                             'stock': stock,
                             'idVendeur': idVendeur,
+                            'description': description,
                           };
                           final success = await context.read<CartCubit>().addToCart(newItem);
                           if (!success) {
@@ -1123,6 +1142,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
               context,
               MaterialPageRoute(
                 builder: (context) => MerchantProfileScreen(
+                  description: products.isNotEmpty ? products[0]['description'] ?? '' : '',
                   merchantId: id,
                   name: name,
                   rating: rating,

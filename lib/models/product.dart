@@ -1,3 +1,5 @@
+import 'category.dart';
+
 class Product {
   final int id;
   final String name;
@@ -9,6 +11,7 @@ class Product {
   final String updatedAt;
   final int categorieId;
   final Media? media;
+  final Category? category;
 
   Product({
     required this.id,
@@ -21,6 +24,7 @@ class Product {
     required this.updatedAt,
     required this.categorieId,
     this.media,
+    this.category,
   });
 
   factory Product.fromJson(Map<String, dynamic> json) {
@@ -35,6 +39,7 @@ class Product {
       updatedAt: json['updatedAt'],
       categorieId: json['categorieId'],
       media: json['media'] != null ? Media.fromJson(json['media']) : null,
+      category: json['category'] != null ? Category.fromJson(json['category']) : null,
     );
   }
 }
