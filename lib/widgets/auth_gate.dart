@@ -166,7 +166,7 @@ class _AuthGateState extends State<AuthGate> {
               width: 120,
               height: 120,
               decoration: BoxDecoration(
-                color: Colors.white,
+                // color: Colors.white,
                 borderRadius: BorderRadius.circular(20),
                 // boxShadow: [
                 //   BoxShadow(
@@ -180,7 +180,7 @@ class _AuthGateState extends State<AuthGate> {
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(20),
                 child: Image.asset(
-                  'assets/images/rapidos.png',
+                  'assets/images/rapidons-3.png',
                   width: 120,
                   height: 120,
                   fit: BoxFit.contain,
