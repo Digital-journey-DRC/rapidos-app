@@ -21,6 +21,8 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:immo/services/auth_gate_service.dart';
 import 'package:immo/screens/auth/login_screen.dart';
+import 'dart:math' as math;
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 class NewHomeScreen extends StatefulWidget {
   const NewHomeScreen({Key? key}) : super(key: key);
@@ -33,6 +35,148 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
   Position? _currentPosition;
   bool _isLoading = false;
   List<dynamic> _commandes = [];
+
+  /// Retourne le widget icône approprié pour une catégorie, ou Icons.category par défaut
+  Widget _getCategoryIconWidget(String categoryName, Color color, double size) {
+    final name = categoryName.toLowerCase().trim();
+    
+    // Footwear / Talons dame / Chaussures dame (priorité spécifique)
+    if (name.contains('footwear') || name.contains('talon') || name.contains('high heel') ||
+        name.contains('highheel') || name.contains('chaussure dame') || name.contains('chaussure femme')) {
+      return FaIcon(FontAwesomeIcons.shoePrints, color: color, size: size);
+    }
+    // Chaussures (priorité spécifique) - utilise FontAwesome
+    if (name.contains('chaussure') || name.contains('shoe') || name.contains('basket') ||
+        name.contains('sneaker') || name.contains('soulier') || name == 'chaussures') {
+      return FaIcon(FontAwesomeIcons.shoePrints, color: color, size: size);
+    }
+    
+    // Boucherie (priorité spécifique)
+    if (name.contains('boucherie') || name.contains('boucher') || name.contains('viande') ||
+        name.contains('meat') || name == 'boucherie') {
+      return FaIcon(FontAwesomeIcons.drumstickBite, color: color, size: size);
+    }
+    
+    // Take away / Fast food (priorité spécifique)
+    if (name.contains('take away') || name.contains('takeaway') || name.contains('à emporter') ||
+        name.contains('a emporter') || name.contains('emporter') || name.contains('take-away') ||
+        name.contains('fastfood') || name.contains('fast food') || name.contains('fast-food') ||
+        name.contains('burger') || name.contains('shawarma')) {
+      return FaIcon(FontAwesomeIcons.burger, color: color, size: size);
+    }
+    
+    // Alimentation
+    if (name.contains('food') || name.contains('nourriture') || name.contains('restaurant') || 
+        name.contains('repas') || name.contains('plat') || name.contains('cuisine')) {
+      return FaIcon(FontAwesomeIcons.utensils, color: color, size: size);
+    }
+    // Épicerie / Supermarché
+    if (name.contains('grocer') || name.contains('épicerie') || name.contains('supermarche') ||
+        name.contains('supermarché') || name.contains('alimentation')) {
+      return FaIcon(FontAwesomeIcons.shoppingCart, color: color, size: size);
+    }
+    // Pharmacie / Santé
+    if (name.contains('pharmac') || name.contains('médicament') || name.contains('santé') ||
+        name.contains('sante') || name.contains('médical')) {
+      return FaIcon(FontAwesomeIcons.pills, color: color, size: size);
+    }
+    // Pâtisserie (priorité spécifique)
+    if (name.contains('pâtisserie') || name.contains('patisserie') || name.contains('patissier')) {
+      return FaIcon(FontAwesomeIcons.birthdayCake, color: color, size: size);
+    }
+    // Sucreries / Desserts
+    if (name.contains('sweet') || name.contains('dessert') || name.contains('gateau') ||
+        name.contains('gâteau') || name.contains('sucre') || name.contains('confiserie')) {
+      return FaIcon(FontAwesomeIcons.cookie, color: color, size: size);
+    }
+    // Magasin / Boutique
+    if (name.contains('store') || name.contains('magasin') || name.contains('boutique') ||
+        name.contains('shop')) {
+      return FaIcon(FontAwesomeIcons.store, color: color, size: size);
+    }
+    // Téléphonie Mobile (priorité haute pour cette catégorie spécifique)
+    if (name.contains('téléphonie') || name.contains('telephonie') || name.contains('mobile') ||
+        name.contains('téléphone mobile') || name.contains('telephone mobile') ||
+        name.contains('smartphone') || name.contains('phone mobile')) {
+      return FaIcon(FontAwesomeIcons.mobileScreenButton, color: color, size: size);
+    }
+    // Électronique / Technologie
+    if (name.contains('electronic') || name.contains('électronique') || name.contains('tech') ||
+        name.contains('téléphone') || name.contains('telephone')) {
+      return FaIcon(FontAwesomeIcons.laptop, color: color, size: size);
+    }
+    // Vêtements / Mode
+    if (name.contains('clothing') || name.contains('vêtement') || name.contains('mode') ||
+        name.contains('habillement') || name.contains('vetement') || name.contains('fashion')) {
+      return FaIcon(FontAwesomeIcons.shirt, color: color, size: size);
+    }
+    // Parfumerie (priorité spécifique)
+    if (name.contains('parfumerie') || name.contains('parfum') || name == 'parfumerie' ||
+        name.contains('fragrance') || name.contains('perfume')) {
+      return FaIcon(FontAwesomeIcons.sprayCan, color: color, size: size);
+    }
+    // Maquillage (priorité spécifique)
+    if (name.contains('maquillage') || name.contains('makeup') || name == 'maquillage') {
+      return FaIcon(FontAwesomeIcons.paintBrush, color: color, size: size);
+    }
+    // Beauté / Cosmétique
+    if (name.contains('beauty') || name.contains('beauté') || name.contains('cosmétique') ||
+        name.contains('cosmetique')) {
+      return FaIcon(FontAwesomeIcons.spa, color: color, size: size);
+    }
+    // Sport / Fitness
+    if (name.contains('sport') || name.contains('fitness') || name.contains('gym') ||
+        name.contains('exercise') || name.contains('musculation')) {
+      return FaIcon(FontAwesomeIcons.futbol, color: color, size: size);
+    }
+    // Livres / Librairie
+    if (name.contains('book') || name.contains('livre') || name.contains('librairie')) {
+      return FaIcon(FontAwesomeIcons.book, color: color, size: size);
+    }
+    // Boissons
+    if (name.contains('drink') || name.contains('boisson') || name.contains('café') ||
+        name.contains('coffee') || name.contains('cafe') || name.contains('jus')) {
+      return FaIcon(FontAwesomeIcons.glassWater, color: color, size: size);
+    }
+    // Fleurs / Plantes
+    if (name.contains('flower') || name.contains('fleur') || name.contains('plante')) {
+      return FaIcon(FontAwesomeIcons.seedling, color: color, size: size);
+    }
+    // Tissage / Produits capillaires (spécifique à votre app)
+    if (name.contains('tissage') || name.contains('weaving') || name.contains('cheveu') ||
+        name.contains('coiffure') || name.contains('capillaire') || name.contains('perruque') ||
+        name.contains('extension') || name.contains('hair') || name.contains('weave')) {
+      return FaIcon(FontAwesomeIcons.scissors, color: color, size: size);
+    }
+    // Automobile / Voiture
+    if (name.contains('auto') || name.contains('voiture') || name.contains('car') ||
+        name.contains('véhicule') || name.contains('vehicule')) {
+      return FaIcon(FontAwesomeIcons.car, color: color, size: size);
+    }
+    // Maison / Décoration
+    if (name.contains('home') || name.contains('maison') || name.contains('décoration') ||
+        name.contains('decoration') || name.contains('meuble') || name.contains('déco')) {
+      return FaIcon(FontAwesomeIcons.house, color: color, size: size);
+    }
+    // Jouets / Enfants
+    if (name.contains('toy') || name.contains('jouet') || name.contains('enfant') ||
+        name.contains('bébé') || name.contains('bebe')) {
+      return FaIcon(FontAwesomeIcons.baby, color: color, size: size);
+    }
+    // Animaux / Pets
+    if (name.contains('animal') || name.contains('pet') || name.contains('chien') ||
+        name.contains('chat')) {
+      return FaIcon(FontAwesomeIcons.paw, color: color, size: size);
+    }
+    // Bijoux
+    if (name.contains('bijou') || name.contains('jewelry') || name.contains('montre') ||
+        name.contains('bague')) {
+      return FaIcon(FontAwesomeIcons.gem, color: color, size: size);
+    }
+    
+    // Icône par défaut
+    return Icon(Icons.category, color: color, size: size);
+  }
 
   @override
   void initState() {
@@ -281,149 +425,156 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        centerTitle: false,
-        automaticallyImplyLeading: false,
-        title: Image.asset(AppAssets.logo, width: 100, height: 100),
-        actions: [
-          // Bouton Logout
-          // IconButton(
-          //   onPressed: () => _showLogoutDialog(context),
-          //   icon: const Icon(
-          //     Icons.logout,
-          //     color: AppColors.primary,
-          //   ),
-          //   tooltip: 'Déconnexion',
-          // ),
-          Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: BlocBuilder<AuthCubit, AuthState>(
-              builder: (context, state) {
-                if (state is AuthSuccess &&
-                    state.user != null &&
-                    state.user!['media'] != null) {
-                  return GestureDetector(
-                    onTap: () {
-                      _checkAuthorizationAndRedirect();
-                      if (_isAuthorizedUser()) {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (context) => const SettingScreen()),
-                        );
-                      }
-                    },
-                    child: CircleAvatar(
-                      radius: 20,
-                      backgroundColor: AppColors.buttonColor2,
-                      child: CircleAvatar(
-                        radius: 17,
-                        backgroundColor: AppColors.white,
-                        backgroundImage:
-                            NetworkImage(state.user!['media']),
-                      ),
-                    ),
-                  );
-                } else {
-                  return GestureDetector(
-                    onTap: () {
-                      _checkAuthorizationAndRedirect();
-                      if (_isAuthorizedUser()) {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (context) => const SettingScreen()),
-                        );
-                      }
-                    },
-                    child: const CircleAvatar(
-                      radius: 20,
-                      backgroundColor: AppColors.buttonColor2,
-                      child: CircleAvatar(
-                        radius: 17,
-                        backgroundColor: AppColors.buttonColor,
-                        child: Icon(Icons.person, color: AppColors.white),
-                      ),
-                    ),
-                  );
-                }
-              },
-            ),
-          ),
-        ],
-      ),
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+      backgroundColor: Colors.white,
+      body: Column(
           children: [
-            // Search bar
-            Padding(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    height: 40,
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey.shade300),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: GestureDetector(
-                      onTap: () {
-                        _checkAuthorizationAndRedirect();
-                        if (_isAuthorizedUser()) {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const AllMerchantsScreen(),
-                            ),
-                          );
-                        }
-                      },
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 16),
-                              child: Text(
-                                'Recherche',
-                                style: TextStyle(
-                                  color: Colors.grey.shade500,
-                                  fontSize: 14,
-                                ),
+            // Orange Header Section (Talabat style)
+            Stack(
+              children: [
+                Container(
+                  color: AppColors.primary,
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                  child: Column(
+                    children: [
+                      // Top row with profile
+           
+                      const SizedBox(height: 50),
+                      // Location selector
+                      GestureDetector(
+                        onTap: () {
+                          // Option to change location
+                        },
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'Trouvez ce dont vous avez besoin',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
-                          ),
-                          Container(
-                            color: AppColors.primary,
-                            height: 40,
-                            width: 40,
-                            child: const Icon(Icons.search, color: Colors.white, size: 20),
-                          ),
-                        ],
+                            // const SizedBox(width: 4),
+                                       Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            BlocBuilder<AuthCubit, AuthState>(
+                              builder: (context, state) {
+                                if (state is AuthSuccess &&
+                                    state.user != null &&
+                                    state.user!['media'] != null) {
+                                  return GestureDetector(
+                                    onTap: () {
+                                      _checkAuthorizationAndRedirect();
+                                      if (_isAuthorizedUser()) {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                              builder: (context) => const SettingScreen()),
+                                        );
+                                      }
+                                    },
+                                    child: CircleAvatar(
+                                      radius: 18,
+                                      backgroundColor: Colors.white,
+                                      backgroundImage: NetworkImage(state.user!['media']),
+                                    ),
+                                  );
+                                } else {
+                                  return GestureDetector(
+                                    onTap: () {
+                                      _checkAuthorizationAndRedirect();
+                                      if (_isAuthorizedUser()) {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                              builder: (context) => const SettingScreen()),
+                                        );
+                                      }
+                                    },
+                                    child: const CircleAvatar(
+                                      radius: 18,
+                                      backgroundColor: Colors.white,
+                                      child: Icon(Icons.person, color: AppColors.primary, size: 20),
+                                    ),
+                                  );
+                                }
+                              },
+                            ),
+                          ],
+                        ),
+                            // Icon(Icons.keyboard_arrow_down, color: Colors.white, size: 20),
+                          ],
+                        ),
                       ),
-                    ),
+                      const SizedBox(height: 20),
+                      // Search bar
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.05),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: GestureDetector(
+                          onTap: () {
+                            _checkAuthorizationAndRedirect();
+                            if (_isAuthorizedUser()) {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => const AllMerchantsScreen(),
+                                ),
+                              );
+                            }
+                          },
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            child: Row(
+                              children: [
+                                Icon(Icons.search, color: Colors.grey.shade600, size: 20),
+                                const SizedBox(width: 12),
+                                Text(
+                                  'Recherche...',
+                                  style: TextStyle(
+                                    color: Colors.grey.shade600,
+                                    fontSize: 15,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 30),
+                    ],
                   ),
-                  const SizedBox(height: 20),
-                  const Text(
-                    'Trouvez ce dont vous avez besoin',
-                    style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black),
+                ),
+                // Wave decoration at the bottom
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  child: CustomPaint(
+                    size: Size(MediaQuery.of(context).size.width, 30),
+                    painter: WavePainter(),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-
-            // Category icons - scrollable
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 12.0),
+            
+            // Categories Section (Horizontal Scroll)
+            Container(
+              color: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 16),
               child: SizedBox(
-                height: 40,
+                height: 120,
                 child: BlocBuilder<CategoryCubit, CategoryState>(
                   builder: (context, state) {
                     if (state is CategoryLoading) {
@@ -431,22 +582,33 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                         scrollDirection: Axis.horizontal,
                         padding: const EdgeInsets.symmetric(horizontal: 16.0),
                         itemCount: 6,
-                        separatorBuilder: (_, __) => const SizedBox(width: 16),
-                        itemBuilder: (context, index) => ShimmerLoading(
+                        separatorBuilder: (_, __) => const SizedBox(width: 12),
+                        itemBuilder: (context, index) => Container(
                           width: 90,
-                          height: 32,
-                          borderRadius: BorderRadius.circular(60),
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade100,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: ShimmerLoading(
+                            width: 90,
+                            height: 120,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                         ),
                       );
                     }
                     if (state is CategoryLoaded) {
+                      // Trier les catégories par ordre alphabétique
+                      final sortedCategories = List.from(state.categories)
+                        ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+                      
                       return ListView.separated(
                         scrollDirection: Axis.horizontal,
                         padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                        itemCount: state.categories.length,
-                        separatorBuilder: (_, __) => const SizedBox(width: 16),
+                        itemCount: sortedCategories.length,
+                        separatorBuilder: (_, __) => const SizedBox(width: 12),
                         itemBuilder: (context, index) {
-                          final cat = state.categories[index];
+                          final cat = sortedCategories[index];
                           return GestureDetector(
                             onTap: () {
                               Navigator.push(
@@ -457,30 +619,51 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                               );
                             },
                             child: Container(
-                              padding: const EdgeInsets.only(
-                                  right: 12, left: 3, top: 3, bottom: 3),
+                              width: 90,
                               decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(60),
-                                border: Border.all(color: AppColors.primary),
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: Colors.grey.shade200),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.03),
+                                    blurRadius: 4,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
                               ),
-                              child: Row(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
                                   Container(
+                                    width: 50,
+                                    height: 50,
                                     decoration: BoxDecoration(
-                                      color: AppColors.primary,
-                                      border:
-                                          Border.all(color: AppColors.primary),
-                                      borderRadius: BorderRadius.circular(60),
+                                      color: AppColors.primary.withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(25),
                                     ),
-                                    padding: const EdgeInsets.all(12),
-                                    child: Icon(Icons.category,
-                                        color: Colors.grey.shade100, size: 10),
+                                    child: Center(
+                                      child: _getCategoryIconWidget(
+                                        cat.name,
+                                        AppColors.primary,
+                                        28,
+                                      ),
+                                    ),
                                   ),
-                                  const SizedBox(width: 4),
-                                  Text(cat.name,
+                                  const SizedBox(height: 8),
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                                    child: Text(
+                                      cat.name,
                                       style: const TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.bold)),
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                      textAlign: TextAlign.center,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
                                 ],
                               ),
                             ),
@@ -490,35 +673,11 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                     }
                     if (state is CategoryError) {
                       return Center(
-                        child: Container(
+                        child: Padding(
                           padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: Colors.grey.shade100,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.grey.shade300),
-                          ),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.info_outline, color: Colors.grey.shade600, size: 24),
-                              const SizedBox(height: 8),
-                              Text(
-                                'Impossible de charger les catégories',
-                                style: TextStyle(
-                                  color: Colors.grey.shade700,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Vérifiez votre connexion internet',
-                                style: TextStyle(
-                                  color: Colors.grey.shade500,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ],
+                          child: Text(
+                            'Erreur de chargement',
+                            style: TextStyle(color: Colors.grey.shade600),
                           ),
                         ),
                       );
@@ -529,394 +688,505 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
               ),
             ),
 
-            // Featured products section
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Padding(
-                        padding: EdgeInsets.only(left: 16),
-                        child: Text(
-                          'Produits vedettes',
-                          style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black),
-                        ),
-                      ),
-                      BlocBuilder<FeaturedProductCubit, FeaturedProductState>(
-                        builder: (context, state) {
-                          if (state is FeaturedProductLoaded &&
-                              state.products.isNotEmpty) {
-                            return TextButton(
-                              onPressed: () {
-                                _checkAuthorizationAndRedirect();
-                                if (_isAuthorizedUser()) {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => AllProductsScreen(
-                                          products: state.products.reversed.toList()),
+            // Scrollable Content
+            Expanded(
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // "Hey there!" Section (if not logged in or for promotions)
+                    BlocBuilder<AuthCubit, AuthState>(
+                      builder: (context, state) {
+                        if (state is! AuthSuccess) {
+                          return Container(
+                            margin: const EdgeInsets.all(16),
+                            padding: const EdgeInsets.all(20),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: Colors.grey.shade200),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.03),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          const Text(
+                                            'Bonjour !',
+                                            style: TextStyle(
+                                              fontSize: 20,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 8),
+                                          Text(
+                                            'Connectez-vous pour une expérience personnalisée',
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              color: Colors.grey.shade600,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                                     ),
-                                  );
-                                }
-                              },
-                              child: const Text('Voir tout',
-                                  style: TextStyle(color: AppColors.primary)),
-                            );
-                          }
-                          return const SizedBox.shrink();
-                        },
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  BlocBuilder<FeaturedProductCubit, FeaturedProductState>(
-                    builder: (context, state) {
-                      if (state is FeaturedProductLoading) {
-                        return const FeaturedProductShimmer();
-                      }
-                      if (state is FeaturedProductError) {
-                        return const Center(
-                            child: Text('Erreur lors du chargement'));
-                      }
-                      if (state is FeaturedProductLoaded) {
-                        final products = state.products;
-                        if (products.isEmpty) {
-                          return const Center(
-                              child: Text('Aucun produit vedette'));
+                                    Container(
+                                      width: 60,
+                                      height: 60,
+                                      decoration: BoxDecoration(
+                                        color: AppColors.primary.withOpacity(0.1),
+                                        borderRadius: BorderRadius.circular(30),
+                                      ),
+                                      child: const Icon(
+                                        Icons.phone_android,
+                                        color: AppColors.primary,
+                                        size: 30,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 16),
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: ElevatedButton(
+                                    onPressed: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) => const LoginScreen(),
+                                        ),
+                                      );
+                                    },
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppColors.primary,
+                                      padding: const EdgeInsets.symmetric(vertical: 14),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                    ),
+                                    child: const Text(
+                                      'Se connecter',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
                         }
-                        return SizedBox(
-                          height: 190,
-                          child: ListView.separated(
-                            scrollDirection: Axis.horizontal,
-                            padding:
-                                const EdgeInsets.symmetric(horizontal: 16.0),
-                            itemCount: products.length,
-                            separatorBuilder: (_, __) =>
-                                const SizedBox(width: 12),
-                            itemBuilder: (context, index) {
-                              final product = products.reversed.toList()[index];
-                              return _buildProductCard(
-                                idVendeur: product.vendeurId.toString(),
-                                description: product.description,
-                                stock: product.stock,
-                                id: product.id,
-                                tag: product.category?.name ?? '',
-                                category: product.category?.name ?? '',
-                                name: product.name,
-                                price: product.price,
-                                imagePath: product.media?.mediaUrl != null
-                                    ? product.media!.mediaUrl
-                                    : 'https://via.placeholder.com/150',
-                              );
+                        return const SizedBox.shrink();
+                      },
+                    ),
+
+                    // Featured products section
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Padding(
+                                padding: EdgeInsets.only(left: 16),
+                                child: Text(
+                                  'Produits populaires',
+                                  style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.black),
+                                ),
+                              ),
+                              BlocBuilder<FeaturedProductCubit, FeaturedProductState>(
+                                builder: (context, state) {
+                                  if (state is FeaturedProductLoaded &&
+                                      state.products.isNotEmpty) {
+                                    return TextButton(
+                                      onPressed: () {
+                                        _checkAuthorizationAndRedirect();
+                                        if (_isAuthorizedUser()) {
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (context) => AllProductsScreen(
+                                                  products: state.products.reversed.toList()),
+                                            ),
+                                          );
+                                        }
+                                      },
+                                      child: const Text('Voir tout',
+                                          style: TextStyle(color: AppColors.primary)),
+                                    );
+                                  }
+                                  return const SizedBox.shrink();
+                                },
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          BlocBuilder<FeaturedProductCubit, FeaturedProductState>(
+                            builder: (context, state) {
+                              if (state is FeaturedProductLoading) {
+                                return const FeaturedProductShimmer();
+                              }
+                              if (state is FeaturedProductError) {
+                                return const Center(
+                                    child: Text('Erreur lors du chargement'));
+                              }
+                              if (state is FeaturedProductLoaded) {
+                                final products = state.products;
+                                if (products.isEmpty) {
+                                  return const Center(
+                                      child: Text('Aucun produit vedette'));
+                                }
+                                return SizedBox(
+                                  height: 190,
+                                  child: ListView.separated(
+                                    scrollDirection: Axis.horizontal,
+                                    padding:
+                                        const EdgeInsets.symmetric(horizontal: 16.0),
+                                    itemCount: products.length,
+                                    separatorBuilder: (_, __) =>
+                                        const SizedBox(width: 12),
+                                    itemBuilder: (context, index) {
+                                      final product = products.reversed.toList()[index];
+                                      return _buildProductCard(
+                                        idVendeur: product.vendeurId.toString(),
+                                        description: product.description,
+                                        stock: product.stock,
+                                        id: product.id,
+                                        tag: product.category?.name ?? '',
+                                        category: product.category?.name ?? '',
+                                        name: product.name,
+                                        price: product.price,
+                                        imagePath: product.media?.mediaUrl != null
+                                            ? product.media!.mediaUrl
+                                            : 'https://via.placeholder.com/150',
+                                      );
+                                    },
+                                  ),
+                                );
+                              }
+                              return const SizedBox.shrink();
                             },
                           ),
-                        );
-                      }
-                      return const SizedBox.shrink();
-                    },
-                  ),
-                ],
-              ),
-            ),
-
-            // Top Marchands section
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 16.0),
-                        child: Text(
-                          'Top Marchands',
-                          style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black),
-                        ),
+                        ],
                       ),
-                      TextButton(
-                        onPressed: () {
-                          _checkAuthorizationAndRedirect();
-                          if (_isAuthorizedUser()) {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const AllMerchantsScreen(),
+                    ),
+
+                    // Top Marchands section
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Padding(
+                                padding: EdgeInsets.symmetric(horizontal: 16.0),
+                                child: Text(
+                                  'Top Marchands',
+                                  style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.black),
+                                ),
                               ),
-                            );
-                          }
-                        },
-                        child: const Text('Voir tout', style: TextStyle(color: AppColors.primary)),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Horizontal scrollable merchants
-                  BlocBuilder<MerchantCubit, MerchantState>(
-                    builder: (context, state) {
-                      if (state is MerchantLoading) {
-                        return MerchantShimmer();
-                      }
-                      if (state is MerchantLoaded) {
-                        final merchants = state.merchants;
-                        if (merchants.isEmpty) {
-                          return const Center(child: Text('Aucun marchand trouvé'));
-                        }
-                        return SizedBox(
-                          height: 100,
-                          child: ListView.separated(
-                            scrollDirection: Axis.horizontal,
-                            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                            itemCount: merchants.length,
-                            separatorBuilder: (_, __) => const SizedBox(width: 12),
-                            itemBuilder: (context, index) {
-                              final vendeur = merchants[index]['vendeur'];
-                              final products = (merchants[index]['products'] as List).cast<Map<String, dynamic>>();
-                              final media = merchants[index]['media'];
-                              final image = media != null && media['mediaUrl'] != null
-                                  ? media['mediaUrl']
-                                  : 'https://via.placeholder.com/150';
-                              final name = '${vendeur['firstName']} ${vendeur['lastName']}';
-                              return GestureDetector(
-                                onTap: () {
+                              TextButton(
+                                onPressed: () {
                                   _checkAuthorizationAndRedirect();
                                   if (_isAuthorizedUser()) {
                                     Navigator.push(
                                       context,
                                       MaterialPageRoute(
-                                        builder: (context) => MerchantProfileScreen(
-                                          description: products.isNotEmpty ? products[0]['description'] ?? '' : '',
-                                          merchantId: vendeur['id'],
-                                        name: name,
-                                        rating: 4.5,
-                                        category: products.isNotEmpty ? products[0]['description'] ?? '' : '',
-                                        imagePath: image,
-                                        isVerified: true,
-                                        products: products,
+                                        builder: (context) => const AllMerchantsScreen(),
                                       ),
-                                    ),
-                                  );
+                                    );
                                   }
                                 },
-                                child: _buildMerchantCard(
-                                  id: vendeur['id'].toString(), // Convertir en String
-                                  name: name,
-                                  rating: 4.5,
-                                  category: products.isNotEmpty ? products[0]['description'] ?? '' : '',
-                                  imagePath: image,
-                                  isVerified: true,
-                                  products: products,
-                                ),
-                              );
-                            },
-                          ),
-                        );
-                      }
-                      if (state is MerchantError) {
-                        return Center(
-                          child: Container(
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: Colors.grey.shade100,
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: Colors.grey.shade300),
-                            ),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.store_outlined, color: Colors.grey.shade600, size: 24),
-                                const SizedBox(height: 8),
-                                Text(
-                                  'Impossible de charger les boutiques',
-                                  style: TextStyle(
-                                    color: Colors.grey.shade700,
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'Vérifiez votre connexion internet',
-                                  style: TextStyle(
-                                    color: Colors.grey.shade500,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      }
-                      return const SizedBox.shrink();
-                    },
-                  ),
-                ],
-              ),
-            ),
-
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-              child: Text('Ma position', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black)),
-            ),
-
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-              child: _isLoading
-                  ? const SizedBox(
-                      height: 150,
-                      child: Center(child: CircularProgressIndicator()),
-                    )
-                  : _commandes.isNotEmpty
-                      ? MouseRegion(
-                          cursor: SystemMouseCursors.click,
-                          child: InkWell(
-                            onTap: () {
-                              _checkAuthorizationAndRedirect();
-                              if (_isAuthorizedUser()) {
-                                Navigator.push(context, MaterialPageRoute(builder: (context) => const NavigationExample(backNavigation: true)));
-                              }
-                            },
-                            child: Container(
-                              height: 200,
-                              width: double.infinity,
-                              decoration: BoxDecoration(
-                                color: Colors.grey[200],
-                                borderRadius: BorderRadius.circular(12),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.1),
-                                    blurRadius: 8,
-                                    offset: const Offset(0, 2),
-                                  ),
-                                ],
-                              ),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(12),
-                                child: Stack(
-                                  children: [
-                                    _currentPosition == null
-                                        ? const Center(child: Text('Impossible d\'obtenir la localisation', style: TextStyle(color: Colors.black54)))
-                                        : GoogleMap(
-                                            initialCameraPosition: CameraPosition(
-                                              target: LatLng(
-                                                _currentPosition!.latitude,
-                                                _currentPosition!.longitude,
-                                              ),
-                                              zoom: 15,
-                                            ),
-                                            onMapCreated: (GoogleMapController controller) {
-                                              // Map controller initialized
-                                            },
-                                            myLocationEnabled: true,
-                                            myLocationButtonEnabled: true,
-                                            zoomControlsEnabled: true,
-                                            mapType: MapType.normal,
-                                          ),
-                                    // Overlay avec effet de survol
-                                    Positioned.fill(
-                                      child: Material(
-                                        color: Colors.transparent,
-                                        child: InkWell(
-                                          onTap: () {
-                                            _checkAuthorizationAndRedirect();
-                                            if (_isAuthorizedUser()) {
-                                              Navigator.push(context, MaterialPageRoute(builder: (context) => const NavigationExample(backNavigation: true)));
-                                            }
-                                          },
-                                          child: Container(
-                                            decoration: BoxDecoration(
-                                              borderRadius: BorderRadius.circular(12),
-                                              gradient: LinearGradient(
-                                                begin: Alignment.topCenter,
-                                                end: Alignment.bottomCenter,
-                                                colors: [
-                                                  Colors.transparent,
-                                                  Colors.black.withOpacity(0.3),
-                                                ],
-                                              ),
-                                            ),
-                                            child: const Center(
-                                              child: Column(
-                                                mainAxisAlignment: MainAxisAlignment.end,
-                                                children: [
-                                                  Icon(
-                                                    Icons.fullscreen,
-                                                    color: Colors.white,
-                                                    size: 24,
-                                                  ),
-                                                  SizedBox(height: 8),
-                                                  Text(
-                                                    'Voir la carte en détail',
-                                                    style: TextStyle(
-                                                      color: Colors.white,
-                                                      fontSize: 14,
-                                                      fontWeight: FontWeight.w600,
-                                                      shadows: [
-                                                        Shadow(
-                                                          offset: Offset(0, 1),
-                                                          blurRadius: 3,
-                                                          color: Colors.black54,
-                                                        ),
-                                                      ],
-                                                    ),
-                                                  ),
-                                                  SizedBox(height: 16),
-                                                ],
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                        )
-                      : Container(
-                          height: 150,
-                          width: double.infinity,
-                          decoration: BoxDecoration(
-                            color: Colors.grey.shade200,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Stack(
-                            alignment: Alignment.center,
-                            children: [
-                              CustomPaint(
-                                painter: MapPatternPainter(),
-                                size: Size.infinite,
-                              ),
-                              Icon(Icons.location_on, color: AppColors.primary.withOpacity(0.7)),
-                              const Positioned(
-                                bottom: 10,
-                                child: Text(
-                                  'Pas de livraison pour le moment',
-                                  style: TextStyle(
-                                      fontWeight: FontWeight.w500,
-                                      fontSize: 14,
-                                      color: Colors.black),
-                                ),
+                                child: const Text('Voir tout', style: TextStyle(color: AppColors.primary)),
                               ),
                             ],
                           ),
+                          const SizedBox(height: 12),
+
+                          // Horizontal scrollable merchants
+                          BlocBuilder<MerchantCubit, MerchantState>(
+                            builder: (context, state) {
+                              if (state is MerchantLoading) {
+                                return MerchantShimmer();
+                              }
+                              if (state is MerchantLoaded) {
+                                final merchants = state.merchants;
+                                if (merchants.isEmpty) {
+                                  return const Center(child: Text('Aucun marchand trouvé'));
+                                }
+                                return SizedBox(
+                                  height: 100,
+                                  child: ListView.separated(
+                                    scrollDirection: Axis.horizontal,
+                                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                                    itemCount: merchants.length,
+                                    separatorBuilder: (_, __) => const SizedBox(width: 12),
+                                    itemBuilder: (context, index) {
+                                      final vendeur = merchants[index]['vendeur'];
+                                      final products = (merchants[index]['products'] as List).cast<Map<String, dynamic>>();
+                                      final media = merchants[index]['media'];
+                                      final image = media != null && media['mediaUrl'] != null
+                                          ? media['mediaUrl']
+                                          : 'https://via.placeholder.com/150';
+                                      final name = '${vendeur['firstName']} ${vendeur['lastName']}';
+                                      return GestureDetector(
+                                        onTap: () {
+                                          _checkAuthorizationAndRedirect();
+                                          if (_isAuthorizedUser()) {
+                                            Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (context) => MerchantProfileScreen(
+                                                  description: products.isNotEmpty ? products[0]['description'] ?? '' : '',
+                                                  merchantId: vendeur['id'],
+                                                name: name,
+                                                rating: 4.5,
+                                                category: products.isNotEmpty ? products[0]['description'] ?? '' : '',
+                                                imagePath: image,
+                                                isVerified: true,
+                                                products: products,
+                                              ),
+                                            ),
+                                          );
+                                          }
+                                        },
+                                        child: _buildMerchantCard(
+                                          id: vendeur['id'].toString(),
+                                          name: name,
+                                          rating: 4.5,
+                                          category: products.isNotEmpty ? products[0]['description'] ?? '' : '',
+                                          imagePath: image,
+                                          isVerified: true,
+                                          products: products,
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                );
+                              }
+                              if (state is MerchantError) {
+                                return Center(
+                                  child: Container(
+                                    padding: const EdgeInsets.all(16),
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey.shade100,
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(color: Colors.grey.shade300),
+                                    ),
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.store_outlined, color: Colors.grey.shade600, size: 24),
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          'Impossible de charger les boutiques',
+                                          style: TextStyle(
+                                            color: Colors.grey.shade700,
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          'Vérifiez votre connexion internet',
+                                          style: TextStyle(
+                                            color: Colors.grey.shade500,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              }
+                              return const SizedBox.shrink();
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // Map Section
+                    if (_commandes.isNotEmpty || _currentPosition != null)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Ma position',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            _isLoading
+                                ? const SizedBox(
+                                    height: 200,
+                                    child: Center(child: CircularProgressIndicator()),
+                                  )
+                                : _commandes.isNotEmpty
+                                    ? GestureDetector(
+                                        onTap: () {
+                                          _checkAuthorizationAndRedirect();
+                                          if (_isAuthorizedUser()) {
+                                            Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (context) => const NavigationExample(backNavigation: true),
+                                              ),
+                                            );
+                                          }
+                                        },
+                                        child: Container(
+                                          height: 200,
+                                          width: double.infinity,
+                                          decoration: BoxDecoration(
+                                            color: Colors.grey[200],
+                                            borderRadius: BorderRadius.circular(16),
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: Colors.black.withOpacity(0.05),
+                                                blurRadius: 8,
+                                                offset: const Offset(0, 2),
+                                              ),
+                                            ],
+                                          ),
+                                          child: ClipRRect(
+                                            borderRadius: BorderRadius.circular(16),
+                                            child: _currentPosition == null
+                                                ? const Center(
+                                                    child: Text(
+                                                      'Impossible d\'obtenir la localisation',
+                                                      style: TextStyle(color: Colors.black54),
+                                                    ),
+                                                  )
+                                                : Stack(
+                                                    children: [
+                                                      GoogleMap(
+                                                        initialCameraPosition: CameraPosition(
+                                                          target: LatLng(
+                                                            _currentPosition!.latitude,
+                                                            _currentPosition!.longitude,
+                                                          ),
+                                                          zoom: 15,
+                                                        ),
+                                                        onMapCreated: (GoogleMapController controller) {},
+                                                        myLocationEnabled: true,
+                                                        myLocationButtonEnabled: true,
+                                                        zoomControlsEnabled: true,
+                                                        mapType: MapType.normal,
+                                                      ),
+                                                      Positioned.fill(
+                                                        child: Material(
+                                                          color: Colors.transparent,
+                                                          child: Container(
+                                                            decoration: BoxDecoration(
+                                                              borderRadius: BorderRadius.circular(16),
+                                                              gradient: LinearGradient(
+                                                                begin: Alignment.topCenter,
+                                                                end: Alignment.bottomCenter,
+                                                                colors: [
+                                                                  Colors.transparent,
+                                                                  Colors.black.withOpacity(0.2),
+                                                                ],
+                                                              ),
+                                                            ),
+                                                            child: const Center(
+                                                              child: Column(
+                                                                mainAxisAlignment: MainAxisAlignment.end,
+                                                                children: [
+                                                                  Icon(
+                                                                    Icons.fullscreen,
+                                                                    color: Colors.white,
+                                                                    size: 24,
+                                                                  ),
+                                                                  SizedBox(height: 8),
+                                                                  Text(
+                                                                    'Voir la carte en détail',
+                                                                    style: TextStyle(
+                                                                      color: Colors.white,
+                                                                      fontSize: 14,
+                                                                      fontWeight: FontWeight.w600,
+                                                                    ),
+                                                                  ),
+                                                                  SizedBox(height: 16),
+                                                                ],
+                                                              ),
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                          ),
+                                        ),
+                                      )
+                                    : Container(
+                                        height: 150,
+                                        width: double.infinity,
+                                        decoration: BoxDecoration(
+                                          color: Colors.grey.shade200,
+                                          borderRadius: BorderRadius.circular(16),
+                                        ),
+                                        child: Stack(
+                                          alignment: Alignment.center,
+                                          children: [
+                                            CustomPaint(
+                                              painter: MapPatternPainter(),
+                                              size: Size.infinite,
+                                            ),
+                                            Icon(Icons.location_on, color: AppColors.primary.withOpacity(0.7)),
+                                            const Positioned(
+                                              bottom: 10,
+                                              child: Text(
+                                                'Pas de livraison pour le moment',
+                                                style: TextStyle(
+                                                  fontWeight: FontWeight.w500,
+                                                  fontSize: 14,
+                                                  color: Colors.black,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                          ],
                         ),
+                      ),
+
+                    const SizedBox(height: 20), // Bottom padding
+                  ],
+                ),
+              ),
             ),
           ],
         ),
-      ),
+      
     );
   }
 
@@ -1266,6 +1536,55 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
 
 }
 
+// Custom painter to draw wave at the bottom of header
+// Smooth wave like Talabat design
+
+
+class WavePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.fill;
+
+    final path = Path();
+    
+    // Wave parameters - smooth and natural like Talabat
+    double waveHeight = 20;
+    double numberOfWaves = 1.5; // Fewer waves for smoother look
+    
+    // Start from bottom left corner
+    path.moveTo(0, size.height);
+    
+    // Create very smooth wave like Talabat - using many points for perfect smoothness
+    int points = 150; // Many points for ultra-smooth curve like Talabat
+    
+    for (int i = 0; i <= points; i++) {
+      double x = (i / points) * size.width;
+      double normalizedX = x / size.width;
+      
+      // Smooth sinusoidal wave
+      double y = size.height - waveHeight * (1 + math.sin(normalizedX * numberOfWaves * 2 * math.pi)) / 2;
+      
+      if (i == 0) {
+        path.moveTo(x, y);
+      } else {
+        path.lineTo(x, y);
+      }
+    }
+    
+    // Complete the path to create a filled shape
+    path.lineTo(size.width, size.height);
+    path.lineTo(0, size.height);
+    path.close();
+    
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
 // Custom painter to draw a grid pattern for the map background
 class MapPatternPainter extends CustomPainter {
   @override
@@ -1329,7 +1648,7 @@ class FeaturedProductShimmer extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Shimmer image
-                Padding(
+                const Padding(
                   padding: const EdgeInsets.only(bottom: 0),
                   child: ShimmerLoading(
                     width: 150,
