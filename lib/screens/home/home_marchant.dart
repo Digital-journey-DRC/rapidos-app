@@ -224,7 +224,7 @@ void saveCommande() async {
                             ),
                             items: state.categories
                                 .map((cat) => DropdownMenuItem(
-                                      value: cat.id.toString(),
+                                      value: cat.name,
                                       child: Text(cat.name),
                                     ))
                                 .toList(),
@@ -527,7 +527,7 @@ void saveCommande() async {
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: AppColors.primary.withOpacity(0.3)),
                   ),
-                  child: Row(
+                  child: const Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       const Icon(
@@ -607,7 +607,7 @@ void saveCommande() async {
                         return SizedBox(
                           width: 220,
                           child: _ProductCard(
-                            badge: 'Nouveau',
+                            badge: product.category?.name ?? '',
                             name: product.name,
                             stock: product.stock.toString(),
                             isPromo: false,

@@ -98,4 +98,48 @@ class ProductService {
       };
     }
   }
+
+  Future<Map<String, dynamic>> deleteProduct({
+    required int productId,
+  }) async {
+    try {
+      final token = await StorageService().getToken();
+      
+      final response = await http.delete(
+        Uri.parse('$baseUrl/products/$productId'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      print('Product delete response status: ${response.statusCode}');
+      print('Product delete response body: ${response.body}');
+
+      if (response.statusCode == 200 || response.statusCode == 201 || response.statusCode == 204) {
+        final responseData = response.body.isNotEmpty 
+            ? jsonDecode(response.body) 
+            : {'message': 'Produit supprimé avec succès'};
+        return {
+          'success': true,
+          'message': responseData['message'] ?? 'Produit supprimé avec succès',
+          'data': responseData,
+        };
+      } else {
+        final errorData = response.body.isNotEmpty 
+            ? jsonDecode(response.body) 
+            : {'message': 'Erreur lors de la suppression du produit'};
+        return {
+          'success': false,
+          'message': errorData['message'] ?? 'Erreur lors de la suppression du produit',
+        };
+      }
+    } catch (e) {
+      print('Error deleting product: $e');
+      return {
+        'success': false,
+        'message': 'Erreur de connexion: $e',
+      };
+    }
+  }
 } 

@@ -19,6 +19,8 @@ class AppAssets {
   static const String house3 = 'assets/images/house3.jpg';
   static const String logo = 'assets/images/rapidos.png';
   static const String logo2 = 'assets/images/rapidons-3.png';
+  static const String newLogo = 'assets/images/rapidons-new.png';
+  static const String logoWhite = 'assets/images/rapidons-white.png';
   
 }
 

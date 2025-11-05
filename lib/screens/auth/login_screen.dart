@@ -54,16 +54,17 @@ class _LoginScreenState extends State<LoginScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
-        child: Center(
+        child: Container(
           child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 24.0),
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisAlignment: MainAxisAlignment.start,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [  
-                Image.asset(AppAssets.logo2, width: 100, height: 100),
+                const SizedBox(height: 50),
+                Image.asset(AppAssets.newLogo, width: 200, height: 200),
 
-                const SizedBox(height: 8),
+                // const SizedBox(height: 8),
                 Text(
                   'Connectez-vous pour continuer',
                   style: AppStyles.body.copyWith(color: AppColors.textLight),

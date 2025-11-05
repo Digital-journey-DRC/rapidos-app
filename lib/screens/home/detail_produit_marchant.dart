@@ -231,29 +231,81 @@ class _DetailProduitMarchantScreenState extends State<DetailProduitMarchantScree
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: const Text('Confirmer la suppression'),
-          content: Text('Êtes-vous sûr de vouloir supprimer "${widget.productName}" ?'),
+          title: const Text('Confirmer la suppression', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+          content: Text('Êtes-vous sûr de vouloir supprimer "${widget.productName}" ?\n\nCette action est irréversible.'),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
               child: const Text('Annuler'),
             ),
             ElevatedButton(
-              onPressed: () {
-                // Ici vous pouvez ajouter la logique pour supprimer le produit
-                Navigator.of(context).pop();
-                Navigator.of(context).pop(); // Retour à la page précédente
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Produit supprimé avec succès')),
-                );
-              },
+              onPressed: _isLoading ? null : () => _deleteProduct(),
               style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-              child: const Text('Supprimer'),
+              child: _isLoading
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : const Text('Supprimer', style: TextStyle(color: Colors.white, fontSize: 16)),
             ),
           ],
         );
       },
     );
+  }
+
+  Future<void> _deleteProduct() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final result = await _productService.deleteProduct(
+        productId: widget.productId,
+      );
+
+      setState(() {
+        _isLoading = false;
+      });
+
+      if (result['success']) {
+        Navigator.of(context).pop(); // Fermer le dialogue de confirmation
+        Navigator.of(context).pop(); // Retour à la page précédente
+        
+        // Rafraîchir la liste des produits
+        context.read<ProductCubit>().fetchProducts();
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['message']),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      } else {
+        Navigator.of(context).pop(); // Fermer le dialogue de confirmation
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['message']),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+      Navigator.of(context).pop(); // Fermer le dialogue de confirmation
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erreur: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   @override
