@@ -64,7 +64,7 @@ class OrderCubit extends Cubit<OrderState> {
       final headers = {
         'Content-Type': 'application/json',
         // 'Content-type' :"application/x-www-form-urlencoded",
-        'Authorization': 'Bearer oat_NDc.eFhWeFR1LXVoMHUwT0FUZF9Ed1ljQnJ4c25COXhCOXVpbGFGc3FqYjIzNDk3NTM5NzU',
+        'Authorization': 'Bearer $token',
       };
 
       final request = http.Request(
@@ -79,7 +79,7 @@ class OrderCubit extends Cubit<OrderState> {
         "quartier": quartier,
         "avenue": avenue,
         "codePostale": "12345",
-        "numero": numero,
+        "numero": numero == "Non spécifié" ? "Pas de détail adresse" : numero,
         "isPrincipal": true,
         "type": "livraison",
         "pays": pays,
@@ -137,8 +137,8 @@ class OrderCubit extends Cubit<OrderState> {
         "commune": commune,
         "quartier": quartier,
         "avenue": avenue,
-        "codePostale": codePostale,
-        "numero": numero,
+        "codePostale": "12345",
+        "numero": numero.isEmpty ? "Pas de détail adresse" : numero,
         "isPrincipal": true,
         "type": "livraison",
         "pays": pays,

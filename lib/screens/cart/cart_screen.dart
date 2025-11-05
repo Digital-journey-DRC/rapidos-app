@@ -11,6 +11,7 @@ import 'package:immo/cubit/order_cubit.dart';
 import 'package:immo/cubit/auth_cubit.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:http/http.dart' as http;
 
 class CartScreen extends StatefulWidget {
   final bool backNavigaton;
@@ -24,32 +25,61 @@ class _CartScreenState extends State<CartScreen> {
   List<Map<String, dynamic>> savedAddresses = [];
   final ValueNotifier<bool> useNewAddress = ValueNotifier<bool>(false);
 
+  // Variables pour la recherche d'adresse
+  final TextEditingController _searchAddressController =
+      TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
+  List<Map<String, dynamic>> _searchResults = [];
+  Timer? _searchDebounceTimer;
+  bool _isSearching = false;
+  bool _isGettingCurrentLocation = false;
+
+  // Variable pour suivre l'adresse sélectionnée depuis Google
+  Map<String, dynamic>? _selectedGoogleAddress;
+
+  // Variables pour stocker les données extraites du geocoding
+  String _extractedVille = '';
+  String _extractedCommune = '';
+  String _extractedQuartier = '';
+  String _extractedAvenue = '';
+
+  // Variable pour stocker les données extraites de manière persistante
+  Map<String, String> _extractedAddressData = {};
+
+  // Contrôleurs pour les champs d'adresse
+  final TextEditingController _villeController = TextEditingController();
+  final TextEditingController _communeController = TextEditingController();
+  final TextEditingController _quartierController = TextEditingController();
+  final TextEditingController _avenueController = TextEditingController();
+  final TextEditingController _numeroController = TextEditingController();
+  final TextEditingController _paysController =
+      TextEditingController(text: 'RDC');
+
   @override
   void initState() {
     super.initState();
     _loadSavedAddresses();
-    _getCurrentLocation();
   }
 
-  Future<void> _getCurrentLocation() async {
+  Future<void> _saveCurrentLocation(double longitude, double latitude) async {
     try {
       // Vérifier et demander les permissions de localisation
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) {
-          return;
-        }
-      }
+      // LocationPermission permission = await Geolocator.checkPermission();
+      // if (permission == LocationPermission.denied) {
+      //   permission = await Geolocator.requestPermission();
+      //   if (permission == LocationPermission.denied) {
+      //     return;
+      //   }
+      // }
 
-      if (permission == LocationPermission.deniedForever) {
-        return;
-      }
+      // if (permission == LocationPermission.deniedForever) {
+      //   return;
+      // }
 
       // Obtenir la position actuelle
-      Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-      );
+      // Position position = await Geolocator.getCurrentPosition(
+      //   desiredAccuracy: LocationAccuracy.high,
+      // );
 
       // Récupérer l'utilisateur connecté
       final authState = context.read<AuthCubit>().state;
@@ -57,6 +87,7 @@ class _CartScreenState extends State<CartScreen> {
         final user = authState.user!;
         final userId = user['id']?.toString() ?? '';
         final userRole = user['role']?.toString() ?? '';
+        final phone = user['phone']?.toString() ?? '';
 
         // Vérifier si un enregistrement existe déjà pour cet utilisateur
         final locationQuery = await FirebaseFirestore.instance
@@ -67,8 +98,8 @@ class _CartScreenState extends State<CartScreen> {
         if (locationQuery.docs.isNotEmpty) {
           // Mettre à jour l'enregistrement existant
           await locationQuery.docs.first.reference.update({
-            'longitude': position.longitude,
-            'latitude': position.latitude,
+            'longitude': longitude,
+            'latitude': latitude,
             'timestamp': FieldValue.serverTimestamp(),
           });
           print('✅ Position mise à jour avec succès');
@@ -77,8 +108,9 @@ class _CartScreenState extends State<CartScreen> {
           await FirebaseFirestore.instance.collection('locations').add({
             'userId': userId,
             'role': userRole,
-            'longitude': position.longitude,
-            'latitude': position.latitude,
+            'longitude': longitude,
+            'latitude': latitude,
+            'phone': phone,
             'timestamp': FieldValue.serverTimestamp(),
           });
           print('✅ Nouvelle position enregistrée avec succès');
@@ -92,6 +124,15 @@ class _CartScreenState extends State<CartScreen> {
   @override
   void dispose() {
     useNewAddress.dispose();
+    _searchAddressController.dispose();
+    _searchFocusNode.dispose();
+    _villeController.dispose();
+    _communeController.dispose();
+    _quartierController.dispose();
+    _avenueController.dispose();
+    _numeroController.dispose();
+    _paysController.dispose();
+    _searchDebounceTimer?.cancel();
     super.dispose();
   }
 
@@ -135,14 +176,17 @@ class _CartScreenState extends State<CartScreen> {
   }
 
   void saveCart(
-      BuildContext context,
-      List<Map<String, dynamic>> cartItems,
-      String ville,
-      String commune,
-      String quartier,
-      String avenue,
-      String numero,
-      String pays) async {
+    BuildContext context,
+    List<Map<String, dynamic>> cartItems,
+    String ville,
+    String commune,
+    String quartier,
+    String avenue,
+    String numero,
+    String pays,
+    double longitude,
+    double latitude,
+  ) async {
     final authState = context.read<AuthCubit>().state;
     if (authState is AuthSuccess && authState.user != null) {
       final user = authState.user!;
@@ -169,10 +213,27 @@ class _CartScreenState extends State<CartScreen> {
         'avenue': avenue,
         'numero': numero,
         'pays': pays,
-        'total': cartItems.fold(0.0, (sum, item) => sum + ((item['price'] ?? 0.0) * (item['quantity'] ?? 1))), // Calculate total from cart items
+        'longitude': longitude,
+        'latitude': latitude,
+        'total': cartItems.fold(
+            0.0,
+            (sum, item) =>
+                sum +
+                ((item['price'] ?? 0.0) *
+                    (item['quantity'] ??
+                        1))), // Calculate total from cart items
       });
 
       print("✅ Commande enregistrée avec succès: ${commandeRef.id}");
+      // Navigator.pop(context);
+      // context.read<CartCubit>().clearCart();
+      // ScaffoldMessenger.of(context).showSnackBar(
+      //   const SnackBar(
+      //     content: Text('Commande créée avec succès!'),
+      //     backgroundColor: AppColors.success,
+      //   ),
+      // );
+      // context.read<CartCubit>().clearCart();
     } else {
       print("❌ Utilisateur non connecté");
       ScaffoldMessenger.of(context).showSnackBar(
@@ -238,6 +299,11 @@ class _CartScreenState extends State<CartScreen> {
 
   void _showAddressBottomSheet(
       BuildContext context, List<Map<String, dynamic>> cartItems) {
+    // Réinitialiser la sélection d'adresse
+    setState(() {
+      _selectedGoogleAddress = null;
+    });
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -256,6 +322,7 @@ class _CartScreenState extends State<CartScreen> {
                   backgroundColor: AppColors.success,
                 ),
               );
+              context.read<CartCubit>().clearCart();
             } else if (state.error != null) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
@@ -387,6 +454,38 @@ class _CartScreenState extends State<CartScreen> {
                                               onPressed: state.isLoading
                                                   ? null
                                                   : () {
+                                                      // Utiliser exactement les champs de la collection delivery_addresses
+                                                      final ville =
+                                                          address['ville'] ??
+                                                              '';
+                                                      final commune =
+                                                          address['commune'] ??
+                                                              '';
+                                                      final quartier =
+                                                          address['quartier'] ??
+                                                              '';
+                                                      final avenue =
+                                                          address['avenue'] ??
+                                                              '';
+                                                      final numero =
+                                                          address['numero'] ??
+                                                              '';
+                                                      final pays =
+                                                          address['pays'] ?? '';
+
+                                                      print(
+                                                          '🔍 Adresse de la collection:');
+                                                      print('   Ville: $ville');
+                                                      print(
+                                                          '   Commune: $commune');
+                                                      print(
+                                                          '   Quartier: $quartier');
+                                                      print(
+                                                          '   Avenue: $avenue');
+                                                      print(
+                                                          '   Numero: $numero');
+                                                      print('   Pays: $pays');
+
                                                       context
                                                           .read<OrderCubit>()
                                                           .createOrder(
@@ -396,34 +495,42 @@ class _CartScreenState extends State<CartScreen> {
                                                                 "id": int.parse(
                                                                     item['id']
                                                                         .toString()),
-                                                                "quantity":
-                                                                    item[
-                                                                        'quantity'],
+                                                                "quantity": item[
+                                                                    'quantity'],
                                                               };
                                                             }).toList(),
-                                                            ville: address[
-                                                                'ville'],
-                                                            commune: address[
-                                                                'commune'],
-                                                            quartier: address[
-                                                                'quartier'],
-                                                            avenue: address[
-                                                                'avenue'],
-                                                            codePostale: '',
-                                                            numero: address[
-                                                                'numero'],
-                                                            pays: address['pays'],
+                                                            // ville: ville,
+                                                            // commune: commune,
+                                                            // quartier: quartier,
+                                                            // avenue: avenue,
+                                                            // codePostale: '',
+                                                            // numero: numero,
+                                                            // pays: pays,
+                                                            ville: "ville",
+                                                            commune: "commune",
+                                                            quartier:
+                                                                "quartier",
+                                                            avenue: "avenue",
+                                                            codePostale:
+                                                                '12345',
+                                                            numero: "numero",
+                                                            pays: "pays",
                                                           );
 
                                                       saveCart(
-                                                          context,
-                                                          cartItems,
-                                                          address['ville'],
-                                                          address['commune'],
-                                                          address['quartier'],
-                                                          address['avenue'],
-                                                          address['numero'],
-                                                          address['pays']);
+                                                        context,
+                                                        cartItems,
+                                                        ville,
+                                                        commune,
+                                                        quartier,
+                                                        avenue,
+                                                        numero,
+                                                        pays,
+                                                        address['longitude'] ??
+                                                            0.0,
+                                                        address['latitude'] ??
+                                                            0.0,
+                                                      );
                                                     },
                                               style: ElevatedButton.styleFrom(
                                                 backgroundColor:
@@ -462,6 +569,7 @@ class _CartScreenState extends State<CartScreen> {
                                   label: const Text(
                                       'Ajouter une nouvelle adresse'),
                                 ),
+                                const SizedBox(height: 50),
                               ],
                             );
                           },
@@ -480,13 +588,24 @@ class _CartScreenState extends State<CartScreen> {
 
   void _showNewAddressForm(
       BuildContext context, List<Map<String, dynamic>> cartItems) {
-    final _villeController = TextEditingController();
-    final _communeController = TextEditingController();
-    final _quartierController = TextEditingController();
-    final _avenueController = TextEditingController();
     final _numeroController = TextEditingController();
-    final _paysController = TextEditingController(text: 'RDC');
     bool saveAddress = false;
+
+    // Variable locale pour suivre l'adresse sélectionnée dans le modal
+    Map<String, dynamic>? selectedAddress;
+
+    // Variable pour stocker l'ID de l'adresse sélectionnée
+    String? selectedAddressId;
+
+    // Nettoyer le cache des adresses au début
+    setState(() {
+      _extractedAddressData.clear();
+      _extractedVille = '';
+      _extractedCommune = '';
+      _extractedQuartier = '';
+      _extractedAvenue = '';
+      _selectedGoogleAddress = null;
+    });
 
     showModalBottomSheet(
       context: context,
@@ -535,6 +654,15 @@ class _CartScreenState extends State<CartScreen> {
                             IconButton(
                               icon: const Icon(Icons.arrow_back),
                               onPressed: () {
+                                // Nettoyer le cache avant de revenir
+                                setState(() {
+                                  _extractedAddressData.clear();
+                                  _extractedVille = '';
+                                  _extractedCommune = '';
+                                  _extractedQuartier = '';
+                                  _extractedAvenue = '';
+                                  _selectedGoogleAddress = null;
+                                });
                                 Navigator.pop(context);
                                 _showAddressBottomSheet(context, cartItems);
                               },
@@ -549,103 +677,684 @@ class _CartScreenState extends State<CartScreen> {
                           ],
                         ),
                         const SizedBox(height: 20),
-                        DropdownButtonFormField<String>(
-                          value: _villeController.text.isEmpty
-                              ? null
-                              : _villeController.text,
-                          decoration: InputDecoration(
-                            labelText: 'Ville',
-                            prefixIcon: const Icon(Icons.location_city),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            filled: true,
-                            fillColor: Colors.white,
-                          ),
-                          items: villes.map((String ville) {
-                            return DropdownMenuItem<String>(
-                              value: ville,
-                              child: Text(ville),
-                            );
-                          }).toList(),
-                          onChanged: (String? newValue) {
-                            setState(() {
-                              _villeController.text = newValue ?? '';
-                              _communeController.text = '';
-                            });
-                          },
-                        ),
-                        const SizedBox(height: 16),
-                        _villeController.text == 'Kinshasa'
-                            ? DropdownButtonFormField<String>(
-                                value: _communeController.text.isEmpty
-                                    ? null
-                                    : _communeController.text,
-                                decoration: InputDecoration(
-                                  labelText: 'Commune',
-                                  prefixIcon: const Icon(Icons.location_on),
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  filled: true,
-                                  fillColor: Colors.white,
-                                ),
-                                items: communesKinshasa.map((String commune) {
-                                  return DropdownMenuItem<String>(
-                                    value: commune,
-                                    child: Text(commune),
-                                  );
-                                }).toList(),
-                                onChanged: (String? newValue) {
+                        SizedBox(
+                          width: double.infinity,
+                          height: 50,
+                          child: OutlinedButton.icon(
+                            onPressed: _isGettingCurrentLocation
+                                ? null
+                                : () async {
+                                    setState(() {
+                                      _isGettingCurrentLocation = true;
+                                    });
+                                    
+                                    // Désactiver le champ de recherche
+                                    _searchAddressController.clear();
+                                    _searchResults.clear();
+                                    
+                                    // Afficher un indicateur de chargement
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Row(
+                                          children: [
+                                            SizedBox(
+                                              width: 20,
+                                              height: 20,
+                                              child: CircularProgressIndicator(
+                                                  strokeWidth: 2),
+                                            ),
+                                            SizedBox(width: 16),
+                                            Text('Récupération de votre position...'),
+                                          ],
+                                        ),
+                                        duration: Duration(seconds: 3),
+                                      ),
+                                    );
+
+                              try {
+                                // Vérifier et demander les permissions de localisation
+                                LocationPermission permission =
+                                    await Geolocator.checkPermission();
+                                if (permission == LocationPermission.denied) {
+                                  permission =
+                                      await Geolocator.requestPermission();
+                                                                  if (permission == LocationPermission.denied) {
                                   setState(() {
-                                    _communeController.text = newValue ?? '';
+                                    _isGettingCurrentLocation = false;
                                   });
-                                },
-                              )
-                            : TextFormField(
-                                controller: _communeController,
-                                decoration: InputDecoration(
-                                  labelText: 'Commune',
-                                  prefixIcon: const Icon(Icons.location_on),
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
+                                  
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                          'Permission de localisation refusée'),
+                                      backgroundColor: Colors.red,
+                                    ),
+                                  );
+                                  return;
+                                }
+                                }
+
+                                if (permission ==
+                                    LocationPermission.deniedForever) {
+                                  setState(() {
+                                    _isGettingCurrentLocation = false;
+                                  });
+                                  
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                          'Permission de localisation refusée définitivement'),
+                                      backgroundColor: Colors.red,
+                                    ),
+                                  );
+                                  return;
+                                }
+
+                                // Obtenir la position actuelle
+                                Position position =
+                                    await Geolocator.getCurrentPosition(
+                                  desiredAccuracy: LocationAccuracy.high,
+                                );
+
+                                print(
+                                    '📍 Position actuelle obtenue: ${position.latitude}, ${position.longitude}');
+
+                                // Récupérer l'adresse depuis les coordonnées
+                                final addressData =
+                                    await getAddressFromGoogleAPI(
+                                  position.latitude,
+                                  position.longitude,
+                                );
+
+                                print(
+                                    '📍 Données d\'adresse extraites: $addressData');
+
+                                // Vérifier que les données ne sont pas vides
+                                if (addressData.isEmpty ||
+                                    (addressData['ville']?.isEmpty == true &&
+                                        addressData['commune']?.isEmpty ==
+                                            true &&
+                                        addressData['quartier']?.isEmpty ==
+                                            true &&
+                                        addressData['avenue']?.isEmpty ==
+                                            true)) {
+                                  setState(() {
+                                    _isGettingCurrentLocation = false;
+                                  });
+                                  
+                                  print('⚠️ Aucune donnée d\'adresse extraite');
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                          'Impossible d\'extraire l\'adresse depuis votre position actuelle. Veuillez essayer une autre méthode.'),
+                                      backgroundColor: Colors.orange,
+                                    ),
+                                  );
+                                  return;
+                                }
+
+                                // Stocker les données extraites dans les variables d'état
+                                setState(() {
+                                  _extractedVille = addressData['ville'] ?? '';
+                                  _extractedCommune =
+                                      addressData['commune'] ?? '';
+                                  _extractedQuartier =
+                                      addressData['quartier'] ?? '';
+                                  _extractedAvenue =
+                                      addressData['avenue'] ?? '';
+
+                                  // Stocker aussi dans la map persistante
+                                  _extractedAddressData = {
+                                    'ville': addressData['ville'] ?? '',
+                                    'commune': addressData['commune'] ?? '',
+                                    'quartier': addressData['quartier'] ?? '',
+                                    'avenue': addressData['avenue'] ?? '',
+                                  };
+
+                                  // Vider les champs de recherche
+                                  _searchResults.clear();
+                                  _searchAddressController.clear();
+                                  _numeroController.text =
+                                      ''; // Champ vide pour que l'utilisateur le remplisse
+                                });
+
+                                setState(() {
+                                  _isGettingCurrentLocation = false;
+                                });
+                                
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                        'Position actuelle utilisée avec succès !'),
+                                    backgroundColor: Colors.green,
                                   ),
-                                  filled: true,
-                                  fillColor: Colors.white,
-                                ),
+                                );
+                              } catch (e) {
+                                setState(() {
+                                  _isGettingCurrentLocation = false;
+                                });
+                                
+                                print(
+                                    '❌ Erreur lors de la récupération de la position: $e');
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                        'Erreur lors de la récupération de la position: $e'),
+                                    backgroundColor: Colors.red,
+                                  ),
+                                );
+                              }
+                            },
+                            style: OutlinedButton.styleFrom(
+                              side: BorderSide(
+                                color: _isGettingCurrentLocation 
+                                    ? Colors.grey 
+                                    : AppColors.primary
                               ),
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          controller: _quartierController,
-                          decoration: InputDecoration(
-                            labelText: 'Quartier',
-                            prefixIcon: const Icon(Icons.map),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
+                              backgroundColor: _isGettingCurrentLocation 
+                                  ? Colors.grey 
+                                  : AppColors.primary,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
                             ),
-                            filled: true,
-                            fillColor: Colors.white,
+                            icon: _isGettingCurrentLocation
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                    ),
+                                  )
+                                : const Icon(Icons.location_on,
+                                    color: Colors.white),
+                            label: Text(
+                              _isGettingCurrentLocation 
+                                  ? 'Récupération en cours...'
+                                  : 'Utiliser ma position actuelle',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
+                            ),
                           ),
                         ),
-                        const SizedBox(height: 16),
+
+                        const SizedBox(height: 20),
+                        // Suggestions rapides pour les villes populaires
+                        Container(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          child: Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              'Kinshasa',
+                              'Lubumbashi',
+                              'Goma',
+                              'Bukavu',
+                              'Matadi',
+                              'Kananga',
+                              'Kisangani',
+                            ]
+                                .map((city) => GestureDetector(
+                                      onTap: _isGettingCurrentLocation
+                                          ? null
+                                          : () {
+                                              _searchAddressController.text =
+                                                  '$city ';
+                                              // Mettre le focus sur le champ de recherche
+                                              FocusScope.of(context)
+                                                  .requestFocus(FocusNode());
+                                              Future.delayed(
+                                                  const Duration(milliseconds: 100),
+                                                  () {
+                                                FocusScope.of(context)
+                                                    .requestFocus(_searchFocusNode);
+                                              });
+                                              setState(() {
+                                                _isSearching = true;
+                                              });
+                                              _searchAddress('$city ');
+                                            },
+                                                                              child: Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 12, vertical: 6),
+                                          decoration: BoxDecoration(
+                                            color: _isGettingCurrentLocation
+                                                ? Colors.grey.withOpacity(0.1)
+                                                : AppColors.primary
+                                                    .withOpacity(0.1),
+                                            borderRadius:
+                                                BorderRadius.circular(20),
+                                            border: Border.all(
+                                                color: _isGettingCurrentLocation
+                                                    ? Colors.grey.withOpacity(0.3)
+                                                    : AppColors.primary
+                                                        .withOpacity(0.3)),
+                                          ),
+                                        child: Text(
+                                          city,
+                                          style: TextStyle(
+                                            color: _isGettingCurrentLocation
+                                                ? Colors.grey
+                                                : AppColors.primary,
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                      ),
+                                    ))
+                                .toList(),
+                          ),
+                        ),
+
                         TextFormField(
-                          controller: _avenueController,
+                          controller: _searchAddressController,
+                          focusNode: _searchFocusNode,
+                          enabled: !_isGettingCurrentLocation,
                           decoration: InputDecoration(
-                            labelText: 'Avenue',
-                            prefixIcon: const Icon(Icons.streetview),
+                            labelText: 'Rechercher une adresse',
+                            hintText: _isGettingCurrentLocation
+                                ? 'Champ désactivé pendant la récupération de position...'
+                                : 'Ex: Kinshasa, Lemba, Avenue du Commerce, Kinshasa...',
+                            prefixIcon: const Icon(Icons.search),
+                            suffixIcon: _isSearching
+                                ? const Padding(
+                                    padding: EdgeInsets.all(8.0),
+                                    child: SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(
+                                          strokeWidth: 2),
+                                    ),
+                                  )
+                                : _searchResults.isNotEmpty
+                                    ? IconButton(
+                                        icon: const Icon(Icons.clear),
+                                        onPressed: _isGettingCurrentLocation
+                                            ? null
+                                            : () {
+                                                setState(() {
+                                                  _searchResults.clear();
+                                                  _searchAddressController.clear();
+                                                  selectedAddress = null;
+                                                  selectedAddressId = null;
+                                                });
+                                              },
+                                      )
+                                    : null,
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
                             filled: true,
-                            fillColor: Colors.white,
+                            fillColor: _isGettingCurrentLocation 
+                                ? Colors.grey.shade100 
+                                : Colors.white,
+                          ),
+                          onChanged: _isGettingCurrentLocation
+                              ? null
+                              : (value) {
+                                  if (value.length > 1) {
+                                    // Réduit à 1 caractère pour plus de réactivité
+                                    setState(() {
+                                      _isSearching = true;
+                                    });
+                                    _searchAddress(value);
+                                  } else {
+                                    setState(() {
+                                      _searchResults.clear();
+                                      _isSearching = false;
+                                      selectedAddress = null;
+                                      selectedAddressId = null;
+                                    });
+                                  }
+                                },
+                          onFieldSubmitted: _isGettingCurrentLocation
+                              ? null
+                              : (value) {
+                                  // Recherche immédiate quand l'utilisateur appuie sur Entrée
+                                  if (value.isNotEmpty) {
+                                    setState(() {
+                                      _isSearching = true;
+                                    });
+                                    _searchAddress(value);
+                                  }
+                                },
+                        ),
+
+                        if (_searchResults.isNotEmpty)
+                          Container(
+                            margin: const EdgeInsets.only(top: 8),
+                            constraints: const BoxConstraints(maxHeight: 250),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Colors.grey.shade300),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.1),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: ListView.builder(
+                              shrinkWrap: true,
+                              itemCount: _searchResults.length,
+                              itemBuilder: (context, index) {
+                                final result = _searchResults[index];
+                                final isSelected = selectedAddressId != null &&
+                                    selectedAddressId == result['place_id'];
+                                final sourceType =
+                                    result['source_type'] ?? 'geocode';
+                                final relevanceScore =
+                                    result['relevance_score'] ?? 0.0;
+
+                                return Container(
+                                  margin: const EdgeInsets.only(bottom: 8),
+                                  decoration: BoxDecoration(
+                                    color: isSelected
+                                        ? AppColors.primary.withOpacity(0.08)
+                                        : Colors.white,
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(
+                                      color: isSelected
+                                          ? AppColors.primary
+                                          : Colors.grey.shade200,
+                                      width: isSelected ? 2 : 1,
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: isSelected
+                                            ? AppColors.primary
+                                                .withOpacity(0.15)
+                                            : Colors.black.withOpacity(0.05),
+                                        blurRadius: isSelected ? 8 : 4,
+                                        offset: const Offset(0, 2),
+                                        spreadRadius: isSelected ? 1 : 0,
+                                      ),
+                                    ],
+                                  ),
+                                  child: Material(
+                                    color: Colors.transparent,
+                                    child: InkWell(
+                                      borderRadius: BorderRadius.circular(16),
+                                      onTap: () {
+                                        print(
+                                            '📍 Adresse sélectionnée: ${result['description']}');
+                                        setState(() {
+                                          selectedAddress = result;
+                                          selectedAddressId =
+                                              result['place_id'];
+                                        });
+                                        _selectAddress(result);
+                                      },
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(16),
+                                        child: Row(
+                                          children: [
+                                            Container(
+                                              padding: const EdgeInsets.all(8),
+                                              decoration: BoxDecoration(
+                                                color: isSelected
+                                                    ? AppColors.primary
+                                                        .withOpacity(0.15)
+                                                    : _getSourceTypeColor(
+                                                            sourceType)
+                                                        .withOpacity(0.1),
+                                                borderRadius:
+                                                    BorderRadius.circular(12),
+                                              ),
+                                              child: Icon(
+                                                isSelected
+                                                    ? Icons.location_on
+                                                    : _getSourceTypeIcon(
+                                                        sourceType),
+                                                color: isSelected
+                                                    ? AppColors.primary
+                                                    : _getSourceTypeColor(
+                                                        sourceType),
+                                                size: 20,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 12),
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    result['description'] ??
+                                                        result[
+                                                            'formatted_address'] ??
+                                                        '',
+                                                    style: TextStyle(
+                                                      fontSize: 14,
+                                                      fontWeight: isSelected
+                                                          ? FontWeight.w600
+                                                          : FontWeight.w500,
+                                                      color: isSelected
+                                                          ? AppColors.primary
+                                                          : Colors.black87,
+                                                      height: 1.3,
+                                                    ),
+                                                    maxLines: 2,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                  ),
+                                                  const SizedBox(height: 4),
+                                                  Row(
+                                                    children: [
+                                                      Container(
+                                                        padding:
+                                                            const EdgeInsets
+                                                                .symmetric(
+                                                                horizontal: 6,
+                                                                vertical: 2),
+                                                        decoration:
+                                                            BoxDecoration(
+                                                          color:
+                                                              _getSourceTypeColor(
+                                                                      sourceType)
+                                                                  .withOpacity(
+                                                                      0.1),
+                                                          borderRadius:
+                                                              BorderRadius
+                                                                  .circular(8),
+                                                        ),
+                                                        child: Text(
+                                                          sourceType ==
+                                                                  'geocode'
+                                                              ? 'Adresse'
+                                                              : 'Établissement',
+                                                          style: TextStyle(
+                                                            fontSize: 10,
+                                                            color:
+                                                                _getSourceTypeColor(
+                                                                    sourceType),
+                                                            fontWeight:
+                                                                FontWeight.w500,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                      const SizedBox(width: 8),
+                                                      if (relevanceScore > 5)
+                                                        Container(
+                                                          padding:
+                                                              const EdgeInsets
+                                                                  .symmetric(
+                                                                  horizontal: 4,
+                                                                  vertical: 1),
+                                                          decoration:
+                                                              BoxDecoration(
+                                                            color: Colors.green
+                                                                .withOpacity(
+                                                                    0.1),
+                                                            borderRadius:
+                                                                BorderRadius
+                                                                    .circular(
+                                                                        4),
+                                                          ),
+                                                          child: Row(
+                                                            mainAxisSize:
+                                                                MainAxisSize
+                                                                    .min,
+                                                            children: [
+                                                              Icon(
+                                                                Icons.star,
+                                                                size: 10,
+                                                                color: Colors
+                                                                    .green,
+                                                              ),
+                                                              const SizedBox(
+                                                                  width: 2),
+                                                              Text(
+                                                                'Pertinent',
+                                                                style:
+                                                                    TextStyle(
+                                                                  fontSize: 9,
+                                                                  color: Colors
+                                                                      .green,
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .w500,
+                                                                ),
+                                                              ),
+                                                            ],
+                                                          ),
+                                                        ),
+                                                    ],
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                            if (isSelected)
+                                              Container(
+                                                padding:
+                                                    const EdgeInsets.all(4),
+                                                decoration: BoxDecoration(
+                                                  color: AppColors.primary,
+                                                  borderRadius:
+                                                      BorderRadius.circular(12),
+                                                ),
+                                                child: const Icon(
+                                                  Icons.check,
+                                                  color: Colors.white,
+                                                  size: 16,
+                                                ),
+                                              ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        const SizedBox(height: 20),
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.green.shade50,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.green.shade200),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(Icons.info_outline,
+                                      color: Colors.green.shade700),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'Adresse sélectionnée',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.green.shade700,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                              if (_extractedAddressData.isNotEmpty) ...[
+                                Container(
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                        color: Colors.green.shade300),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        '📍 Adresse extraite :',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.green.shade700,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      if (_extractedAddressData['ville']
+                                              ?.isNotEmpty ==
+                                          true)
+                                        Text(
+                                          '🏙️ ${_extractedAddressData['ville']}',
+                                          style: const TextStyle(fontSize: 14),
+                                        ),
+                                      if (_extractedAddressData['commune']
+                                              ?.isNotEmpty ==
+                                          true)
+                                        Text(
+                                          '🏘️ ${_extractedAddressData['commune']}',
+                                          style: const TextStyle(fontSize: 14),
+                                        ),
+                                      if (_extractedAddressData['quartier']
+                                              ?.isNotEmpty ==
+                                          true)
+                                        Text(
+                                          '🏠 ${_extractedAddressData['quartier']}',
+                                          style: const TextStyle(fontSize: 14),
+                                        ),
+                                      if (_extractedAddressData['avenue']
+                                              ?.isNotEmpty ==
+                                          true)
+                                        Text(
+                                          '🛣️ ${_extractedAddressData['avenue']}',
+                                          style: const TextStyle(fontSize: 14),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                              ] else ...[
+                                Text(
+                                  'L\'adresse sera automatiquement extraite de votre sélection Google.',
+                                  style: TextStyle(
+                                    color: Colors.green.shade600,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ],
+                            ],
                           ),
                         ),
                         const SizedBox(height: 16),
                         TextFormField(
                           controller: _numeroController,
+                          maxLines: 3,
                           decoration: InputDecoration(
-                            labelText: 'Numéro',
-                            prefixIcon: const Icon(Icons.home),
+                            labelText: "Référence de l'adresse",
+                            hintText:
+                                'Ex : N°7A, 2ème étage, Appartement 15, Référence: près du marché, etc.',
+                            prefixIcon: const Icon(Icons.info_outline),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
@@ -653,24 +1362,11 @@ class _CartScreenState extends State<CartScreen> {
                             fillColor: Colors.white,
                           ),
                         ),
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          controller: _paysController,
-                          enabled: false,
-                          decoration: InputDecoration(
-                            labelText: 'Pays',
-                            prefixIcon: const Icon(Icons.public),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            filled: true,
-                            fillColor: Colors.grey[100],
-                          ),
-                        ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 20),
                         CheckboxListTile(
                           value: saveAddress,
                           onChanged: (bool? value) {
+                            // Utiliser seulement le setState du StatefulBuilder
                             setState(() {
                               saveAddress = value ?? false;
                             });
@@ -690,21 +1386,63 @@ class _CartScreenState extends State<CartScreen> {
                           child: ElevatedButton(
                             onPressed: state.isLoading
                                 ? null
-                                : () {
-                                    if (_villeController.text.isEmpty ||
-                                        _communeController.text.isEmpty ||
-                                        _quartierController.text.isEmpty ||
-                                        _avenueController.text.isEmpty ||
-                                        _numeroController.text.isEmpty) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
+                                : () async {
+                                    // Vérifier qu'une adresse a été sélectionnée en utilisant la map persistante
+                                    if (_extractedAddressData.isEmpty) {
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
                                         const SnackBar(
                                           content: Text(
-                                              'Veuillez remplir tous les champs'),
+                                              'Veuillez sélectionner une adresse depuis la recherche Google'),
                                           backgroundColor: Colors.red,
                                         ),
                                       );
                                       return;
                                     }
+
+                                    // Vérifier que le champ détail adresse n'est pas vide
+                                    if (_numeroController.text.trim().isEmpty) {
+                                      showDialog(
+                                        context: context,
+                                        builder: (BuildContext context) {
+                                          return AlertDialog(
+                                            title:
+                                                const Text('Champ obligatoire'),
+                                            content: const Text(
+                                                'Le champ "Référence de l\'adresse" est obligatoire. Veuillez entrer un numéro, étage, référence ou autre détail pour que le livreur puisse vous trouver.'),
+                                            actions: [
+                                              TextButton(
+                                                onPressed: () {
+                                                  Navigator.pop(context);
+                                                },
+                                                child: const Text('OK'),
+                                              ),
+                                            ],
+                                          );
+                                        },
+                                      );
+                                      return;
+                                    }
+
+                                    // Utiliser les données extraites du geocoding depuis la map persistante
+                                    final detailAdresse =
+                                        _numeroController.text.trim();
+                                    final ville =
+                                        _extractedAddressData['ville'] ?? '';
+                                    final commune =
+                                        _extractedAddressData['commune'] ?? '';
+                                    final quartier =
+                                        _extractedAddressData['quartier'] ?? '';
+                                    final avenue =
+                                        _extractedAddressData['avenue'] ?? '';
+
+                                    print(
+                                        '🚀 Tentative de création de commande avec données geocoding...');
+                                    print('   Ville: $ville');
+                                    print('   Commune: $commune');
+                                    print('   Quartier: $quartier');
+                                    print('   Avenue: $avenue');
+                                    print('   Détail: $detailAdresse');
 
                                     context.read<OrderCubit>().createOrder(
                                           produits: cartItems.map((item) {
@@ -714,36 +1452,79 @@ class _CartScreenState extends State<CartScreen> {
                                               "quantity": item['quantity'],
                                             };
                                           }).toList(),
-                                          ville: _villeController.text,
-                                          commune: _communeController.text,
-                                          quartier: _quartierController.text,
-                                          avenue: _avenueController.text,
-                                          codePostale: '',
-                                          numero: _numeroController.text,
-                                          pays: _paysController.text,
+                                          // ville:
+                                          //     ville.isNotEmpty ? ville : 'N/A',
+                                          // commune: commune.isNotEmpty
+                                          //     ? commune
+                                          //     : 'N/A',
+                                          // quartier: quartier.isNotEmpty
+                                          //     ? quartier
+                                          //     : 'N/A',
+                                          // avenue: avenue.isNotEmpty
+                                          //     ? avenue
+                                          //     : 'N/A',
+                                          // codePostale: '',
+                                          // numero: detailAdresse,
+                                          // pays: 'RDC',
+
+                                          ville: "ville",
+                                          commune: "commune",
+                                          quartier: "quartier",
+                                          avenue: "avenue",
+                                          codePostale: '12345',
+                                          numero: "numero",
+                                          pays: "pays",
                                         );
+
+                                    // Obtenir les coordonnées depuis l'adresse complète
+                                    String fullAddress =
+                                        '$quartier, $commune, $ville, $detailAdresse, RDC';
+                                    final coordinates =
+                                        await getCoordinatesFromGoogle(
+                                            fullAddress);
 
                                     saveCart(
                                         context,
                                         cartItems,
-                                        _villeController.text,
-                                        _communeController.text,
-                                        _quartierController.text,
-                                        _avenueController.text,
-                                        _numeroController.text,
-                                        _paysController.text);
+                                        ville.isNotEmpty ? ville : 'N/A',
+                                        commune.isNotEmpty ? commune : 'N/A',
+                                        quartier.isNotEmpty ? quartier : 'N/A',
+                                        avenue.isNotEmpty ? avenue : 'N/A',
+                                        detailAdresse,
+                                        'RDC',
+                                        coordinates['longitude'] ?? 0.0,
+                                        coordinates['latitude'] ?? 0.0);
 
                                     if (saveAddress) {
-                                      _saveDeliveryAddress(
-                                        context,
-                                        _villeController.text,
-                                        _communeController.text,
-                                        _quartierController.text,
-                                        _avenueController.text,
-                                        _numeroController.text,
-                                        _paysController.text,
+                                      // Obtenir les coordonnées depuis l'adresse complète
+                                      String fullAddress =
+                                          '$quartier, $commune, $ville, $detailAdresse, RDC';
+                                      final coordinates =
+                                          await getCoordinatesFromGoogle(
+                                              fullAddress);
+
+                                      _saveDeliveryAddressWithCoordinates(
+                                        coordinates['latitude'] ?? 0.0,
+                                        coordinates['longitude'] ?? 0.0,
+                                        ville.isNotEmpty ? ville : 'N/A',
+                                        commune.isNotEmpty ? commune : 'N/A',
+                                        quartier.isNotEmpty ? quartier : 'N/A',
+                                        avenue.isNotEmpty ? avenue : 'N/A',
+                                        detailAdresse,
+                                        'RDC',
+                                        fullAddress,
                                       );
                                     }
+
+                                    // Vider le cache des adresses extraites après la commande
+                                    setState(() {
+                                      _extractedAddressData.clear();
+                                      _extractedVille = '';
+                                      _extractedCommune = '';
+                                      _extractedQuartier = '';
+                                      _extractedAvenue = '';
+                                      _selectedGoogleAddress = null;
+                                    });
                                   },
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppColors.primary,
@@ -764,6 +1545,7 @@ class _CartScreenState extends State<CartScreen> {
                                   ),
                           ),
                         ),
+                        const SizedBox(height: 50),
                       ],
                     ),
                   ),
@@ -776,15 +1558,597 @@ class _CartScreenState extends State<CartScreen> {
     );
   }
 
-  // Méthode pour sauvegarder l'adresse de livraison
-  Future<void> _saveDeliveryAddress(
-    BuildContext context,
+  Future<Map<String, double>> getCoordinatesFromGoogle(String address) async {
+    const apiKey = 'AIzaSyCpJzuEa7jLAcP8ub8AVM8flT2aK5cPdh0';
+    final url =
+        'https://maps.googleapis.com/maps/api/geocode/json?address=${Uri.encodeComponent(address)}&key=$apiKey';
+
+    try {
+      final response = await http.get(Uri.parse(url));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+
+        if (data['status'] == 'OK') {
+          final location = data['results'][0]['geometry']['location'];
+          final lat = location['lat'];
+          final lng = location['lng'];
+
+          print('Latitude: $lat, Longitude: $lng');
+
+          return {
+            'latitude': lat,
+            'longitude': lng,
+          };
+        } else {
+          print('Adresse introuvable: ${data['status']}');
+          throw Exception('Adresse introuvable: ${data['status']}');
+        }
+      } else {
+        print('Erreur serveur: ${response.statusCode}');
+        throw Exception('Erreur serveur: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Erreur lors de la récupération des coordonnées: $e');
+      throw Exception('Erreur lors de la récupération des coordonnées: $e');
+    }
+  }
+
+  Future<Map<String, String>> getAddressFromGoogleAPI(
+      double lat, double lng) async {
+    const apiKey = 'AIzaSyCpJzuEa7jLAcP8ub8AVM8flT2aK5cPdh0';
+    final url =
+        'https://maps.googleapis.com/maps/api/geocode/json?latlng=$lat,$lng&key=$apiKey&language=fr';
+
+    try {
+      final response = await http.get(Uri.parse(url));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['status'] == 'OK') {
+          final results = data['results'];
+          if (results.isNotEmpty) {
+            final addressComponents = results[0]['address_components'];
+
+            String ville = '';
+            String commune = '';
+            String quartier = '';
+            String avenue = '';
+
+            for (var component in addressComponents) {
+              final types = component['types'] as List;
+              if (types.contains('locality') ||
+                  types.contains('administrative_area_level_1')) {
+                ville = component['long_name'];
+              } else if (types.contains('administrative_area_level_2')) {
+                commune = component['long_name'];
+              } else if (types.contains('sublocality') ||
+                  types.contains('neighborhood')) {
+                quartier = component['long_name'];
+              } else if (types.contains('route')) {
+                avenue = component['long_name'];
+              }
+            }
+
+            print('📍 Adresse extraite depuis les coordonnées:');
+            print('   Ville: $ville');
+            print('   Commune: $commune');
+            print('   Quartier: $quartier');
+            print('   Avenue: $avenue');
+
+            final result = {
+              'ville': ville,
+              'commune': commune,
+              'quartier': quartier,
+              'avenue': avenue,
+            };
+
+            print('📍 Résultat final: $result');
+
+            // Sauvegarder l'adresse avec les coordonnées dans delivery_addresses
+            await _saveDeliveryAddressWithCoordinates(
+              lat,
+              lng,
+              ville,
+              commune,
+              quartier,
+              avenue,
+              '', // numero vide pour l'instant
+              'RDC',
+              results[0]['formatted_address'] ?? '',
+            );
+
+            return result;
+          }
+        } else {
+          print('❌ Erreur Google API: ${data['status']}');
+          throw Exception('Erreur Google API: ${data['status']}');
+        }
+      } else {
+        print('❌ Erreur HTTP: ${response.statusCode}');
+        throw Exception('Erreur HTTP: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('❌ Erreur lors de la récupération de l\'adresse: $e');
+      throw Exception('Erreur lors de la récupération de l\'adresse: $e');
+    }
+
+    return {};
+  }
+
+  // Méthode pour rechercher des adresses avec l'API Google Places
+  Future<void> _searchAddress(String query) async {
+    print('🔍 Recherche d\'adresse: $query'); // Debug log
+
+    // Annuler la recherche précédente si elle est en cours
+    _searchDebounceTimer?.cancel();
+
+    // Debounce intelligent : plus court pour les requêtes courtes, plus long pour les longues
+    final debounceTime = query.length < 5 ? 200 : 500;
+
+    _searchDebounceTimer =
+        Timer(Duration(milliseconds: debounceTime), () async {
+      const apiKey = 'AIzaSyCpJzuEa7jLAcP8ub8AVM8flT2aK5cPdh0';
+
+      // Recherche plus intelligente avec plusieurs types de résultats
+      final List<String> searchUrls = [
+        // Recherche principale avec géocodage
+        'https://maps.googleapis.com/maps/api/place/autocomplete/json'
+            '?input=${Uri.encodeComponent(query)}'
+            '&types=geocode'
+            '&components=country:cd'
+            '&key=$apiKey',
+
+        // Recherche d'établissements pour plus de précision
+        'https://maps.googleapis.com/maps/api/place/autocomplete/json'
+            '?input=${Uri.encodeComponent(query)}'
+            '&types=establishment'
+            '&components=country:cd'
+            '&key=$apiKey',
+      ];
+
+      print('🌐 URLs de recherche: $searchUrls'); // Debug log
+
+      try {
+        final List<Map<String, dynamic>> allResults = [];
+
+        // Effectuer les recherches en parallèle
+        final List<Future<http.Response>> requests =
+            searchUrls.map((url) => http.get(Uri.parse(url))).toList();
+
+        final responses = await Future.wait(requests);
+
+        for (int i = 0; i < responses.length; i++) {
+          final response = responses[i];
+          print('📡 Réponse $i reçue: ${response.statusCode}'); // Debug log
+
+          if (response.statusCode == 200) {
+            final data = jsonDecode(response.body);
+            print('📊 Données reçues: ${data['status']}'); // Debug log
+
+            if (data['status'] == 'OK') {
+              final predictions =
+                  List<Map<String, dynamic>>.from(data['predictions']);
+
+              // Ajouter un type pour identifier la source
+              for (var prediction in predictions) {
+                prediction['source_type'] =
+                    i == 0 ? 'geocode' : 'establishment';
+                prediction['relevance_score'] =
+                    _calculateRelevanceScore(query, prediction['description']);
+              }
+
+              allResults.addAll(predictions);
+              print(
+                  '📍 Prédictions trouvées: ${predictions.length}'); // Debug log
+            } else {
+              print('❌ Erreur de recherche $i: ${data['status']}');
+            }
+          } else {
+            print('❌ Erreur serveur $i: ${response.statusCode}');
+          }
+        }
+
+        // Trier et dédupliquer les résultats
+        final uniqueResults = _deduplicateAndSortResults(allResults, query);
+
+        setState(() {
+          _searchResults = uniqueResults;
+          _isSearching = false;
+        });
+
+        print('✅ Résultats finaux: ${uniqueResults.length}');
+      } catch (e) {
+        print('❌ Erreur lors de la recherche d\'adresse: $e');
+        setState(() {
+          _searchResults.clear();
+          _isSearching = false;
+        });
+
+        // Afficher un message d'erreur à l'utilisateur
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                  'Erreur de connexion. Vérifiez votre connexion internet.'),
+              backgroundColor: Colors.orange,
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+      }
+    });
+  }
+
+  // Calculer un score de pertinence pour trier les résultats
+  double _calculateRelevanceScore(String query, String description) {
+    final queryLower = query.toLowerCase();
+    final descLower = description.toLowerCase();
+
+    double score = 0.0;
+
+    // Bonus pour les correspondances exactes au début
+    if (descLower.startsWith(queryLower)) {
+      score += 10.0;
+    }
+
+    // Bonus pour les mots-clés importants
+    final keywords = [
+      'kinshasa',
+      'lubumbashi',
+      'goma',
+      'bukavu',
+      'matadi',
+      'avenue',
+      'boulevard',
+      'rue'
+    ];
+    for (final keyword in keywords) {
+      if (descLower.contains(keyword)) {
+        score += 2.0;
+      }
+    }
+
+    // Bonus pour la longueur (adresses plus complètes)
+    score += descLower.length * 0.1;
+
+    // Malus pour les adresses trop longues
+    if (descLower.length > 100) {
+      score -= 5.0;
+    }
+
+    return score;
+  }
+
+  // Dédupliquer et trier les résultats
+  List<Map<String, dynamic>> _deduplicateAndSortResults(
+      List<Map<String, dynamic>> results, String query) {
+    final Map<String, Map<String, dynamic>> uniqueResults = {};
+
+    for (final result in results) {
+      final description = result['description'] as String;
+      final placeId = result['place_id'] as String;
+
+      // Garder le résultat avec le meilleur score
+      if (!uniqueResults.containsKey(placeId) ||
+          (result['relevance_score'] ?? 0.0) >
+              (uniqueResults[placeId]?['relevance_score'] ?? 0.0)) {
+        uniqueResults[placeId] = result;
+      }
+    }
+
+    // Trier par score de pertinence décroissant
+    final sortedResults = uniqueResults.values.toList();
+    sortedResults.sort((a, b) =>
+        (b['relevance_score'] ?? 0.0).compareTo(a['relevance_score'] ?? 0.0));
+
+    // Limiter à 10 résultats pour éviter la surcharge
+    return sortedResults.take(10).toList();
+  }
+
+  // Obtenir la couleur selon le type de source
+  Color _getSourceTypeColor(String sourceType) {
+    switch (sourceType) {
+      case 'geocode':
+        return Colors.blue;
+      case 'establishment':
+        return Colors.green;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  // Obtenir l'icône selon le type de source
+  IconData _getSourceTypeIcon(String sourceType) {
+    switch (sourceType) {
+      case 'geocode':
+        return Icons.location_on_outlined;
+      case 'establishment':
+        return Icons.business;
+      default:
+        return Icons.location_on_outlined;
+    }
+  }
+
+  // Méthode pour sélectionner une adresse et récupérer ses coordonnées
+  Future<void> _selectAddress(Map<String, dynamic> place) async {
+    print('🎯 Sélection d\'adresse: ${place['description']}');
+
+    const apiKey = 'AIzaSyCpJzuEa7jLAcP8ub8AVM8flT2aK5cPdh0';
+    final placeId = place['place_id'];
+    final url = 'https://maps.googleapis.com/maps/api/place/details/json'
+        '?place_id=$placeId'
+        '&fields=geometry,formatted_address,address_components'
+        '&key=$apiKey';
+
+    print('🌐 URL de détails: $url'); // Debug log
+
+    try {
+      final response = await http.get(Uri.parse(url));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+
+        if (data['status'] == 'OK') {
+          final result = data['result'];
+          final location = result['geometry']['location'];
+          final addressComponents = result['address_components'] as List;
+
+          // Extraire les composants d'adresse avec une approche plus robuste
+          String ville = '';
+          String commune = '';
+          String quartier = '';
+          String avenue = '';
+          String numero = '';
+
+          print(
+              '🔍 Composants d\'adresse trouvés: ${addressComponents.length}');
+
+          for (var component in addressComponents) {
+            final types = List<String>.from(component['types']);
+            final longName = component['long_name'] ?? '';
+            final shortName = component['short_name'] ?? '';
+
+            print('📍 Composant: $longName - Types: $types');
+
+            if (types.contains('locality') ||
+                types.contains('administrative_area_level_1')) {
+              ville = longName;
+              print('🏙️ Ville trouvée: $ville');
+            } else if (types.contains('sublocality_level_1') ||
+                types.contains('sublocality') ||
+                types.contains('administrative_area_level_2')) {
+              commune = longName;
+              print('🏘️ Commune trouvée: $commune');
+            } else if (types.contains('sublocality_level_2') ||
+                types.contains('neighborhood')) {
+              quartier = longName;
+              print('🏠 Quartier trouvé: $quartier');
+            } else if (types.contains('route')) {
+              avenue = longName;
+              print('🛣️ Avenue trouvée: $avenue');
+            } else if (types.contains('street_number')) {
+              numero = longName;
+              print('🏠 Numéro trouvé: $numero');
+            }
+          }
+
+          // Si on n'a pas trouvé de ville, essayer de l'extraire de l'adresse complète
+          if (ville.isEmpty) {
+            final formattedAddress = result['formatted_address'] ?? '';
+            if (formattedAddress.contains('Kinshasa')) {
+              ville = 'Kinshasa';
+            } else if (formattedAddress.contains('Lubumbashi')) {
+              ville = 'Lubumbashi';
+            } else if (formattedAddress.contains('Goma')) {
+              ville = 'Goma';
+            } else if (formattedAddress.contains('Bukavu')) {
+              ville = 'Bukavu';
+            } else if (formattedAddress.contains('Matadi')) {
+              ville = 'Matadi';
+            } else if (formattedAddress.contains('Kananga')) {
+              ville = 'Kananga';
+            } else if (formattedAddress.contains('Kisangani')) {
+              ville = 'Kisangani';
+            } else if (formattedAddress.contains('Kolwezi')) {
+              ville = 'Kolwezi';
+            } else if (formattedAddress.contains('Likasi')) {
+              ville = 'Likasi';
+            } else if (formattedAddress.contains('Kikwit')) {
+              ville = 'Kikwit';
+            } else if (formattedAddress.contains('Tshikapa')) {
+              ville = 'Tshikapa';
+            } else if (formattedAddress.contains('Uvira')) {
+              ville = 'Uvira';
+            } else if (formattedAddress.contains('Bunia')) {
+              ville = 'Bunia';
+            } else if (formattedAddress.contains('Kalemie')) {
+              ville = 'Kalemie';
+            } else if (formattedAddress.contains('Kindu')) {
+              ville = 'Kindu';
+            } else if (formattedAddress.contains('Mbandaka')) {
+              ville = 'Mbandaka';
+            } else if (formattedAddress.contains('Mbanza-Ngungu')) {
+              ville = 'Mbanza-Ngungu';
+            } else if (formattedAddress.contains('Boma')) {
+              ville = 'Boma';
+            } else if (formattedAddress.contains('Kamina')) {
+              ville = 'Kamina';
+            }
+            print('🏙️ Ville extraite de l\'adresse: $ville');
+          }
+
+          // Si on n'a pas trouvé de commune, essayer de l'extraire
+          if (commune.isEmpty && quartier.isNotEmpty) {
+            // Parfois le quartier est stocké comme commune
+            commune = quartier;
+            quartier = '';
+            print('🏘️ Commune extraite du quartier: $commune');
+          }
+
+          // Essayer d'extraire plus d'informations de l'adresse complète si nécessaire
+          if (avenue.isEmpty || quartier.isEmpty) {
+            final formattedAddress = result['formatted_address'] ?? '';
+            final addressParts = formattedAddress.split(',');
+
+            // Essayer de trouver l'avenue dans les parties de l'adresse
+            if (avenue.isEmpty) {
+              for (var part in addressParts) {
+                final trimmedPart = part.trim();
+                if (trimmedPart.contains('Avenue') ||
+                    trimmedPart.contains('Boulevard') ||
+                    trimmedPart.contains('Rue') ||
+                    trimmedPart.contains('Route')) {
+                  avenue = trimmedPart;
+                  print('🛣️ Avenue extraite: $avenue');
+                  break;
+                }
+              }
+            }
+
+            // Essayer de trouver le quartier dans les parties de l'adresse
+            if (quartier.isEmpty) {
+              for (var part in addressParts) {
+                final trimmedPart = part.trim();
+                if (!trimmedPart.contains('Kinshasa') &&
+                    !trimmedPart.contains('RDC') &&
+                    !trimmedPart.contains('Congo') &&
+                    trimmedPart.length > 3) {
+                  quartier = trimmedPart;
+                  print('🏠 Quartier extrait: $quartier');
+                  break;
+                }
+              }
+            }
+          }
+
+          // Stocker les données extraites dans les variables d'état et dans la map persistante
+          setState(() {
+            _extractedVille = ville.isNotEmpty ? ville : '';
+            _extractedCommune = commune.isNotEmpty ? commune : '';
+            _extractedQuartier = quartier.isNotEmpty ? quartier : '';
+            _extractedAvenue = avenue.isNotEmpty ? avenue : '';
+
+            // Stocker aussi dans la map persistante
+            _extractedAddressData = {
+              'ville': ville.isNotEmpty ? ville : '',
+              'commune': commune.isNotEmpty ? commune : '',
+              'quartier': quartier.isNotEmpty ? quartier : '',
+              'avenue': avenue.isNotEmpty ? avenue : '',
+            };
+
+            _numeroController.text =
+                ''; // Champ vide pour que l'utilisateur le remplisse
+            _searchResults.clear();
+            _searchAddressController.clear();
+          });
+
+          print('✅ Champs mis à jour:');
+          print('   Ville: ${_villeController.text}');
+          print('   Commune: ${_communeController.text}');
+          print('   Quartier: ${_quartierController.text}');
+          print('   Avenue: ${_avenueController.text}');
+          print('   Numéro: ${_numeroController.text}');
+
+          // Afficher les coordonnées trouvées
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content:
+                  Text('Adresse sélectionnée: ${result['formatted_address']}'),
+              backgroundColor: AppColors.primary,
+              duration: const Duration(seconds: 2),
+            ),
+          );
+
+          // Sauvegarder les coordonnées GeoJSON
+          final coordinates = {
+            'type': 'Point',
+            'coordinates': [location['lng'], location['lat']]
+          };
+
+          print('📍 Coordonnées GeoJSON: $coordinates');
+
+          // Sauvegarder les coordonnées GeoJSON dans Firestore
+          // await _saveGeoJSONCoordinates(
+          //     coordinates, result['formatted_address']);
+
+          // Sauvegarder l'adresse avec les coordonnées dans delivery_addresses
+          await _saveDeliveryAddressWithCoordinates(
+            location['lat'],
+            location['lng'],
+            ville,
+            commune,
+            quartier,
+            avenue,
+            numero,
+            'RDC',
+            result['formatted_address'],
+          );
+        } else {
+          print(
+              '❌ Erreur lors de la récupération des détails: ${data['status']}');
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                  'Erreur lors de la récupération des détails: ${data['status']}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      } else {
+        print('❌ Erreur serveur: ${response.statusCode}');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur serveur: ${response.statusCode}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      print('❌ Erreur lors de la sélection d\'adresse: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erreur lors de la sélection d\'adresse: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  // Méthode pour sauvegarder les coordonnées GeoJSON
+  // Future<void> _saveGeoJSONCoordinates(
+  //     Map<String, dynamic> coordinates, String address) async {
+  //   final authState = context.read<AuthCubit>().state;
+  //   if (authState is AuthSuccess && authState.user != null) {
+  //     final user = authState.user!;
+  //     final userId = user['id']?.toString() ?? '';
+
+  //     try {
+  //       await FirebaseFirestore.instance.collection('geo_coordinates').add({
+  //         'userId': userId,
+  //         'address': address,
+  //         'coordinates': coordinates,
+  //         'timestamp': FieldValue.serverTimestamp(),
+  //       });
+
+  //       print('✅ Coordonnées GeoJSON sauvegardées avec succès');
+  //     } catch (e) {
+  //       print('❌ Erreur lors de la sauvegarde des coordonnées: $e');
+  //     }
+  //   }
+  // }
+
+  // Méthode pour sauvegarder l'adresse de livraison avec coordonnées
+  Future<void> _saveDeliveryAddressWithCoordinates(
+    double latitude,
+    double longitude,
     String ville,
     String commune,
     String quartier,
     String avenue,
     String numero,
     String pays,
+    String fullAddress,
   ) async {
     final authState = context.read<AuthCubit>().state;
     if (authState is AuthSuccess && authState.user != null) {
@@ -805,7 +2169,60 @@ class _CartScreenState extends State<CartScreen> {
           'numero': numero,
           'pays': pays,
           'phone': user['phone'] ?? '',
+          'latitude': latitude,
+          'longitude': longitude,
+          'fullAddress': fullAddress,
+          'source': 'google_geocoding',
         });
+        _saveCurrentLocation(longitude, latitude);
+
+        print('✅ Adresse avec coordonnées sauvegardée dans delivery_addresses');
+      } catch (e) {
+        print(
+            '❌ Erreur lors de la sauvegarde de l\'adresse avec coordonnées: $e');
+      }
+    }
+  }
+
+  // Méthode pour sauvegarder l'adresse de livraison
+  Future<void> _saveDeliveryAddress(
+    BuildContext context,
+    String ville,
+    String commune,
+    String quartier,
+    String avenue,
+    String numero,
+    String pays,
+  ) async {
+    final authState = context.read<AuthCubit>().state;
+    if (authState is AuthSuccess && authState.user != null) {
+      final user = authState.user!;
+      final userId = user['id']?.toString() ?? '';
+      final userName =
+          '${user['firstName'] ?? ''} ${user['lastName'] ?? ''}'.trim();
+
+      try {
+        // Obtenir les coordonnées depuis l'adresse
+        String fullAddress = '$quartier, $commune, $ville, $numero, RDC';
+        final coordinates = await getCoordinatesFromGoogle(fullAddress);
+
+        await FirebaseFirestore.instance.collection('delivery_addresses').add({
+          'timestamp': FieldValue.serverTimestamp(),
+          'userId': userId,
+          'userName': userName,
+          'ville': ville,
+          'commune': commune,
+          'quartier': quartier,
+          'avenue': avenue,
+          'numero': numero,
+          'pays': pays,
+          'phone': user['phone'] ?? '',
+          'latitude': coordinates['latitude'],
+          'longitude': coordinates['longitude'],
+        });
+
+        _saveCurrentLocation(
+            coordinates['longitude'] ?? 0.0, coordinates['latitude'] ?? 0.0);
 
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(

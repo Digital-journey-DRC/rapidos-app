@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../services/profile_service.dart';
+import '../../cubit/auth_cubit.dart';
 
 // States
 abstract class ProfileState {}
@@ -34,8 +35,14 @@ class IncomeSummaryLoaded extends ProfileState {
 // Cubit
 class ProfileCubit extends Cubit<ProfileState> {
   final ProfileService _profileService;
+  AuthCubit? _authCubit;
 
   ProfileCubit(this._profileService) : super(ProfileInitial());
+
+  // Méthode pour injecter l'AuthCubit
+  void setAuthCubit(AuthCubit authCubit) {
+    _authCubit = authCubit;
+  }
 
   Future<void> updateProfile({
     required String userId,
@@ -46,7 +53,12 @@ class ProfileCubit extends Cubit<ProfileState> {
     String? phone,
   }) async {
     try {
+      print('🔄 ProfileCubit: Début de updateProfile');
+      print('🔄 ProfileCubit: userId=$userId, firstName=$firstName, lastName=$lastName, email=$email, phone=$phone');
+      
       emit(ProfileLoading());
+      
+      print('🔄 ProfileCubit: Appel du service...');
       final response = await _profileService.updateProfile(
         userId: userId,
         token: token,
@@ -56,18 +68,57 @@ class ProfileCubit extends Cubit<ProfileState> {
         phone: phone,
       );
       
+      print('✅ ProfileCubit: Réponse reçue: $response');
+      
+      // Mettre à jour l'AuthCubit avec les nouvelles données utilisateur
+      if (_authCubit != null) {
+        try {
+          // Récupérer l'état actuel de l'AuthCubit
+          final currentAuthState = _authCubit!.state;
+          if (currentAuthState is AuthSuccess && currentAuthState.user != null) {
+            // Créer une copie des données utilisateur mises à jour
+            final updatedUserData = Map<String, dynamic>.from(currentAuthState.user!);
+            
+            // Mettre à jour avec les nouvelles données du profil
+            if (firstName != null) updatedUserData['firstName'] = firstName;
+            if (lastName != null) updatedUserData['lastName'] = lastName;
+            if (email != null) updatedUserData['email'] = email;
+            if (phone != null) updatedUserData['phone'] = phone;
+            
+            // Si l'API a retourné des données utilisateur, les utiliser
+            if (response['data'] != null) {
+              updatedUserData.addAll(response['data']);
+            }
+            
+            print('🔄 ProfileCubit: Mise à jour de l\'AuthCubit avec les nouvelles données');
+            print('📝 Données utilisateur mises à jour: $updatedUserData');
+            
+            // Mettre à jour l'AuthCubit
+            _authCubit!.updateUser(updatedUserData, currentAuthState.token!);
+            
+            // Forcer la mise à jour de l'interface utilisateur
+            print('✅ Données utilisateur mises à jour et persistées');
+          }
+        } catch (e) {
+          print('❌ ProfileCubit: Erreur lors de la mise à jour de l\'AuthCubit: $e');
+        }
+      }
+      
       // Vérifier si l'API a retourné des données utilisateur
       if (response['success'] == true && response['data'] != null) {
         // Inclure les données mises à jour dans l'état
+        print('✅ ProfileCubit: Émission ProfileSuccess avec données');
         emit(ProfileSuccess(
           'Profil mis à jour avec succès',
           data: response['data']
         ));
       } else {
         // Si pas de données retournées, émettre l'état avec juste le message
+        print('✅ ProfileCubit: Émission ProfileSuccess sans données');
         emit(ProfileSuccess('Profil mis à jour avec succès'));
       }
     } catch (e) {
+      print('❌ ProfileCubit: Erreur: $e');
       emit(ProfileError(e.toString()));
     }
   }

@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:immo/cubit/listing_cubit.dart';
-import 'package:immo/screens/acheteur_location.dart';
 import 'package:immo/screens/cart/cart_screen.dart';
+import 'package:immo/screens/express_livreur.dart';
+import 'package:immo/screens/express_screen.dart';
 import 'package:immo/screens/favoris_screen.dart';
 import 'package:immo/screens/home/home_livreur.dart';
 import 'package:immo/screens/home/home_marchant.dart';
 import 'package:immo/screens/home/new_home.dart';
-
+import 'package:immo/screens/home/voir_plus_produits.dart';
+import 'package:immo/screens/navigation_example.dart';
 import 'package:immo/screens/order_screen.dart';
 
 import '../constants.dart';
@@ -19,6 +21,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:io';
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../services/version_service.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -33,14 +36,18 @@ class _MainScreenState extends State<MainScreen> {
   late final StreamController<void> _cartStreamController;
 
   final List<Widget> _screens = [
-    // const DashboardScreen(),
     const NewHomeScreen(),
     const CartScreen(backNavigaton: false),
     const FavorisScreen(),
     const HomeMarchantScreen(),
     const OrderScreen(backNavigation: false),
     const HomeLivreurScreen(),
-    const AcheteurLocation()
+    // const TrackingMapPage(),
+    const NavigationExample(backNavigation: false),
+    const VoirPlusProduitsScreen(),
+    const ExpressScreen(),
+    const ExpressLivreur(),
+    const NavigationExample(backNavigation: false),
   ];
 
   static Future<void> saveTokenToFirestore(
@@ -72,20 +79,26 @@ class _MainScreenState extends State<MainScreen> {
         }
       }
 
-      final docRef = FirebaseFirestore.instance.collection('tokens').doc(token);
+      if (userId == null) {
+        print('❌ userId is null, cannot save token');
+        return;
+      }
+
+      // Utiliser userId comme identifiant du document
+      final docRef = FirebaseFirestore.instance.collection('tokens').doc(userId);
       await docRef.set({
         'token': token,
         'timestamp': FieldValue.serverTimestamp(),
         'platform': Platform.isIOS ? 'ios' : 'android',
         'role': role ?? 'user',
-        'userId': userId ?? '1',
+        'userId': userId,
         'permission_status':
             (await FirebaseMessaging.instance.getNotificationSettings())
                 .authorizationStatus
                 .toString(),
-      });
+      }, SetOptions(merge: true)); // merge pour ne pas effacer d'autres champs
 
-      print("✅ Token saved to Firestore successfully");
+      print("✅ Token saved to Firestore successfully (by userId)");
     } catch (e) {
       print("❌ Error saving token to Firestore: $e");
     }
@@ -135,6 +148,11 @@ class _MainScreenState extends State<MainScreen> {
     // Charger les données au démarrage
     context.read<ListingCubit>().getListings();
     _initializeFirebaseMessaging();
+    
+    // Vérifier la version après l'initialisation
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      VersionService.checkForUpdate(context);
+    });
   }
 
   @override
@@ -144,6 +162,25 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   void _onItemTapped(int index) {
+    final authState = context.read<AuthCubit>().state;
+    
+    // Vérifier si l'utilisateur a le numéro spécifique
+    if (authState is AuthSuccess && authState.user != null) {
+      final userPhone = authState.user!['phone']?.toString();
+      print('🔍 MainScreen: Vérification du numéro - $userPhone');
+      
+      if (userPhone == "+243842613999") {
+        print('🚫 MainScreen: Utilisateur avec numéro restreint détecté, redirection vers login');
+        // Rediriger vers le login
+        context.read<AuthCubit>().logout();
+        Navigator.of(context).pushNamedAndRemoveUntil(
+          AppRoutes.login,
+          (route) => false,
+        );
+        return;
+      }
+    }
+
     setState(() {
       _previousIndex = _currentIndex;
       _currentIndex = index;
@@ -167,6 +204,11 @@ class _MainScreenState extends State<MainScreen> {
     final bool isLivreur = authState is AuthSuccess &&
         authState.user != null &&
         authState.user!['role'] == 'livreur';
+    
+    // Vérifier si l'utilisateur a le numéro restreint
+    final bool isRestrictedUser = authState is AuthSuccess &&
+        authState.user != null &&
+        authState.user!['phone']?.toString() == "+243842613999";
 
     List<BottomNavigationBarItem> navigationItems = [
       const BottomNavigationBarItem(
@@ -201,23 +243,31 @@ class _MainScreenState extends State<MainScreen> {
         _screens[2], // FavorisScreen
         _screens[4],
         _screens[6]
+        // _screens[10]
         // HomeMarchantScreen
       ];
     } else if (isVendeur) {
       filteredScreens = [
         _screens[3], // HomeMarchantScreen
-        // _screens[3], // HomeMarchantScreen (pour l'onglet Produits)
-        _screens[4], // HomeMarchantScreen (pour l'onglet Profil)
+        _screens[7], // HomeMarchantScreen (pour l'onglet Produits)
+        _screens[4],
+        _screens[8], // HomeMarchantScreen (pour l'onglet Profil)
       ];
       navigationItems = const [
         BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Accueil'),
+        BottomNavigationBarItem(icon: Icon(Icons.shopping_bag), label: 'Produits'),
         BottomNavigationBarItem(
             icon: Icon(Icons.shopping_cart_checkout), label: 'Commandes'),
+        BottomNavigationBarItem(
+            icon: Icon(Icons.bolt_outlined), label: 'Express'),
       ];
     } else if (isLivreur) {
       filteredScreens = [
         _screens[5],
+        _screens[6],
         _screens[4],
+        _screens[9],
+        // _screens[10]
         // HomeLivreurScreen
         // CartScreen
         // HomeMarchantScreen
@@ -226,7 +276,11 @@ class _MainScreenState extends State<MainScreen> {
         BottomNavigationBarItem(
             icon: Icon(Icons.bar_chart_outlined), label: 'Statistiques'),
         BottomNavigationBarItem(
+            icon: Icon(Icons.place_outlined), label: 'Maps'),
+        BottomNavigationBarItem(
             icon: Icon(Icons.shopping_cart_checkout), label: 'Livraisons'),
+        BottomNavigationBarItem(
+            icon: Icon(Icons.bolt_outlined), label: 'Express'),
       ];
     } else {
       filteredScreens = _screens;
@@ -237,7 +291,8 @@ class _MainScreenState extends State<MainScreen> {
         index: _currentIndex,
         children: filteredScreens,
       ),
-      bottomNavigationBar: BottomNavigationBar(
+      // Cacher la barre de navigation pour l'utilisateur restreint
+      bottomNavigationBar: isRestrictedUser ? null : BottomNavigationBar(
         backgroundColor: const Color.fromARGB(255, 250, 250, 250),
         currentIndex: _currentIndex,
         onTap: _onItemTapped,
@@ -249,34 +304,4 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
-  // Afficher une boîte de dialogue de confirmation avant la déconnexion
-  void _confirmLogout(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Déconnexion'),
-          content: const Text('Êtes-vous sûr de vouloir vous déconnecter ?'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Annuler'),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                context.read<AuthCubit>().logout();
-                Navigator.of(context).pushNamedAndRemoveUntil(
-                  AppRoutes.login,
-                  (route) => false,
-                );
-              },
-              child: const Text('Déconnexion',
-                  style: TextStyle(color: Colors.red)),
-            ),
-          ],
-        );
-      },
-    );
-  }
 }

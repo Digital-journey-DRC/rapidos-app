@@ -14,13 +14,44 @@ class RessetPasswordScreen extends StatefulWidget {
 
 class _RessetPasswordScreenState extends State<RessetPasswordScreen> {
   final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
   bool _isLoading = false;
   bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
+
+  // Variables pour les validations du mot de passe
+  bool _hasMinLength = false;
+  bool _hasNumber = false;
+  bool _hasUppercase = false;
+  bool _hasLowercase = false;
+  bool _hasSpecialChar = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _passwordController.addListener(_validatePassword);
+  }
 
   @override
   void dispose() {
     _passwordController.dispose();
+    _confirmPasswordController.dispose();
     super.dispose();
+  }
+
+  void _validatePassword() {
+    final password = _passwordController.text;
+    setState(() {
+      _hasMinLength = password.length >= 12;
+      _hasNumber = password.contains(RegExp(r'[0-9]'));
+      _hasUppercase = password.contains(RegExp(r'[A-Z]'));
+      _hasLowercase = password.contains(RegExp(r'[a-z]'));
+      _hasSpecialChar = password.contains(RegExp(r'[!@#$%^&*(),.?":{}|<>]'));
+    });
+  }
+
+  bool _isPasswordValid() {
+    return _hasMinLength && _hasNumber && _hasUppercase && _hasLowercase && _hasSpecialChar;
   }
 
   void _resetPassword() async {
@@ -28,6 +59,39 @@ class _RessetPasswordScreenState extends State<RessetPasswordScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Veuillez saisir un nouveau mot de passe'),
+          backgroundColor: AppColors.error,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    if (!_isPasswordValid()) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Le mot de passe ne respecte pas les critères de sécurité'),
+          backgroundColor: AppColors.error,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    if (_confirmPasswordController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Veuillez confirmer votre mot de passe'),
+          backgroundColor: AppColors.error,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    if (_passwordController.text != _confirmPasswordController.text) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Les mots de passe ne correspondent pas'),
           backgroundColor: AppColors.error,
           behavior: SnackBarBehavior.floating,
         ),
@@ -52,18 +116,27 @@ class _RessetPasswordScreenState extends State<RessetPasswordScreen> {
         _isLoading = false;
       });
 
-      // Afficher un message de succès
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Mot de passe réinitialisé avec succès'),
-            backgroundColor: AppColors.success,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+              // Afficher un message de succès
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Mot de passe réinitialisé avec succès. Redirection vers la page de connexion...'),
+              backgroundColor: AppColors.success,
+              behavior: SnackBarBehavior.floating,
+              duration: Duration(seconds: 2),
+            ),
+          );
 
-        // Rediriger vers la page de connexion
-        Navigator.of(context).popUntil((route) => route.isFirst);
+        // Rediriger vers la page de connexion après un court délai
+        Future.delayed(const Duration(seconds: 2), () {
+          if (mounted) {
+            // Naviguer vers l'écran de connexion
+            Navigator.of(context).pushNamedAndRemoveUntil(
+              AppRoutes.login, 
+              (route) => false,
+            );
+          }
+        });
       }
     } catch (e) {
       setState(() {
@@ -107,12 +180,7 @@ class _RessetPasswordScreenState extends State<RessetPasswordScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     const SizedBox(height: 50),
-                    Image.asset(
-                      AppAssets.backgroundImage,
-                      height: 70,
-                      width: 100,
-                      fit: BoxFit.contain,
-                    ),
+                    Image.asset(AppAssets.logo, width: 100, height: 100),
                     const SizedBox(height: 10),
                     Text(
                       'Nouveau mot de passe',
@@ -170,7 +238,102 @@ class _RessetPasswordScreenState extends State<RessetPasswordScreen> {
                               fillColor: Colors.white,
                             ),
                           ),
-                          const SizedBox(height: 32),
+                          const SizedBox(height: 16),
+                          // Indicateurs de validation du mot de passe
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Colors.grey[50],
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Colors.grey[300]!),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Critères de sécurité :',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.grey[700],
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                _buildValidationRow(
+                                  'Au moins 12 caractères',
+                                  _hasMinLength,
+                                  Icons.check_circle,
+                                  Icons.cancel,
+                                ),
+                                _buildValidationRow(
+                                  'Au moins un chiffre',
+                                  _hasNumber,
+                                  Icons.check_circle,
+                                  Icons.cancel,
+                                ),
+                                _buildValidationRow(
+                                  'Au moins une majuscule',
+                                  _hasUppercase,
+                                  Icons.check_circle,
+                                  Icons.cancel,
+                                ),
+                                _buildValidationRow(
+                                  'Au moins une minuscule',
+                                  _hasLowercase,
+                                  Icons.check_circle,
+                                  Icons.cancel,
+                                ),
+                                _buildValidationRow(
+                                  'Au moins un caractère spécial',
+                                  _hasSpecialChar,
+                                  Icons.check_circle,
+                                  Icons.cancel,
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          TextFormField(
+                            controller: _confirmPasswordController,
+                            obscureText: _obscureConfirmPassword,
+                            decoration: InputDecoration(
+                              labelText: 'Confirmer le mot de passe',
+                              prefixIcon: const Icon(Icons.lock_outline),
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                  _obscureConfirmPassword 
+                                      ? Icons.visibility_off 
+                                      : Icons.visibility,
+                                  color: AppColors.textLight,
+                                ),
+                                onPressed: () {
+                                  setState(() {
+                                    _obscureConfirmPassword = !_obscureConfirmPassword;
+                                  });
+                                },
+                              ),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(
+                                  color: AppColors.secondary, 
+                                  width: 1.0
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(
+                                  color: AppColors.primary, 
+                                  width: 2.0
+                                ),
+                              ),
+                              filled: true,
+                              fillColor: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
                           SizedBox(
                             width: double.infinity,
                             child: ElevatedButton(
@@ -213,6 +376,30 @@ class _RessetPasswordScreenState extends State<RessetPasswordScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildValidationRow(String text, bool isValid, IconData validIcon, IconData invalidIcon) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        children: [
+          Icon(
+            isValid ? validIcon : invalidIcon,
+            size: 16,
+            color: isValid ? Colors.green : Colors.red,
+          ),
+          const SizedBox(width: 8),
+          Text(
+            text,
+            style: TextStyle(
+              fontSize: 12,
+              color: isValid ? Colors.green[700] : Colors.red[700],
+              fontWeight: isValid ? FontWeight.w500 : FontWeight.normal,
+            ),
+          ),
+        ],
       ),
     );
   }

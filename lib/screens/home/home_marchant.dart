@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:immo/constants.dart';
 import 'package:immo/screens/home/voir_plus_produits.dart';
+import 'package:immo/screens/home/detail_produit_marchant.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -176,7 +177,9 @@ void saveCommande() async {
                       ],
                       decoration: InputDecoration(
                         labelText: 'Prix',
-                        prefixIcon: const Icon(Icons.attach_money),
+                        // prefixIcon: const Icon(Icons.attach_money),
+                        // prefixIcon: const Text("FC", style: TextStyle(fontSize: 20),),
+                        prefixIcon: const Padding(padding: EdgeInsets.only(left:10), child: Text("FC", style: TextStyle(fontSize: 18),),),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -257,9 +260,9 @@ void saveCommande() async {
                                 borderRadius: BorderRadius.circular(8),
                                 child: Image.file(_imageFile!, fit: BoxFit.cover),
                               )
-                            : Column(
+                            : const Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
-                                children: const [
+                                children:[
                                   Icon(Icons.add_photo_alternate, color: Colors.grey),
                                   SizedBox(height: 8),
                                   Text('Ajouter une image', style: TextStyle(color: Colors.grey)),
@@ -447,7 +450,7 @@ void saveCommande() async {
             padding: const EdgeInsets.only(right: 12),
             child: BlocBuilder<AuthCubit, AuthState>(
               builder: (context, state) {
-                if (state is AuthSuccess && state.user != null && state.user!['profileImage'] != null) {
+                if (state is AuthSuccess && state.user != null && state.user!['media'] != null) {
                   return GestureDetector(
                     onTap: () {
                       Navigator.push(
@@ -461,7 +464,7 @@ void saveCommande() async {
                       child: CircleAvatar(
                         radius: 17,
                         backgroundColor: AppColors.white,
-                        backgroundImage: NetworkImage(state.user!['profileImage']),
+                        backgroundImage: NetworkImage(state.user!['media']),
                       ),
                     ),
                   );
@@ -514,59 +517,35 @@ void saveCommande() async {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 // ElevatedButton(onPressed: saveCommande, child: const Text('Enregistrer commande')),
-                const Text('Vos Produits',
+                const Text('Mes Produits',
                     style:
                         TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                BlocBuilder<ProductCubit, ProductState>(
-                  builder: (context, state) {
-                    if (state is ProductLoaded) {
-                      if (state.products.isEmpty) {
-                        return TextButton(
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => VoirPlusProduitsScreen(
-                                  products: state.products.map((product) => {
-                                    'badge': 'Nouveau',
-                                    'name': product.name,
-                                    'stock': product.stock.toString(),
-                                    'price': product.price.toString(),
-                                    'isPromo': 'false',
-                                    'imageUrl': product.media?.mediaUrl ?? 'https://via.placeholder.com/150',
-                                  }).toList(),
-                                ),
-                              ),
-                            );
-                          },
-                          child: const Text('Voir plus',
-                              style: TextStyle(color: AppColors.primary)),
-                        );
-                      }
-                      return TextButton(
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => VoirPlusProduitsScreen(
-                                products: state.products.reversed.toList().map((product) => {
-                                  'badge': 'Nouveau',
-                                  'name': product.name,
-                                  'stock': product.stock.toString(),
-                                  'price': product.price.toString(),
-                                  'isPromo': 'false',
-                                  'imageUrl': product.media?.mediaUrl ?? 'https://via.placeholder.com/150',
-                                }).toList(),
-                              ),
-                            ),
-                          );
-                        },
-                        child: const Text('Voir plus',
-                            style: TextStyle(color: AppColors.primary)),
-                      );
-                    }
-                    return const SizedBox.shrink();
-                  },
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.touch_app,
+                        size: 14,
+                        color: AppColors.primary,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Cliquez pour modifier',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -628,12 +607,13 @@ void saveCommande() async {
                         return SizedBox(
                           width: 220,
                           child: _ProductCard(
-                            badge: 'Nouveau',
+                            badge: product.category?.name ?? '',
                             name: product.name,
                             stock: product.stock.toString(),
                             isPromo: false,
                             price: product.price.toString(),
                             imageUrl: product.media?.mediaUrl ?? 'https://via.placeholder.com/150',
+                            productId: product.id,
                           ),
                         );
                       },
@@ -759,7 +739,7 @@ class _QuickNavButton extends StatelessWidget {
             border: Border.all(color: AppColors.primary),
           ),
           padding: const EdgeInsets.all(20),
-          child: Icon(icon, color: AppColors.primary, size: 28),
+          child: Icon(icon, color: AppColors.primary, size: 8),
         ),
         const SizedBox(height: 4),
         Text(label, style: const TextStyle(fontSize: 13)),
@@ -768,115 +748,250 @@ class _QuickNavButton extends StatelessWidget {
   }
 }
 
-class _ProductCard extends StatelessWidget {
+class _ProductCard extends StatefulWidget {
   final String badge;
   final String name;
   final String stock;
   final bool isPromo;
   final String imageUrl;
   final String price;
+  final int productId;
   const _ProductCard(
       {required this.badge,
       required this.name,
       required this.stock,
       required this.price,
       required this.isPromo,
-      required this.imageUrl});
+      required this.imageUrl,
+      required this.productId});
+
+  @override
+  State<_ProductCard> createState() => _ProductCardState();
+}
+
+class _ProductCardState extends State<_ProductCard> with SingleTickerProviderStateMixin {
+  late AnimationController _animationController;
+  late Animation<double> _scaleAnimation;
+  bool _isHovered = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 200),
+      vsync: this,
+    );
+    _scaleAnimation = Tween<double>(
+      begin: 1.0,
+      end: 1.02,
+    ).animate(CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeInOut,
+    ));
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
+
+  void _onTapDown(TapDownDetails details) {
+    _animationController.forward();
+  }
+
+  void _onTapUp(TapUpDetails details) {
+    _animationController.reverse();
+  }
+
+  void _onTapCancel() {
+    _animationController.reverse();
+  }
+
   @override
   Widget build(BuildContext context) {
-    final String displayImageUrl = (imageUrl.isEmpty || imageUrl == 'null')
+    final String displayImageUrl = (widget.imageUrl.isEmpty || widget.imageUrl == 'null')
         ? 'https://via.placeholder.com/150'
-        : imageUrl.startsWith('http')
-            ? imageUrl
-            : 'http://24.144.87.127:3333/$imageUrl';
-    return SizedBox(
-      width: 220,
-      child: Container(
-        height: 110,
-        margin: const EdgeInsets.only(bottom: 8),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: Colors.grey.shade300),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.grey.withOpacity(0.07),
-              blurRadius: 4,
-              offset: const Offset(0, 2),
+        : widget.imageUrl.startsWith('http')
+            ? widget.imageUrl
+            : 'http://24.144.87.127:3333/$widget.imageUrl';
+    return GestureDetector(
+      onTap: () {
+        // Navigation vers la page de détail du produit
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => DetailProduitMarchantScreen(
+              productName: widget.name,
+              productPrice: widget.price,
+              productStock: widget.stock,
+              productBadge: widget.badge,
+              productImageUrl: widget.imageUrl,
+              isPromo: widget.isPromo,
+              productId: widget.productId,
             ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Stack(
-              children: [
-                ClipRRect(
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(14),
-                    bottomLeft: Radius.circular(14),
-                  ),
-                  child: Image.network(
-                    displayImageUrl,
-                    width: 64,
-                    height: 110,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) => Container(
-                      width: 64,
-                      height: 110,
-                      color: Colors.grey[200],
-                      child: const Icon(Icons.image, color: Colors.grey),
+          ),
+        );
+      },
+      onTapDown: _onTapDown,
+      onTapUp: _onTapUp,
+      onTapCancel: _onTapCancel,
+      child: AnimatedBuilder(
+        animation: _scaleAnimation,
+        builder: (context, child) {
+          return Transform.scale(
+            scale: _scaleAnimation.value,
+            child: Container(
+              width: 220,
+              child: Container(
+                height: 110,
+                margin: const EdgeInsets.only(bottom: 8),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: Colors.grey.shade300),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.grey.withOpacity(0.07),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
                     ),
-                  ),
+                  ],
                 ),
-                Positioned(
-                  top: 8,
-                  left: 8,
-                  child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: isPromo ? Colors.redAccent : AppColors.primary,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      badge,
-                      style: const TextStyle(color: Colors.white, fontSize: 11),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Padding(
-                padding:
-                    const EdgeInsets.symmetric(vertical: 16, horizontal: 4),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
+                child: Stack(
                   children: [
-                    Text(name,
-                        style: const TextStyle(
-                            fontWeight: FontWeight.bold, fontSize: 15)),
-                    const SizedBox(height: 4),
-                    Text("En Stock: "+stock,
-                        style:
-                            TextStyle(color: Colors.grey[600], fontSize: 12)),
-                    const SizedBox(height: 4),
-                    Text(
-                      "$price FC",
-                      style: TextStyle(
-                        color: isPromo ? Colors.red : Colors.green,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13,
+                    Row(
+                      children: [
+                        Stack(
+                          children: [
+                            ClipRRect(
+                              borderRadius: const BorderRadius.only(
+                                topLeft: Radius.circular(14),
+                                bottomLeft: Radius.circular(14),
+                              ),
+                              child: Image.network(
+                                displayImageUrl,
+                                width: 64,
+                                height: 110,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) => Container(
+                                  width: 64,
+                                  height: 110,
+                                  color: Colors.grey[200],
+                                  child: const Icon(Icons.image, color: Colors.grey),
+                                ),
+                              ),
+                            ),
+                            Positioned(
+                              top: 8,
+                              left: 8,
+                              child: Container(
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: widget.isPromo ? Colors.redAccent : AppColors.primary,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  widget.badge,
+                                  style: const TextStyle(color: Colors.white, fontSize: 11),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Padding(
+                            padding:
+                                const EdgeInsets.symmetric(vertical: 16, horizontal: 4),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(widget.name,
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.bold, fontSize: 15)),
+                                const SizedBox(height: 4),
+                                Text("En Stock: "+widget.stock,
+                                    style:
+                                        TextStyle(color: Colors.grey[600], fontSize: 12)),
+                                const SizedBox(height: 4),
+                                Text(
+                                  "${widget.price} FC",
+                                  style: TextStyle(
+                                    color: widget.isPromo ? Colors.red : Colors.green,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    // Indicateur de clic pour modifier
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withOpacity(0.9),
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.1),
+                              blurRadius: 2,
+                              offset: const Offset(0, 1),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.edit,
+                              size: 12,
+                              color: Colors.white,
+                            ),
+                            const SizedBox(width: 2),
+                            Text(
+                              'Modifier',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    // Indicateur de clic subtil
+                    Positioned(
+                      bottom: 8,
+                      right: 8,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(
+                          Icons.touch_app,
+                          size: 14,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
                   ],
                 ),
               ),
             ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }

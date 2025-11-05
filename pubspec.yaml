@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.0.2+2
+version: 1.0.16+16
 
 environment:
   sdk: ^3.6.1
@@ -32,12 +32,14 @@ dependencies:
     sdk: flutter
   flutter_localizations:
     sdk: flutter
+  # flutter_mapbox_navigation:
+  #   path: flutter_mapbox_navigation
   cupertino_icons: ^1.0.2
   google_fonts: ^6.1.0
   flutter_svg: ^2.0.9
   provider: ^6.1.1
   cached_network_image: ^3.3.0
-  intl: ^0.19.0
+  intl: ^0.20.2
   flutter_map: ^6.1.0
   latlong2: ^0.9.0
   font_awesome_flutter: ^10.6.0
@@ -54,8 +56,8 @@ dependencies:
   http_parser: ^4.1.2
   flutter_expandable_fab: ^2.3.0
   shared_preferences: ^2.2.2
-  pdf: ^3.10.4
-  printing: ^5.11.0
+  # pdf: ^3.10.4
+  # printing: ^5.11.0
   share_plus: ^10.1.4
   app_links: ^6.4.0
   url_launcher: ^6.2.5
@@ -72,6 +74,12 @@ dependencies:
   firebase_storage: ^12.4.7
   camera: ^0.11.1
   flutter_polyline_points: ^2.1.0
+  flutter_tts: ^4.2.3
+  package_info_plus: ^8.0.2
+  # mapbox_maps_flutter: ^2.9.0
+  # flutter_mapbox_navigation: ^0.2.2
+  flutter_mapbox_navigation:
+    path: flutter_mapbox_navigation
 
 dev_dependencies:
   flutter_test:
@@ -101,6 +109,7 @@ flutter:
     - assets/images/kin.png
     - assets/images/
     - assets/notif.mp3
+    - assets/images/pin-livreur.png
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

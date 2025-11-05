@@ -20,6 +20,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
   String _selectedRole = 'acheteur';
+  
+  // Variables pour les validations du mot de passe
+  bool _hasMinLength = false;
+  bool _hasNumber = false;
+  bool _hasUppercase = false;
+  bool _hasLowercase = false;
+  bool _hasSpecialChar = false;
+  
   Country _selectedCountry = Country(
     phoneCode: "243",
     countryCode: "CD",
@@ -34,6 +42,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
   );
 
   @override
+  void initState() {
+    super.initState();
+    _passwordController.addListener(_validatePassword);
+  }
+
+  @override
   void dispose() {
     _firstNameController.dispose();
     _lastNameController.dispose();
@@ -41,6 +55,21 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _phoneController.dispose();
     _passwordController.dispose();
     super.dispose();
+  }
+
+  void _validatePassword() {
+    final password = _passwordController.text;
+    setState(() {
+      _hasMinLength = password.length >= 12;
+      _hasNumber = password.contains(RegExp(r'[0-9]'));
+      _hasUppercase = password.contains(RegExp(r'[A-Z]'));
+      _hasLowercase = password.contains(RegExp(r'[a-z]'));
+      _hasSpecialChar = password.contains(RegExp(r'[!@#$%^&*(),.?":{}|<>]'));
+    });
+  }
+
+  bool _isPasswordValid() {
+    return _hasMinLength && _hasNumber && _hasUppercase && _hasLowercase && _hasSpecialChar;
   }
 
   @override
@@ -251,6 +280,60 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       fillColor: Colors.white,
                     ),
                   ),
+                  const SizedBox(height: 16),
+                  // Indicateurs de validation du mot de passe
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[50],
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.grey[300]!),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Critères de sécurité :',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.grey[700],
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        _buildValidationRow(
+                          'Au moins 12 caractères',
+                          _hasMinLength,
+                          Icons.check_circle,
+                          Icons.cancel,
+                        ),
+                        _buildValidationRow(
+                          'Au moins un chiffre',
+                          _hasNumber,
+                          Icons.check_circle,
+                          Icons.cancel,
+                        ),
+                        _buildValidationRow(
+                          'Au moins une majuscule',
+                          _hasUppercase,
+                          Icons.check_circle,
+                          Icons.cancel,
+                        ),
+                        _buildValidationRow(
+                          'Au moins une minuscule',
+                          _hasLowercase,
+                          Icons.check_circle,
+                          Icons.cancel,
+                        ),
+                        _buildValidationRow(
+                          'Au moins un caractère spécial',
+                          _hasSpecialChar,
+                          Icons.check_circle,
+                          Icons.cancel,
+                        ),
+                      ],
+                    ),
+                  ),
                   const SizedBox(height: 24),
                   ElevatedButton(
                     onPressed: state is AuthLoading
@@ -286,11 +369,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             }
 
                             // Validation du mot de passe
-                            if (_passwordController.text.length < 6) {
+                            if (!_isPasswordValid()) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
                                   content: Text(
-                                      'Le mot de passe doit contenir au moins 6 caractères'),
+                                      'Le mot de passe doit contenir au moins 12 caractères, inclure au moins une lettre majuscule, une lettre minuscule, un chiffre et un caractère spécial'),
                                 ),
                               );
                               return;
@@ -348,6 +431,30 @@ class _RegisterScreenState extends State<RegisterScreen> {
             },
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildValidationRow(String text, bool isValid, IconData validIcon, IconData invalidIcon) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        children: [
+          Icon(
+            isValid ? validIcon : invalidIcon,
+            size: 16,
+            color: isValid ? Colors.green : Colors.red,
+          ),
+          const SizedBox(width: 8),
+          Text(
+            text,
+            style: TextStyle(
+              fontSize: 12,
+              color: isValid ? Colors.green[700] : Colors.red[700],
+              fontWeight: isValid ? FontWeight.w500 : FontWeight.normal,
+            ),
+          ),
+        ],
       ),
     );
   }

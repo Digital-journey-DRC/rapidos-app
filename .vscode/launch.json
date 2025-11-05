@@ -10,17 +10,17 @@
             "request": "launch",
             "type": "dart"
         },
-        {
-            "name": "Rapidos (profile mode)",
-            "request": "launch",
-            "type": "dart",
-            "flutterMode": "profile"
-        },
-        {
-            "name": "Rapidos (release mode)",
-            "request": "launch",
-            "type": "dart",
-            "flutterMode": "release"
-        }
+        // {
+        //     "name": "Rapidos (profile mode)",
+        //     "request": "launch",
+        //     "type": "dart",
+        //     "flutterMode": "profile"
+        // },
+        // {
+        //     "name": "Rapidos (release mode)",
+        //     "request": "launch",
+        //     "type": "dart",
+        //     "flutterMode": "release"
+        // }
     ]
 }

@@ -19,10 +19,9 @@ import 'package:immo/cubits/utility_bill/utility_bill_cubit.dart';
 import 'package:immo/screens/auth/login_screen.dart';
 import 'package:immo/screens/auth/register_screen.dart';
 import 'package:immo/screens/dashboard/Annonce_screen.dart';
-import 'package:immo/screens/dashboard/dashboard_screen.dart';
 import 'package:immo/screens/main_screen.dart';
+import 'package:immo/widgets/auth_gate.dart';
 import 'package:immo/screens/messages_screen.dart';
-import 'package:immo/screens/order_details_screen.dart';
 import 'package:immo/screens/order_screen.dart';
 import 'package:immo/services/auth_service.dart';
 import 'package:immo/services/building_service.dart';
@@ -38,6 +37,7 @@ import 'services/payment_storage_service.dart';
 import 'package:immo/cubit/product_cubit.dart';
 import 'package:immo/cubit/featured_product_cubit.dart';
 import 'package:immo/cubit/category_cubit.dart';
+import 'package:immo/cubit/category_products_cubit.dart';
 import 'package:immo/cubit/cart_cubit.dart';
 import 'package:immo/cubit/order_cubit.dart';
 import 'package:immo/cubit/merchant_cubit.dart';
@@ -45,12 +45,15 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'firebase_options.dart';
-import 'package:flutter/foundation.dart';
 import 'dart:io';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:immo/cubits/express/express_cubit.dart';
+import 'package:immo/screens/test_firebase_screen.dart';
+import 'package:immo/screens/admin_version_screen.dart';
+import 'package:immo/screens/test_modal_screen.dart';
 
 final AudioPlayer player = AudioPlayer();
 
@@ -88,50 +91,56 @@ class FirebaseMessagingService {
 
   final FirebaseMessaging _firebaseMessaging = FirebaseMessaging.instance;
 
-  // static Future<void> saveTokenToFirestore(String token, AuthState authState) async {
-  //   try {
-  //     String? userId;
-  //     String? role;
+  static Future<void> saveTokenToFirestore(String token, AuthState authState) async {
+    try {
+      String? userId;
+      String? role;
 
-  //     if (authState is AuthSuccess && authState.user != null) {
-  //       print('📱 AuthState user data: ${authState.user}');
-  //       userId = authState.user!['id']?.toString();
-  //       role = authState.user!['role'];
-  //       print('📱 From AuthState - userId: $userId, role: $role');
-  //     } else {
-  //       // Si l'état d'authentification n'a pas les données, essayer de les récupérer depuis SharedPreferences
-  //       final prefs = await SharedPreferences.getInstance();
-  //       final userDataStr = prefs.getString('user_data');
-  //       print('📱 SharedPreferences user data: $userDataStr');
+      if (authState is AuthSuccess && authState.user != null) {
+        print('📱 AuthState user data: ${authState.user}');
+        userId = authState.user!['id']?.toString();
+        role = authState.user!['role'];
+        print('📱 From AuthState - userId: $userId, role: $role');
+      } else {
+        // Si l'état d'authentification n'a pas les données, essayer de les récupérer depuis SharedPreferences
+        final prefs = await SharedPreferences.getInstance();
+        final userDataStr = prefs.getString('user_data');
+        print('📱 SharedPreferences user data: $userDataStr');
         
-  //       if (userDataStr != null) {
-  //         try {
-  //           final userData = jsonDecode(userDataStr);
-  //           print('📱 Parsed user data: $userData');
-  //           userId = userData['id']?.toString();
-  //           role = userData['role'];
-  //           print('📱 From SharedPreferences - userId: $userId, role: $role');
-  //         } catch (e) {
-  //           print('❌ Error parsing user data from SharedPreferences: $e');
-  //         }
-  //       }
-  //     }
+        if (userDataStr != null) {
+          try {
+            final userData = jsonDecode(userDataStr);
+            print('📱 Parsed user data: $userData');
+            userId = userData['id']?.toString();
+            role = userData['role'];
+            print('📱 From SharedPreferences - userId: $userId, role: $role');
+          } catch (e) {
+            print('❌ Error parsing user data from SharedPreferences: $e');
+          }
+        }
+      }
 
-  //     final docRef = FirebaseFirestore.instance.collection('tokens').doc(token);
-  //     await docRef.set({
-  //       'token': token,
-  //       'timestamp': FieldValue.serverTimestamp(),
-  //       'platform': Platform.isIOS ? 'ios' : 'android',
-  //       'role': role ?? 'user',
-  //       'userId': userId ?? '1',
-  //       'permission_status': (await FirebaseMessaging.instance.getNotificationSettings()).authorizationStatus.toString(),
-  //     });
+      if (userId == null) {
+        print('❌ userId is null, cannot save token');
+        return;
+      }
 
-  //     print("✅ Token saved to Firestore successfully");
-  //   } catch (e) {
-  //     print("❌ Error saving token to Firestore: $e");
-  //   }
-  // }
+      // Utiliser userId comme identifiant du document
+      final docRef = FirebaseFirestore.instance.collection('tokens').doc(userId);
+      await docRef.set({
+        'token': token,
+        'timestamp': FieldValue.serverTimestamp(),
+        'platform': Platform.isIOS ? 'ios' : 'android',
+        'role': role ?? 'user',
+        'userId': userId,
+        'permission_status': (await FirebaseMessaging.instance.getNotificationSettings()).authorizationStatus.toString(),
+      }, SetOptions(merge: true)); // merge pour ne pas effacer d'autres champs
+
+      print("✅ Token saved to Firestore successfully (by userId)");
+    } catch (e) {
+      print("❌ Error saving token to Firestore: $e");
+    }
+  }
 
   Future<void> initialize() async {
     try {
@@ -185,9 +194,20 @@ class FirebaseMessagingService {
       // Configurer le gestionnaire de messages en arrière-plan
       FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
-      // Obtenir le token FCM
-      String? token = await _firebaseMessaging.getToken();
-      print('FCM Token: $token');
+      // Listen for token refresh
+      _firebaseMessaging.onTokenRefresh.listen((String token) {
+        print('🔄 FCM Token Refreshed: $token');
+        // saveTokenToFirestore(token, AuthInitial());
+      });
+
+      // Get initial token
+      String? initialToken = await _firebaseMessaging.getToken();
+      if (initialToken != null) {
+        print('✅ Initial FCM Token: $initialToken');
+        // saveTokenToFirestore(initialToken, AuthInitial());
+      } else {
+        print('⚠️ No FCM token received');
+      }
 
       if (settings.authorizationStatus == AuthorizationStatus.authorized ||
           settings.authorizationStatus == AuthorizationStatus.provisional) {
@@ -205,7 +225,7 @@ class FirebaseMessagingService {
         String? initialToken = await _firebaseMessaging.getToken();
         if (initialToken != null) {
           print('✅ Initial FCM Token: $initialToken');
-          // await saveTokenToFirestore(initialToken, AuthInitial());
+          // saveTokenToFirestore(initialToken, AuthInitial());
         } else {
           print('⚠️ No FCM token received');
         }
@@ -353,7 +373,8 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _authCubit.checkAuth();
+    // Ne pas appeler checkAuth() ici car AuthGate s'en charge
+    // _authCubit.checkAuth();
     _initializeAppLinks();
   }
 
@@ -429,7 +450,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
           // Listen for token refresh
           messaging.onTokenRefresh.listen((String token) {
             print('🔄 FCM Token Refreshed: $token');
-            // FirebaseMessagingService.saveTokenToFirestore(token, _authCubit.state);
+            // saveTokenToFirestore(token, AuthInitial());
           });
 
           if (Platform.isIOS) {
@@ -464,7 +485,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
           String? token = await messaging.getToken();
           if (token != null) {
             print('✅ FCM Token received: $token');
-            // await FirebaseMessagingService.saveTokenToFirestore(token, _authCubit.state);
+            // saveTokenToFirestore(token, AuthInitial());
             return; // Success, exit the retry loop
           } else {
             print('⚠️ No FCM token received');
@@ -490,6 +511,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     }
   }
 
+
   @override
   Widget build(BuildContext context) {
     return MultiBlocProvider(
@@ -514,58 +536,56 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         BlocProvider(create: (context) => ProductCubit()),
         BlocProvider(create: (context) => FeaturedProductCubit()),
         BlocProvider(create: (context) => CategoryCubit()),
+        BlocProvider(create: (context) => CategoryProductsCubit()),
         BlocProvider(create: (context) => CartCubit()),
         BlocProvider(create: (context) => OrderCubit()),
         BlocProvider(create: (context) => MerchantCubit()),
         BlocProvider(create: (context) => FavoritesCubit()),
+        BlocProvider(create: (context) => ExpressCubit()),
       ],
-      child: BlocBuilder<AuthCubit, AuthState>(
-        builder: (context, state) {
-          return MaterialApp(
-            navigatorKey: navigatorKey,
-            debugShowCheckedModeBanner: false,
-            title: 'Immo App',
-            supportedLocales: const [
-              Locale('en'),
-              Locale('fr'),
-            ],
-            localizationsDelegates: const [
-              CountryLocalizations.delegate,
-              GlobalMaterialLocalizations.delegate,
-              GlobalCupertinoLocalizations.delegate,
-              GlobalWidgetsLocalizations.delegate,
-            ],
-            theme: ThemeData(
-              useMaterial3: true,
-              scaffoldBackgroundColor: AppColors.background,
-              textTheme: GoogleFonts.plusJakartaSansTextTheme(
-                Theme.of(context).textTheme,
-              ),
-              colorScheme: ColorScheme.fromSeed(
-                seedColor: AppColors.primary,
-                primary: AppColors.primary,
-                secondary: AppColors.secondary,
-                background: AppColors.background,
-              ),
-            ),
-            home: state is AuthSuccess && state.token != null
-                ? const MainScreen()
-                : const LoginScreen(),
-            routes: {
-              AppRoutes.login: (context) => const LoginScreen(),
-              AppRoutes.register: (context) => const RegisterScreen(),
-              AppRoutes.profile: (context) => const DashboardScreen(),
-              AppRoutes.main: (context) => const MainScreen(),
-              AppRoutes.chat: (context) {
-                final Map<dynamic, dynamic> rawArgs = ModalRoute.of(context)!
-                    .settings
-                    .arguments as Map<dynamic, dynamic>;
-                final Map<String, dynamic> args =
-                    Map<String, dynamic>.from(rawArgs);
-                return ChatScreen(conversation: args);
-              },
-            },
-          );
+      child: MaterialApp(
+        navigatorKey: navigatorKey,
+        debugShowCheckedModeBanner: false,
+        title: 'Rapidos App',
+        supportedLocales: const [
+          Locale('en'),
+          Locale('fr'),
+        ],
+        localizationsDelegates: const [
+          CountryLocalizations.delegate,
+          GlobalMaterialLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+        ],
+        theme: ThemeData(
+          useMaterial3: true,
+          scaffoldBackgroundColor: AppColors.background,
+          textTheme: GoogleFonts.plusJakartaSansTextTheme(
+            Theme.of(context).textTheme,
+          ),
+          colorScheme: ColorScheme.fromSeed(
+            seedColor: AppColors.primary,
+            primary: AppColors.primary,
+            secondary: AppColors.secondary,
+            background: AppColors.background,
+          ),
+        ),
+        home: const AuthGate(),
+        routes: {
+          AppRoutes.login: (context) => const LoginScreen(),
+          AppRoutes.register: (context) => const RegisterScreen(),
+          AppRoutes.main: (context) => const MainScreen(),
+          AppRoutes.chat: (context) {
+            final Map<dynamic, dynamic> rawArgs = ModalRoute.of(context)!
+                .settings
+                .arguments as Map<dynamic, dynamic>;
+            final Map<String, dynamic> args =
+                Map<String, dynamic>.from(rawArgs);
+            return ChatScreen(conversation: args);
+          },
+          '/test-firebase': (context) => const TestFirebaseScreen(),
+          '/admin-version': (context) => const AdminVersionScreen(),
+          '/test-modals': (context) => const TestModalScreen(),
         },
       ),
     );

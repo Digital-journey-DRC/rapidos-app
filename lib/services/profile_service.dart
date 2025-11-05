@@ -6,7 +6,7 @@ import 'package:http_parser/http_parser.dart';
 import '../constants.dart';
 
 class ProfileService {
-  final String baseUrl = 'http://68.183.30.146:8000/api/v1';
+  final String baseUrl = 'http://24.144.87.127:3333';
 
   Future<Map<String, dynamic>> updateProfile({
     required String userId,
@@ -17,26 +17,42 @@ class ProfileService {
     String? phone,
   }) async {
     try {
-      final response = await http.put(
-        Uri.parse('$baseUrl/users/profile'),
+      print('🔄 Mise à jour du profil pour l\'utilisateur: $userId');
+      print('📝 Données à envoyer: firstName=$firstName, lastName=$lastName, email=$email, phone=$phone');
+      
+      // Préparer le body JSON
+      final body = <String, dynamic>{};
+      if (firstName != null && firstName.isNotEmpty) body['firstName'] = firstName;
+      if (lastName != null && lastName.isNotEmpty) body['lastName'] = lastName;
+      if (email != null && email.isNotEmpty) body['email'] = email;
+      if (phone != null && phone.isNotEmpty) body['phone'] = phone;
+      
+      print('📦 Body JSON: ${jsonEncode(body)}');
+      
+      // Faire la requête POST
+      final response = await http.post(
+        Uri.parse('$baseUrl/users/update/$userId'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
         },
-        body: jsonEncode({
-          if (firstName != null) 'firstName': firstName,
-          if (lastName != null) 'lastName': lastName,
-          if (email != null) 'email': email,
-          if (phone != null) 'phone': phone,
-        }),
+        body: jsonEncode(body),
       );
 
+      print('📡 Status Code: ${response.statusCode}');
+      print('📡 Response Headers: ${response.headers}');
+      print('📡 Response Body: ${response.body}');
+
       if (response.statusCode == 200) {
+        print('✅ Profil mis à jour avec succès');
         return jsonDecode(response.body);
       } else {
-        throw Exception('Failed to update profile: ${response.body}');
+        print('❌ Erreur lors de la mise à jour du profil: ${response.statusCode}');
+        print('❌ Response: ${response.body}');
+        throw Exception('Failed to update profile: ${response.statusCode} - ${response.body}');
       }
     } catch (e) {
+      print('❌ Erreur lors de la mise à jour du profil: $e');
       throw Exception('Error updating profile: $e');
     }
   }

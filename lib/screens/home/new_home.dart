@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:immo/constants.dart';
 import 'package:immo/screens/home/all_merchants_screen.dart';
+import 'package:immo/screens/navigation_example.dart';
 import 'package:immo/screens/product/product_detail_screen.dart';
 import '../merchant/merchant_profile_screen.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:immo/cubit/auth_cubit.dart';
 import 'package:immo/screens/dashboard/setting_screen.dart';
 import 'package:immo/cubit/featured_product_cubit.dart';
-import 'package:immo/widgets/image_viewer.dart' as img_viewer;
 import 'package:immo/screens/product/all_products_screen.dart';
+import 'package:immo/screens/product/category_products_screen.dart';
 import 'package:immo/cubit/category_cubit.dart';
 import 'package:immo/widgets/shimmer_loading.dart';
 import 'package:immo/cubit/merchant_cubit.dart';
@@ -16,6 +17,12 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:immo/cubit/order_cubit.dart';
 import 'package:immo/cubit/cart_cubit.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'package:immo/services/auth_gate_service.dart';
+import 'package:immo/screens/auth/login_screen.dart';
+import 'dart:math' as math;
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 class NewHomeScreen extends StatefulWidget {
   const NewHomeScreen({Key? key}) : super(key: key);
@@ -25,45 +32,384 @@ class NewHomeScreen extends StatefulWidget {
 }
 
 class _NewHomeScreenState extends State<NewHomeScreen> {
-  GoogleMapController? _mapController;
   Position? _currentPosition;
   bool _isLoading = false;
   List<dynamic> _commandes = [];
 
+  /// Retourne le widget icône approprié pour une catégorie, ou Icons.category par défaut
+  Widget _getCategoryIconWidget(String categoryName, Color color, double size) {
+    final name = categoryName.toLowerCase().trim();
+
+    // Footwear / Talons dame / Chaussures dame (priorité spécifique)
+    if (name.contains('footwear') ||
+        name.contains('talon') ||
+        name.contains('high heel') ||
+        name.contains('highheel') ||
+        name.contains('chaussure dame') ||
+        name.contains('chaussure femme')) {
+      return FaIcon(FontAwesomeIcons.shoePrints, color: color, size: size);
+    }
+    // Chaussures (priorité spécifique) - utilise FontAwesome
+    if (name.contains('chaussure') ||
+        name.contains('shoe') ||
+        name.contains('basket') ||
+        name.contains('sneaker') ||
+        name.contains('soulier') ||
+        name == 'chaussures') {
+      return FaIcon(FontAwesomeIcons.shoePrints, color: color, size: size);
+    }
+
+    // Boucherie (priorité spécifique)
+    if (name.contains('boucherie') ||
+        name.contains('boucher') ||
+        name.contains('viande') ||
+        name.contains('meat') ||
+        name == 'boucherie') {
+      return FaIcon(FontAwesomeIcons.drumstickBite, color: color, size: size);
+    }
+
+    // Take away / Fast food (priorité spécifique)
+    if (name.contains('take away') ||
+        name.contains('takeaway') ||
+        name.contains('à emporter') ||
+        name.contains('a emporter') ||
+        name.contains('emporter') ||
+        name.contains('take-away') ||
+        name.contains('fastfood') ||
+        name.contains('fast food') ||
+        name.contains('fast-food') ||
+        name.contains('burger') ||
+        name.contains('shawarma')) {
+      return FaIcon(FontAwesomeIcons.burger, color: color, size: size);
+    }
+
+    // Alimentation
+    if (name.contains('food') ||
+        name.contains('nourriture') ||
+        name.contains('restaurant') ||
+        name.contains('repas') ||
+        name.contains('plat') ||
+        name.contains('cuisine')) {
+      return FaIcon(FontAwesomeIcons.utensils, color: color, size: size);
+    }
+    // Épicerie / Supermarché
+    if (name.contains('grocer') ||
+        name.contains('épicerie') ||
+        name.contains('supermarche') ||
+        name.contains('supermarché') ||
+        name.contains('alimentation')) {
+      return FaIcon(FontAwesomeIcons.shoppingCart, color: color, size: size);
+    }
+    // Pharmacie / Santé
+    if (name.contains('pharmac') ||
+        name.contains('médicament') ||
+        name.contains('santé') ||
+        name.contains('sante') ||
+        name.contains('médical')) {
+      return FaIcon(FontAwesomeIcons.pills, color: color, size: size);
+    }
+    // Pâtisserie (priorité spécifique)
+    if (name.contains('pâtisserie') ||
+        name.contains('patisserie') ||
+        name.contains('patissier')) {
+      return FaIcon(FontAwesomeIcons.birthdayCake, color: color, size: size);
+    }
+    // Sucreries / Desserts
+    if (name.contains('sweet') ||
+        name.contains('dessert') ||
+        name.contains('gateau') ||
+        name.contains('gâteau') ||
+        name.contains('sucre') ||
+        name.contains('confiserie')) {
+      return FaIcon(FontAwesomeIcons.cookie, color: color, size: size);
+    }
+    // Magasin / Boutique
+    if (name.contains('store') ||
+        name.contains('magasin') ||
+        name.contains('boutique') ||
+        name.contains('shop')) {
+      return FaIcon(FontAwesomeIcons.store, color: color, size: size);
+    }
+    // Téléphonie Mobile (priorité haute pour cette catégorie spécifique)
+    if (name.contains('téléphonie') ||
+        name.contains('telephonie') ||
+        name.contains('mobile') ||
+        name.contains('téléphone mobile') ||
+        name.contains('telephone mobile') ||
+        name.contains('smartphone') ||
+        name.contains('phone mobile')) {
+      return FaIcon(FontAwesomeIcons.mobileScreenButton,
+          color: color, size: size);
+    }
+    // Électronique / Technologie
+    if (name.contains('electronic') ||
+        name.contains('électronique') ||
+        name.contains('tech') ||
+        name.contains('téléphone') ||
+        name.contains('telephone')) {
+      return FaIcon(FontAwesomeIcons.laptop, color: color, size: size);
+    }
+    // Vêtements / Mode
+    if (name.contains('clothing') ||
+        name.contains('vêtement') ||
+        name.contains('mode') ||
+        name.contains('habillement') ||
+        name.contains('vetement') ||
+        name.contains('fashion')) {
+      return FaIcon(FontAwesomeIcons.shirt, color: color, size: size);
+    }
+    // Parfumerie (priorité spécifique)
+    if (name.contains('parfumerie') ||
+        name.contains('parfum') ||
+        name == 'parfumerie' ||
+        name.contains('fragrance') ||
+        name.contains('perfume')) {
+      return FaIcon(FontAwesomeIcons.sprayCan, color: color, size: size);
+    }
+    // Maquillage (priorité spécifique)
+    if (name.contains('maquillage') ||
+        name.contains('makeup') ||
+        name == 'maquillage') {
+      return FaIcon(FontAwesomeIcons.paintBrush, color: color, size: size);
+    }
+    // Beauté / Cosmétique
+    if (name.contains('beauty') ||
+        name.contains('beauté') ||
+        name.contains('cosmétique') ||
+        name.contains('cosmetique')) {
+      return FaIcon(FontAwesomeIcons.spa, color: color, size: size);
+    }
+    // Sport / Fitness
+    if (name.contains('sport') ||
+        name.contains('fitness') ||
+        name.contains('gym') ||
+        name.contains('exercise') ||
+        name.contains('musculation')) {
+      return FaIcon(FontAwesomeIcons.futbol, color: color, size: size);
+    }
+    // Livres / Librairie
+    if (name.contains('book') ||
+        name.contains('livre') ||
+        name.contains('librairie')) {
+      return FaIcon(FontAwesomeIcons.book, color: color, size: size);
+    }
+    // Boissons
+    if (name.contains('drink') ||
+        name.contains('boisson') ||
+        name.contains('café') ||
+        name.contains('coffee') ||
+        name.contains('cafe') ||
+        name.contains('jus')) {
+      return FaIcon(FontAwesomeIcons.glassWater, color: color, size: size);
+    }
+    // Fleurs / Plantes
+    if (name.contains('flower') ||
+        name.contains('fleur') ||
+        name.contains('plante')) {
+      return FaIcon(FontAwesomeIcons.seedling, color: color, size: size);
+    }
+    // Tissage / Produits capillaires (spécifique à votre app)
+    if (name.contains('tissage') ||
+        name.contains('weaving') ||
+        name.contains('cheveu') ||
+        name.contains('coiffure') ||
+        name.contains('capillaire') ||
+        name.contains('perruque') ||
+        name.contains('extension') ||
+        name.contains('hair') ||
+        name.contains('weave')) {
+      return FaIcon(FontAwesomeIcons.scissors, color: color, size: size);
+    }
+    // Automobile / Voiture
+    if (name.contains('auto') ||
+        name.contains('voiture') ||
+        name.contains('car') ||
+        name.contains('véhicule') ||
+        name.contains('vehicule')) {
+      return FaIcon(FontAwesomeIcons.car, color: color, size: size);
+    }
+    // Maison / Décoration
+    if (name.contains('home') ||
+        name.contains('maison') ||
+        name.contains('décoration') ||
+        name.contains('decoration') ||
+        name.contains('meuble') ||
+        name.contains('déco')) {
+      return FaIcon(FontAwesomeIcons.house, color: color, size: size);
+    }
+    // Jouets / Enfants
+    if (name.contains('toy') ||
+        name.contains('jouet') ||
+        name.contains('enfant') ||
+        name.contains('bébé') ||
+        name.contains('bebe')) {
+      return FaIcon(FontAwesomeIcons.baby, color: color, size: size);
+    }
+    // Animaux / Pets
+    if (name.contains('animal') ||
+        name.contains('pet') ||
+        name.contains('chien') ||
+        name.contains('chat')) {
+      return FaIcon(FontAwesomeIcons.paw, color: color, size: size);
+    }
+    // Bijoux
+    if (name.contains('bijou') ||
+        name.contains('jewelry') ||
+        name.contains('montre') ||
+        name.contains('bague')) {
+      return FaIcon(FontAwesomeIcons.gem, color: color, size: size);
+    }
+
+    // Icône par défaut
+    return Icon(Icons.category, color: color, size: size);
+  }
+
   @override
   void initState() {
     super.initState();
-    context.read<FeaturedProductCubit>().fetchFeaturedProducts();
-    context.read<CategoryCubit>().fetchCategories();
-    context.read<MerchantCubit>().fetchMerchants();
-    _fetchOrdersAndLocation();
+    // Attendre que l'AuthCubit soit initialisé avant de charger les données
+    _initializeData();
+  }
+
+  Future<void> _initializeData() async {
+    try {
+      print('🔄 NewHomeScreen: Initialisation des données...');
+
+      // Attendre que l'AuthCubit soit initialisé
+      int attempts = 0;
+      while (attempts < 10) {
+        final authState = context.read<AuthCubit>().state;
+        print(
+            '🔍 NewHomeScreen: État AuthCubit (tentative ${attempts + 1}): ${authState.runtimeType}');
+
+        if (authState is AuthSuccess && authState.token != null) {
+          print(
+              '✅ NewHomeScreen: AuthCubit initialisé, chargement des données...');
+          break;
+        }
+
+        await Future.delayed(const Duration(milliseconds: 500));
+        attempts++;
+      }
+
+      // Charger les données
+      context.read<FeaturedProductCubit>().fetchFeaturedProducts();
+      context.read<CategoryCubit>().fetchCategories();
+      context.read<MerchantCubit>().fetchMerchants(context);
+      _fetchOrdersAndLocation();
+      _fetchUserMedia();
+
+      print('✅ NewHomeScreen: Données initialisées');
+    } catch (e) {
+      print('❌ NewHomeScreen: Erreur lors de l\'initialisation: $e');
+    }
+  }
+
+  Future<void> _fetchUserMedia() async {
+    try {
+      print('🔄 NewHomeScreen: Récupération des médias utilisateur...');
+
+      // Récupérer l'utilisateur connecté
+      final authState = context.read<AuthCubit>().state;
+      print('🔍 NewHomeScreen: État AuthCubit: ${authState.runtimeType}');
+
+      if (authState is AuthSuccess && authState.user != null) {
+        final userId = authState.user!['id']?.toString() ?? '';
+        final token = authState.token;
+
+        print(
+            '🔄 NewHomeScreen: Récupération des médias pour l\'utilisateur: $userId');
+
+        if (userId.isNotEmpty && token != null) {
+          // Requête pour récupérer les médias de l'utilisateur
+          final response = await http.get(
+            Uri.parse('http://24.144.87.127:3333/users/me'),
+            headers: {
+              'Authorization': 'Bearer $token',
+              'Content-Type': 'application/json',
+            },
+          );
+
+          if (response.statusCode == 200) {
+            final data = jsonDecode(response.body);
+            print(
+                '✅ NewHomeScreen: Médias récupérés: ${data['data']['media']}');
+
+            // Mettre à jour les données utilisateur avec les médias
+            if (data['data']['media'] != null) {
+              final updatedUser = Map<String, dynamic>.from(authState.user!);
+              updatedUser['media'] = data['data']['media'];
+
+              // Mettre à jour l'état de l'authentification
+              context.read<AuthCubit>().updateUser(updatedUser, token);
+              print('✅ NewHomeScreen: Données utilisateur mises à jour');
+            }
+          } else {
+            print(
+                '❌ NewHomeScreen: Erreur lors de la récupération des médias: ${response.statusCode}');
+            print('❌ NewHomeScreen: Réponse: ${response.body}');
+          }
+        } else {
+          print(
+              '❌ NewHomeScreen: Token ou userId manquant pour la récupération des médias');
+          print(
+              '❌ NewHomeScreen: userId: $userId, token: ${token != null ? "présent" : "absent"}');
+        }
+      } else {
+        print(
+            '❌ NewHomeScreen: Utilisateur non connecté ou AuthCubit non initialisé');
+        print('❌ NewHomeScreen: authState: $authState');
+      }
+    } catch (e) {
+      print('❌ NewHomeScreen: Erreur lors de la récupération des médias: $e');
+    }
   }
 
   Future<void> _fetchOrdersAndLocation() async {
-    setState(() { _isLoading = true; });
     try {
+      print('🔄 NewHomeScreen: Récupération des commandes et localisation...');
+      setState(() {
+        _isLoading = true;
+      });
+
       // Récupérer les commandes via OrderCubit
       final orderCubit = context.read<OrderCubit>();
       await orderCubit.fetchOrders();
       final commandes = orderCubit.orderListState.commandes;
-      setState(() { _commandes = commandes; });
+      setState(() {
+        _commandes = commandes;
+      });
+
+      print('📦 NewHomeScreen: Commandes récupérées: ${commandes.length}');
+
       if (commandes.isNotEmpty) {
         // Si au moins une commande, récupérer la position
+        print('📍 NewHomeScreen: Récupération de la position...');
         bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
         if (!serviceEnabled) {
-          setState(() { _isLoading = false; });
+          print('❌ NewHomeScreen: Service de localisation désactivé');
+          setState(() {
+            _isLoading = false;
+          });
           return;
         }
         LocationPermission permission = await Geolocator.checkPermission();
         if (permission == LocationPermission.denied) {
           permission = await Geolocator.requestPermission();
           if (permission == LocationPermission.denied) {
-            setState(() { _isLoading = false; });
+            print('❌ NewHomeScreen: Permission de localisation refusée');
+            setState(() {
+              _isLoading = false;
+            });
             return;
           }
         }
         if (permission == LocationPermission.deniedForever) {
-          setState(() { _isLoading = false; });
+          print(
+              '❌ NewHomeScreen: Permission de localisation refusée définitivement');
+          setState(() {
+            _isLoading = false;
+          });
           return;
         }
         Position position = await Geolocator.getCurrentPosition(
@@ -73,470 +419,985 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
           _currentPosition = position;
           _isLoading = false;
         });
+        print(
+            '✅ NewHomeScreen: Position récupérée: ${position.latitude}, ${position.longitude}');
       } else {
-        setState(() { _isLoading = false; });
+        setState(() {
+          _isLoading = false;
+        });
+        print('ℹ️ NewHomeScreen: Aucune commande trouvée');
       }
     } catch (e) {
-      setState(() { _isLoading = false; });
+      print(
+          '❌ NewHomeScreen: Erreur lors de la récupération des commandes: $e');
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  /// Affiche une boîte de dialogue de confirmation pour la déconnexion
+  void _showLogoutDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Déconnexion'),
+          content: const Text('Êtes-vous sûr de vouloir vous déconnecter ?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Annuler'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _logout();
+              },
+              child: const Text(
+                'Déconnexion',
+                style: TextStyle(color: Colors.red),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  /// Vérifie si l'utilisateur est autorisé à effectuer des actions
+  bool _isAuthorizedUser() {
+    try {
+      final authState = context.read<AuthCubit>().state;
+      if (authState is AuthSuccess && authState.user != null) {
+        final userPhone = authState.user!['phone']?.toString() ?? '';
+        print(
+            '🔍 Vérification autorisation - Téléphone utilisateur: $userPhone');
+
+        // Si le numéro est +243842613999, l'utilisateur n'est PAS autorisé
+        final isAuthorized = userPhone != '+243842613999';
+        print('🔍 Utilisateur autorisé: $isAuthorized');
+
+        return isAuthorized;
+      }
+      print('❌ Utilisateur non connecté');
+      return false;
+    } catch (e) {
+      print('❌ Erreur lors de la vérification d\'autorisation: $e');
+      return false;
+    }
+  }
+
+  /// Redirige vers le login si l'utilisateur n'est pas autorisé
+  void _checkAuthorizationAndRedirect() {
+    if (!_isAuthorizedUser()) {
+      print('🚫 Utilisateur non autorisé, redirection vers login...');
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+        (route) => false,
+      );
+    }
+  }
+
+  /// Effectue la déconnexion et redirige vers l'écran de login
+  Future<void> _logout() async {
+    try {
+      print('🔄 Déconnexion en cours...');
+
+      // Effacer la session via AuthGateService
+      final authGateService = AuthGateService();
+      await authGateService.clearSession();
+
+      // Effacer la session via AuthCubit
+      if (mounted) {
+        context.read<AuthCubit>().logout();
+      }
+
+      print('✅ Session effacée avec succès');
+
+      // Rediriger vers l'écran de login
+      if (mounted) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const LoginScreen()),
+          (route) => false,
+        );
+      }
+    } catch (e) {
+      print('❌ Erreur lors de la déconnexion: $e');
+      // Rediriger quand même vers l'écran de login
+      if (mounted) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const LoginScreen()),
+          (route) => false,
+        );
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        centerTitle: false,
-        automaticallyImplyLeading: false,
-        title: Image.asset(AppAssets.logo, width: 100, height: 100),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: BlocBuilder<AuthCubit, AuthState>(
-              builder: (context, state) {
-                if (state is AuthSuccess &&
-                    state.user != null &&
-                    state.user!['profileImage'] != null) {
-                  return GestureDetector(
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (context) => const SettingScreen()),
-                      );
-                    },
-                    child: CircleAvatar(
-                      radius: 20,
-                      backgroundColor: AppColors.buttonColor2,
-                      child: CircleAvatar(
-                        radius: 17,
-                        backgroundColor: AppColors.white,
-                        backgroundImage:
-                            NetworkImage(state.user!['profileImage']),
-                      ),
-                    ),
-                  );
-                } else {
-                  return GestureDetector(
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (context) => const SettingScreen()),
-                      );
-                    },
-                    child: const CircleAvatar(
-                      radius: 20,
-                      backgroundColor: AppColors.buttonColor2,
-                      child: CircleAvatar(
-                        radius: 17,
-                        backgroundColor: AppColors.buttonColor,
-                        child: Icon(Icons.person, color: AppColors.white),
-                      ),
-                    ),
-                  );
-                }
-              },
-            ),
-          ),
-        ],
-      ),
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Search bar
-            Padding(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    height: 40,
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey.shade300),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: GestureDetector(
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const AllMerchantsScreen(),
-                          ),
-                        );
-                      },
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 16),
-                              child: Text(
-                                'Recherche',
-                                style: TextStyle(
-                                  color: Colors.grey.shade500,
-                                  fontSize: 14,
-                                ),
+      backgroundColor: Colors.white,
+      body: Column(
+        children: [
+          // Orange Header Section (Talabat style)
+          Stack(
+            children: [
+              Container(
+                color: AppColors.primary,
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                child: Column(
+                  children: [
+                    // Top row with profile
+
+                    const SizedBox(height: 50),
+                    
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Image.asset(AppAssets.logoWhite, width: 100, height: 100),
+                                                  Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              BlocBuilder<AuthCubit, AuthState>(
+                                builder: (context, state) {
+                                  if (state is AuthSuccess &&
+                                      state.user != null &&
+                                      state.user!['media'] != null) {
+                                    return GestureDetector(
+                                      onTap: () {
+                                        _checkAuthorizationAndRedirect();
+                                        if (_isAuthorizedUser()) {
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                                builder: (context) =>
+                                                    const SettingScreen()),
+                                          );
+                                        }
+                                      },
+                                      child: CircleAvatar(
+                                        radius: 18,
+                                        backgroundColor: Colors.white,
+                                        backgroundImage:
+                                            NetworkImage(state.user!['media']),
+                                      ),
+                                    );
+                                  } else {
+                                    return GestureDetector(
+                                      onTap: () {
+                                        _checkAuthorizationAndRedirect();
+                                        if (_isAuthorizedUser()) {
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                                builder: (context) =>
+                                                    const SettingScreen()),
+                                          );
+                                        }
+                                      },
+                                      child: const CircleAvatar(
+                                        radius: 18,
+                                        backgroundColor: Colors.white,
+                                        child: Icon(Icons.person,
+                                            color: AppColors.primary, size: 20),
+                                      ),
+                                    );
+                                  }
+                                },
                               ),
+                            ],
+                          ),
+                          // Icon(Icons.keyboard_arrow_down, color: Colors.white, size: 20),
+                      ],
+                    ),
+                    // Location selector
+                    GestureDetector(
+                      onTap: () {
+                        // Option to change location
+                      },
+                      child:const  Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Trouvez ce dont vous avez besoin',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
-                          Container(
-                            color: AppColors.primary,
-                            height: 40,
-                            width: 40,
-                            child: const Icon(Icons.search, color: Colors.white, size: 20),
-                          ),
+                          // const SizedBox(width: 4),
+                        
                         ],
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 20),
-                  const Text(
-                    'Trouvez ce dont vous avez besoin',
-                    style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black),
-                  ),
-                ],
-              ),
-            ),
+                    const SizedBox(height: 20),
+                    // Search bar
 
-            // Category icons - scrollable
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 12.0),
-              child: SizedBox(
-                height: 40,
-                child: BlocBuilder<CategoryCubit, CategoryState>(
-                  builder: (context, state) {
-                    if (state is CategoryLoading) {
-                      return ListView.separated(
-                        scrollDirection: Axis.horizontal,
-                        padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                        itemCount: 6,
-                        separatorBuilder: (_, __) => const SizedBox(width: 16),
-                        itemBuilder: (context, index) => ShimmerLoading(
-                          width: 90,
-                          height: 32,
-                          borderRadius: BorderRadius.circular(60),
-                        ),
-                      );
-                    }
-                    if (state is CategoryLoaded) {
-                      return ListView.separated(
-                        scrollDirection: Axis.horizontal,
-                        padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                        itemCount: state.categories.length,
-                        separatorBuilder: (_, __) => const SizedBox(width: 16),
-                        itemBuilder: (context, index) {
-                          final cat = state.categories[index];
+                    BlocBuilder<FeaturedProductCubit, FeaturedProductState>(
+                      builder: (context, state) {
+                        if (state is FeaturedProductLoaded &&
+                            state.products.isNotEmpty) {
                           return Container(
-                            padding: const EdgeInsets.only(
-                                right: 12, left: 3, top: 3, bottom: 3),
                             decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(60),
-                              border: Border.all(color: AppColors.primary),
-                            ),
-                            child: Row(
-                              children: [
-                                Container(
-                                  decoration: BoxDecoration(
-                                    color: AppColors.primary,
-                                    border:
-                                        Border.all(color: AppColors.primary),
-                                    borderRadius: BorderRadius.circular(60),
-                                  ),
-                                  padding: const EdgeInsets.all(12),
-                                  child: Icon(Icons.category,
-                                      color: Colors.grey.shade100, size: 10),
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.05),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 2),
                                 ),
-                                const SizedBox(width: 4),
-                                Text(cat.name,
-                                    style: const TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.bold)),
                               ],
                             ),
-                          );
-                        },
-                      );
-                    }
-                    if (state is CategoryError) {
-                      return Center(
-                          child: Text(state.message,
-                              style: const TextStyle(color: Colors.red)));
-                    }
-                    return const SizedBox.shrink();
-                  },
-                ),
-              ),
-            ),
-
-            // Featured products section
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Padding(
-                        padding: EdgeInsets.only(left: 16),
-                        child: Text(
-                          'Produits vedettes',
-                          style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black),
-                        ),
-                      ),
-                      BlocBuilder<FeaturedProductCubit, FeaturedProductState>(
-                        builder: (context, state) {
-                          if (state is FeaturedProductLoaded &&
-                              state.products.isNotEmpty) {
-                            return TextButton(
-                              onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => AllProductsScreen(
-                                        products: state.products.reversed.toList()),
-                                  ),
-                                );
-                              },
-                              child: const Text('Voir tout',
-                                  style: TextStyle(color: AppColors.primary)),
-                            );
-                          }
-                          return const SizedBox.shrink();
-                        },
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  BlocBuilder<FeaturedProductCubit, FeaturedProductState>(
-                    builder: (context, state) {
-                      if (state is FeaturedProductLoading) {
-                        return const FeaturedProductShimmer();
-                      }
-                      if (state is FeaturedProductError) {
-                        return const Center(
-                            child: Text('Erreur lors du chargement'));
-                      }
-                      if (state is FeaturedProductLoaded) {
-                        final products = state.products;
-                        if (products.isEmpty) {
-                          return const Center(
-                              child: Text('Aucun produit vedette'));
-                        }
-                        return SizedBox(
-                          height: 190,
-                          child: ListView.separated(
-                            scrollDirection: Axis.horizontal,
-                            padding:
-                                const EdgeInsets.symmetric(horizontal: 16.0),
-                            itemCount: products.length,
-                            separatorBuilder: (_, __) =>
-                                const SizedBox(width: 12),
-                            itemBuilder: (context, index) {
-                              final product = products.reversed.toList()[index];
-                              return _buildProductCard(
-                                idVendeur: product.vendeurId.toString(),
-                                stock: product.stock,
-                                id: product.id,
-                                tag: 'Nouveau',
-                                category: 'Catégorie',
-                                name: product.name,
-                                price: product.price,
-                                imagePath: product.media?.mediaUrl != null
-                                    ? product.media!.mediaUrl
-                                    : 'https://via.placeholder.com/150',
-                              );
-                            },
-                          ),
-                        );
-                      }
-                      return const SizedBox.shrink();
-                    },
-                  ),
-                ],
-              ),
-            ),
-
-            // Top Marchands section
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 16.0),
-                        child: Text(
-                          'Top Marchands',
-                          style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black),
-                        ),
-                      ),
-                      TextButton(
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const AllMerchantsScreen(),
-                            ),
-                          );
-                        },
-                        child: const Text('Voir tout', style: TextStyle(color: AppColors.primary)),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Horizontal scrollable merchants
-                  BlocBuilder<MerchantCubit, MerchantState>(
-                    builder: (context, state) {
-                      if (state is MerchantLoading) {
-                        return MerchantShimmer();
-                      }
-                      if (state is MerchantLoaded) {
-                        final merchants = state.merchants;
-                        if (merchants.isEmpty) {
-                          return const Center(child: Text('Aucun marchand trouvé'));
-                        }
-                        return SizedBox(
-                          height: 100,
-                          child: ListView.separated(
-                            scrollDirection: Axis.horizontal,
-                            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                            itemCount: merchants.length,
-                            separatorBuilder: (_, __) => const SizedBox(width: 12),
-                            itemBuilder: (context, index) {
-                              final vendeur = merchants[index]['vendeur'];
-                              final products = (merchants[index]['products'] as List).cast<Map<String, dynamic>>();
-                              final image = products.isNotEmpty && products[0]['media'] != null
-                                  ? 'http://24.144.87.127:3333/${products[0]['media']['mediaUrl']}'
-                                  : 'https://via.placeholder.com/150';
-                              final name = '${vendeur['firstName']} ${vendeur['lastName']}';
-                              return GestureDetector(
-                                onTap: () {
+                            child: GestureDetector(
+                              onTap: () {
+                                _checkAuthorizationAndRedirect();
+                                if (_isAuthorizedUser()) {
                                   Navigator.push(
                                     context,
                                     MaterialPageRoute(
-                                      builder: (context) => MerchantProfileScreen(
-                                        name: name,
-                                        rating: 4.5,
-                                        category: products.isNotEmpty ? products[0]['description'] ?? '' : '',
-                                        imagePath: image,
-                                        isVerified: true,
-                                        products: products,
-                                      ),
+                                      // builder: (context) => const AllMerchantsScreen(),
+                                      builder: (context) =>
+                                          AllProductsScreen(
+                                              products: state.products.reversed
+                                                  .toList()),
                                     ),
                                   );
-                                },
-                                child: _buildMerchantCard(
-                                  name: name,
-                                  rating: 4.5,
-                                  category: products.isNotEmpty ? products[0]['description'] ?? '' : '',
-                                  imagePath: image,
-                                  isVerified: true,
-                                  products: products,
+                                }
+                              },
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 12),
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.search,
+                                        color: Colors.grey.shade600, size: 20),
+                                    const SizedBox(width: 12),
+                                    Text(
+                                      'Recherche...',
+                                      style: TextStyle(
+                                        color: Colors.grey.shade600,
+                                        fontSize: 15,
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                              );
-                            },
+                              ),
+                            ),
+                          );
+                        }
+                        return const SizedBox.shrink();
+                      },
+                    ),
+
+                    const SizedBox(height: 30),
+                  ],
+                ),
+              ),
+              // Wave decoration at the bottom
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: CustomPaint(
+                  size: Size(MediaQuery.of(context).size.width, 30),
+                  painter: WavePainter(),
+                ),
+              ),
+            ],
+          ),
+
+          // Categories Section (Horizontal Scroll)
+          Container(
+            color: Colors.white,
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            child: SizedBox(
+              height: 120,
+              child: BlocBuilder<CategoryCubit, CategoryState>(
+                builder: (context, state) {
+                  if (state is CategoryLoading) {
+                    return ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                      itemCount: 6,
+                      separatorBuilder: (_, __) => const SizedBox(width: 12),
+                      itemBuilder: (context, index) => Container(
+                        width: 90,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: ShimmerLoading(
+                          width: 90,
+                          height: 120,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    );
+                  }
+                  if (state is CategoryLoaded) {
+                    // Trier les catégories par ordre alphabétique
+                    final sortedCategories = List.from(state.categories)
+                      ..sort((a, b) =>
+                          a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+
+                    return ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                      itemCount: sortedCategories.length,
+                      separatorBuilder: (_, __) => const SizedBox(width: 12),
+                      itemBuilder: (context, index) {
+                        final cat = sortedCategories[index];
+                        return GestureDetector(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                    CategoryProductsScreen(category: cat),
+                              ),
+                            );
+                          },
+                          child: Container(
+                            width: 90,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Colors.grey.shade200),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.03),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Container(
+                                  width: 50,
+                                  height: 50,
+                                  decoration: BoxDecoration(
+                                    color: AppColors.primary.withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(25),
+                                  ),
+                                  child: Center(
+                                    child: _getCategoryIconWidget(
+                                      cat.name,
+                                      AppColors.primary,
+                                      28,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Padding(
+                                  padding:
+                                      const EdgeInsets.symmetric(horizontal: 4),
+                                  child: Text(
+                                    cat.name,
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         );
-                      }
-                      if (state is MerchantError) {
-                        return Center(child: Text(state.message, style: const TextStyle(color: Colors.red)));
-                      }
-                      return const SizedBox.shrink();
-                    },
-                  ),
-                ],
+                      },
+                    );
+                  }
+                  if (state is CategoryError) {
+                    return Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Text(
+                          'Erreur de chargement',
+                          style: TextStyle(color: Colors.grey.shade600),
+                        ),
+                      ),
+                    );
+                  }
+                  return const SizedBox.shrink();
+                },
               ),
             ),
+          ),
 
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-              child: Text('Position du livreur', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black)),
-            ),
-
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-              child: _isLoading
-                  ? const SizedBox(
-                      height: 150,
-                      child: Center(child: CircularProgressIndicator()),
-                    )
-                  : _commandes.isNotEmpty
-                      ? Container(
-                          height: 200,
-                          width: double.infinity,
+          // Scrollable Content
+          Expanded(
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // "Hey there!" Section (if not logged in or for promotions)
+                  BlocBuilder<AuthCubit, AuthState>(
+                    builder: (context, state) {
+                      if (state is! AuthSuccess) {
+                        return Container(
+                          margin: const EdgeInsets.all(16),
+                          padding: const EdgeInsets.all(20),
                           decoration: BoxDecoration(
-                            color: Colors.grey[200],
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(12),
-                            child: _currentPosition == null
-                                ? const Center(child: Text('Impossible d\'obtenir la localisation', style: TextStyle(color: Colors.black54)))
-                                : GoogleMap(
-                                    initialCameraPosition: CameraPosition(
-                                      target: LatLng(
-                                        _currentPosition!.latitude,
-                                        _currentPosition!.longitude,
-                                      ),
-                                      zoom: 15,
-                                    ),
-                                    onMapCreated: (GoogleMapController controller) {
-                                      _mapController = controller;
-                                    },
-                                    myLocationEnabled: true,
-                                    myLocationButtonEnabled: true,
-                                    zoomControlsEnabled: true,
-                                    mapType: MapType.normal,
-                                  ),
-                          ),
-                        )
-                      : Container(
-                          height: 150,
-                          width: double.infinity,
-                          decoration: BoxDecoration(
-                            color: Colors.grey.shade200,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Stack(
-                            alignment: Alignment.center,
-                            children: [
-                              CustomPaint(
-                                painter: MapPatternPainter(),
-                                size: Size.infinite,
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: Colors.grey.shade200),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.03),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
                               ),
-                              Icon(Icons.location_on, color: AppColors.primary.withOpacity(0.7)),
-                              const Positioned(
-                                bottom: 10,
-                                child: Text(
-                                  'Pas de livraison pour le moment',
-                                  style: TextStyle(
-                                      fontWeight: FontWeight.w500,
-                                      fontSize: 14,
-                                      color: Colors.black),
+                            ],
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        const Text(
+                                          'Bonjour !',
+                                          style: TextStyle(
+                                            fontSize: 20,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          'Connectez-vous pour une expérience personnalisée',
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            color: Colors.grey.shade600,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Container(
+                                    width: 60,
+                                    height: 60,
+                                    decoration: BoxDecoration(
+                                      color: AppColors.primary.withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(30),
+                                    ),
+                                    child: const Icon(
+                                      Icons.phone_android,
+                                      color: AppColors.primary,
+                                      size: 30,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 16),
+                              SizedBox(
+                                width: double.infinity,
+                                child: ElevatedButton(
+                                  onPressed: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) =>
+                                            const LoginScreen(),
+                                      ),
+                                    );
+                                  },
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppColors.primary,
+                                    padding: const EdgeInsets.symmetric(
+                                        vertical: 14),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                  ),
+                                  child: const Text(
+                                    'Se connecter',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
                                 ),
                               ),
                             ],
                           ),
+                        );
+                      }
+                      return const SizedBox.shrink();
+                    },
+                  ),
+
+                  // Featured products section
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Padding(
+                              padding: EdgeInsets.only(left: 16),
+                              child: Text(
+                                'Produits populaires',
+                                style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.black),
+                              ),
+                            ),
+                            BlocBuilder<FeaturedProductCubit,
+                                FeaturedProductState>(
+                              builder: (context, state) {
+                                if (state is FeaturedProductLoaded &&
+                                    state.products.isNotEmpty) {
+                                  return TextButton(
+                                    onPressed: () {
+                                      _checkAuthorizationAndRedirect();
+                                      if (_isAuthorizedUser()) {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) =>
+                                                AllProductsScreen(
+                                                    products: state
+                                                        .products.reversed
+                                                        .toList()),
+                                          ),
+                                        );
+                                      }
+                                    },
+                                    child: const Text('Voir tout',
+                                        style: TextStyle(
+                                            color: AppColors.primary)),
+                                  );
+                                }
+                                return const SizedBox.shrink();
+                              },
+                            ),
+                          ],
                         ),
+                        const SizedBox(height: 12),
+                        BlocBuilder<FeaturedProductCubit, FeaturedProductState>(
+                          builder: (context, state) {
+                            if (state is FeaturedProductLoading) {
+                              return const FeaturedProductShimmer();
+                            }
+                            if (state is FeaturedProductError) {
+                              return const Center(
+                                  child: Text('Erreur lors du chargement'));
+                            }
+                            if (state is FeaturedProductLoaded) {
+                              final products = state.products;
+                              if (products.isEmpty) {
+                                return const Center(
+                                    child: Text('Aucun produit vedette'));
+                              }
+                              return SizedBox(
+                                height: 190,
+                                child: ListView.separated(
+                                  scrollDirection: Axis.horizontal,
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 16.0),
+                                  itemCount: products.length,
+                                  separatorBuilder: (_, __) =>
+                                      const SizedBox(width: 12),
+                                  itemBuilder: (context, index) {
+                                    final product =
+                                        products.reversed.toList()[index];
+                                    return _buildProductCard(
+                                      idVendeur: product.vendeurId.toString(),
+                                      description: product.description,
+                                      stock: product.stock,
+                                      id: product.id,
+                                      tag: product.category?.name ?? '',
+                                      category: product.category?.name ?? '',
+                                      name: product.name,
+                                      price: product.price,
+                                      imagePath: product.media?.mediaUrl != null
+                                          ? product.media!.mediaUrl
+                                          : 'https://via.placeholder.com/150',
+                                    );
+                                  },
+                                ),
+                              );
+                            }
+                            return const SizedBox.shrink();
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Top Marchands section
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 16.0),
+                              child: Text(
+                                'Top Marchands',
+                                style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.black),
+                              ),
+                            ),
+                            TextButton(
+                              onPressed: () {
+                                _checkAuthorizationAndRedirect();
+                                if (_isAuthorizedUser()) {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          const AllMerchantsScreen(),
+                                    ),
+                                  );
+                                }
+                              },
+                              child: const Text('Voir tout',
+                                  style: TextStyle(color: AppColors.primary)),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+
+                        // Horizontal scrollable merchants
+                        BlocBuilder<MerchantCubit, MerchantState>(
+                          builder: (context, state) {
+                            if (state is MerchantLoading) {
+                              return MerchantShimmer();
+                            }
+                            if (state is MerchantLoaded) {
+                              final merchants = state.merchants;
+                              if (merchants.isEmpty) {
+                                return const Center(
+                                    child: Text('Aucun marchand trouvé'));
+                              }
+                              return SizedBox(
+                                height: 100,
+                                child: ListView.separated(
+                                  scrollDirection: Axis.horizontal,
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 16.0),
+                                  itemCount: merchants.length,
+                                  separatorBuilder: (_, __) =>
+                                      const SizedBox(width: 12),
+                                  itemBuilder: (context, index) {
+                                    final vendeur = merchants[index]['vendeur'];
+                                    final products =
+                                        (merchants[index]['products'] as List)
+                                            .cast<Map<String, dynamic>>();
+                                    final media = merchants[index]['media'];
+                                    final image = media != null &&
+                                            media['mediaUrl'] != null
+                                        ? media['mediaUrl']
+                                        : 'https://via.placeholder.com/150';
+                                    final name =
+                                        '${vendeur['firstName']} ${vendeur['lastName']}';
+                                    return GestureDetector(
+                                      onTap: () {
+                                        _checkAuthorizationAndRedirect();
+                                        if (_isAuthorizedUser()) {
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (context) =>
+                                                  MerchantProfileScreen(
+                                                description: products.isNotEmpty
+                                                    ? products[0]
+                                                            ['description'] ??
+                                                        ''
+                                                    : '',
+                                                merchantId: vendeur['id'],
+                                                name: name,
+                                                rating: 4.5,
+                                                category: products.isNotEmpty
+                                                    ? products[0]
+                                                            ['description'] ??
+                                                        ''
+                                                    : '',
+                                                imagePath: image,
+                                                isVerified: true,
+                                                products: products,
+                                              ),
+                                            ),
+                                          );
+                                        }
+                                      },
+                                      child: _buildMerchantCard(
+                                        id: vendeur['id'].toString(),
+                                        name: name,
+                                        rating: 4.5,
+                                        category: products.isNotEmpty
+                                            ? products[0]['description'] ?? ''
+                                            : '',
+                                        imagePath: image,
+                                        isVerified: true,
+                                        products: products,
+                                      ),
+                                    );
+                                  },
+                                ),
+                              );
+                            }
+                            if (state is MerchantError) {
+                              return Center(
+                                child: Container(
+                                  padding: const EdgeInsets.all(16),
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey.shade100,
+                                    borderRadius: BorderRadius.circular(8),
+                                    border:
+                                        Border.all(color: Colors.grey.shade300),
+                                  ),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.store_outlined,
+                                          color: Colors.grey.shade600,
+                                          size: 24),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        'Impossible de charger les boutiques',
+                                        style: TextStyle(
+                                          color: Colors.grey.shade700,
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        'Vérifiez votre connexion internet',
+                                        style: TextStyle(
+                                          color: Colors.grey.shade500,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            }
+                            return const SizedBox.shrink();
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Map Section
+                  if (_commandes.isNotEmpty || _currentPosition != null)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16.0, vertical: 12.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Ma position',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          _isLoading
+                              ? const SizedBox(
+                                  height: 200,
+                                  child: Center(
+                                      child: CircularProgressIndicator()),
+                                )
+                              : _commandes.isNotEmpty
+                                  ? GestureDetector(
+                                      onTap: () {
+                                        _checkAuthorizationAndRedirect();
+                                        if (_isAuthorizedUser()) {
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (context) =>
+                                                  const NavigationExample(
+                                                      backNavigation: true),
+                                            ),
+                                          );
+                                        }
+                                      },
+                                      child: Container(
+                                        height: 200,
+                                        width: double.infinity,
+                                        decoration: BoxDecoration(
+                                          color: Colors.grey[200],
+                                          borderRadius:
+                                              BorderRadius.circular(16),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: Colors.black
+                                                  .withOpacity(0.05),
+                                              blurRadius: 8,
+                                              offset: const Offset(0, 2),
+                                            ),
+                                          ],
+                                        ),
+                                        child: ClipRRect(
+                                          borderRadius:
+                                              BorderRadius.circular(16),
+                                          child: _currentPosition == null
+                                              ? const Center(
+                                                  child: Text(
+                                                    'Impossible d\'obtenir la localisation',
+                                                    style: TextStyle(
+                                                        color: Colors.black54),
+                                                  ),
+                                                )
+                                              : Stack(
+                                                  children: [
+                                                    GoogleMap(
+                                                      initialCameraPosition:
+                                                          CameraPosition(
+                                                        target: LatLng(
+                                                          _currentPosition!
+                                                              .latitude,
+                                                          _currentPosition!
+                                                              .longitude,
+                                                        ),
+                                                        zoom: 15,
+                                                      ),
+                                                      onMapCreated:
+                                                          (GoogleMapController
+                                                              controller) {},
+                                                      myLocationEnabled: true,
+                                                      myLocationButtonEnabled:
+                                                          true,
+                                                      zoomControlsEnabled: true,
+                                                      mapType: MapType.normal,
+                                                    ),
+                                                    Positioned.fill(
+                                                      child: Material(
+                                                        color:
+                                                            Colors.transparent,
+                                                        child: Container(
+                                                          decoration:
+                                                              BoxDecoration(
+                                                            borderRadius:
+                                                                BorderRadius
+                                                                    .circular(
+                                                                        16),
+                                                            gradient:
+                                                                LinearGradient(
+                                                              begin: Alignment
+                                                                  .topCenter,
+                                                              end: Alignment
+                                                                  .bottomCenter,
+                                                              colors: [
+                                                                Colors
+                                                                    .transparent,
+                                                                Colors.black
+                                                                    .withOpacity(
+                                                                        0.2),
+                                                              ],
+                                                            ),
+                                                          ),
+                                                          child: const Center(
+                                                            child: Column(
+                                                              mainAxisAlignment:
+                                                                  MainAxisAlignment
+                                                                      .end,
+                                                              children: [
+                                                                Icon(
+                                                                  Icons
+                                                                      .fullscreen,
+                                                                  color: Colors
+                                                                      .white,
+                                                                  size: 24,
+                                                                ),
+                                                                SizedBox(
+                                                                    height: 8),
+                                                                Text(
+                                                                  'Voir la carte en détail',
+                                                                  style:
+                                                                      TextStyle(
+                                                                    color: Colors
+                                                                        .white,
+                                                                    fontSize:
+                                                                        14,
+                                                                    fontWeight:
+                                                                        FontWeight
+                                                                            .w600,
+                                                                  ),
+                                                                ),
+                                                                SizedBox(
+                                                                    height: 16),
+                                                              ],
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                        ),
+                                      ),
+                                    )
+                                  : Container(
+                                      height: 150,
+                                      width: double.infinity,
+                                      decoration: BoxDecoration(
+                                        color: Colors.grey.shade200,
+                                        borderRadius: BorderRadius.circular(16),
+                                      ),
+                                      child: Stack(
+                                        alignment: Alignment.center,
+                                        children: [
+                                          CustomPaint(
+                                            painter: MapPatternPainter(),
+                                            size: Size.infinite,
+                                          ),
+                                          Icon(Icons.location_on,
+                                              color: AppColors.primary
+                                                  .withOpacity(0.7)),
+                                          const Positioned(
+                                            bottom: 10,
+                                            child: Text(
+                                              'Pas de livraison pour le moment',
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.w500,
+                                                fontSize: 14,
+                                                color: Colors.black,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                        ],
+                      ),
+                    ),
+
+                  const SizedBox(height: 20), // Bottom padding
+                ],
+              ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -544,6 +1405,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
   Widget _buildProductCard({
     required String idVendeur,
     required int id,
+    required String description,
     required String tag,
     required String category,
     required int stock,
@@ -555,21 +1417,25 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
       builder: (context) {
         return GestureDetector(
           onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => ProductDetailScreen(
-                  idVendeur: idVendeur,
-                  id: id,
-                  tag: tag,
-                  category: category,
-                  stock: stock,
-                  name: name,
-                  price: price,
-                  imagePath: imagePath,
+            _checkAuthorizationAndRedirect();
+            if (_isAuthorizedUser()) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ProductDetailScreen(
+                    description: description,
+                    idVendeur: idVendeur,
+                    id: id,
+                    tag: tag,
+                    category: category,
+                    stock: stock,
+                    name: name,
+                    price: price,
+                    imagePath: imagePath,
+                  ),
                 ),
-              ),
-            );
+              );
+            }
           },
           child: Container(
             width: 150,
@@ -614,6 +1480,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                       top: 8,
                       left: 8,
                       child: Container(
+                        // width: 110,
                         padding: const EdgeInsets.symmetric(
                             horizontal: 8, vertical: 2),
                         decoration: BoxDecoration(
@@ -629,8 +1496,10 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                         ),
                         child: Text(
                           tag,
-                          style: const TextStyle(
-                              fontSize: 10, color: Colors.white),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style:
+                              const TextStyle(fontSize: 9, color: Colors.white),
                         ),
                       ),
                     ),
@@ -640,6 +1509,9 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                       right: 8,
                       child: GestureDetector(
                         onTap: () async {
+                          _checkAuthorizationAndRedirect();
+                          if (!_isAuthorizedUser()) return;
+
                           final newItem = {
                             'id': id,
                             'name': name,
@@ -649,13 +1521,17 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                             'quantity': 1,
                             'stock': stock,
                             'idVendeur': idVendeur,
+                            'description': description,
                           };
-                          final success = await context.read<CartCubit>().addToCart(newItem);
+                          final success = await context
+                              .read<CartCubit>()
+                              .addToCart(newItem);
                           if (!success) {
                             if (mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
-                                  content: Text('Stock insuffisant : il ne reste que $stock en stock.'),
+                                  content: Text(
+                                      'Stock insuffisant : il ne reste que $stock en stock.'),
                                   backgroundColor: Colors.red,
                                 ),
                               );
@@ -668,7 +1544,6 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                                 content: const Text('Article ajouté au panier'),
                                 backgroundColor: AppColors.primary,
                                 duration: const Duration(seconds: 2),
-                
                               ),
                             );
                           }
@@ -739,24 +1614,32 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
     required String category,
     required String imagePath,
     required bool isVerified,
+    required String id,
     required List<Map<String, dynamic>> products,
   }) {
     return Builder(
       builder: (context) => GestureDetector(
         onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => MerchantProfileScreen(
-                name: name,
-                rating: rating,
-                category: category,
-                imagePath: imagePath,
-                isVerified: isVerified,
-                products: products,
+          _checkAuthorizationAndRedirect();
+          if (_isAuthorizedUser()) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => MerchantProfileScreen(
+                  description: products.isNotEmpty
+                      ? products[0]['description'] ?? ''
+                      : '',
+                  merchantId: id,
+                  name: name,
+                  rating: rating,
+                  category: category,
+                  imagePath: imagePath,
+                  isVerified: isVerified,
+                  products: products,
+                ),
               ),
-            ),
-          );
+            );
+          }
         },
         child: Container(
           width: 180,
@@ -866,40 +1749,57 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
       ),
     );
   }
+}
 
-  Widget _buildReviewCard(String name, int rating, String comment) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade200,
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              CircleAvatar(
-                backgroundColor: Colors.grey.shade300,
-                radius: 12,
-              ),
-              const SizedBox(width: 8),
-              Text(name, style: const TextStyle(fontSize: 13)),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Row(
-            children: List.generate(
-              rating,
-              (index) => const Icon(Icons.star, color: Colors.amber, size: 14),
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(comment, style: const TextStyle(fontSize: 13)),
-        ],
-      ),
-    );
+// Custom painter to draw wave at the bottom of header
+// Smooth wave like Talabat design
+
+class WavePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.fill;
+
+    final path = Path();
+
+    // Wave parameters - smooth and natural like Talabat
+    double waveHeight = 20;
+    double numberOfWaves = 1.5; // Fewer waves for smoother look
+
+    // Start from bottom left corner
+    path.moveTo(0, size.height);
+
+    // Create very smooth wave like Talabat - using many points for perfect smoothness
+    int points = 150; // Many points for ultra-smooth curve like Talabat
+
+    for (int i = 0; i <= points; i++) {
+      double x = (i / points) * size.width;
+      double normalizedX = x / size.width;
+
+      // Smooth sinusoidal wave
+      double y = size.height -
+          waveHeight *
+              (1 + math.sin(normalizedX * numberOfWaves * 2 * math.pi)) /
+              2;
+
+      if (i == 0) {
+        path.moveTo(x, y);
+      } else {
+        path.lineTo(x, y);
+      }
+    }
+
+    // Complete the path to create a filled shape
+    path.lineTo(size.width, size.height);
+    path.lineTo(0, size.height);
+    path.close();
+
+    canvas.drawPath(path, paint);
   }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 // Custom painter to draw a grid pattern for the map background
@@ -965,7 +1865,7 @@ class FeaturedProductShimmer extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Shimmer image
-                Padding(
+                const Padding(
                   padding: const EdgeInsets.only(bottom: 0),
                   child: ShimmerLoading(
                     width: 150,

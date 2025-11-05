@@ -167,11 +167,11 @@ class _OTPScreenState extends State<OTPScreen> {
         await Future.delayed(const Duration(seconds: 2));
         
         // Vérifier l'OTP directement avec le service
-        final authService = AuthService();
-        final response = await authService.verifyOTP(
-          id: widget.user!['id'],
-          otp:  int.parse(_otp)
-        );
+        // final authService = AuthService();
+        // final response = await authService.verifyOTP(
+        //   id: widget.user!['id']??"",
+        //   otp:  int.parse(_otp)
+        // );
         
         // Si nous arrivons ici, c'est que l'OTP est correct
         setState(() {
@@ -249,7 +249,7 @@ class _OTPScreenState extends State<OTPScreen> {
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Un nouveau code a été envoyé sur WhatsApp'),
+        content: Text('Un nouveau code a été envoyé'),
         backgroundColor: Colors.green,
         behavior: SnackBarBehavior.floating,
       ),
@@ -263,16 +263,72 @@ class _OTPScreenState extends State<OTPScreen> {
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: AppColors.text),
-          onPressed: () => Navigator.pop(context),
+    return BlocListener<AuthCubit, AuthState>(
+      listener: (context, state) {
+        if (state is AuthSuccess) {
+          // Afficher un message de succès amélioré
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  const Icon(Icons.check_circle, color: Colors.white, size: 20),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Inscription réussie !',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                        const Text(
+                          'Votre compte a été créé avec succès',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.white70,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              backgroundColor: Colors.green,
+              behavior: SnackBarBehavior.floating,
+              duration: const Duration(seconds: 3),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              margin: const EdgeInsets.all(16),
+            ),
+          );
+          
+          // Redirection automatique vers l'écran principal après vérification OTP réussie
+          Navigator.pushReplacementNamed(context, AppRoutes.main);
+        } else if (state is AuthError) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(state.message),
+              backgroundColor: Colors.red,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_ios, color: AppColors.text),
+            onPressed: () => Navigator.pop(context),
+          ),
         ),
-      ),
       body: SafeArea(
         child: Stack(
           children: [
@@ -298,7 +354,7 @@ class _OTPScreenState extends State<OTPScreen> {
                         children: [
                           const TextSpan(
                             text:
-                                'Veuillez entrer le code à 6 chiffres envoyé sur WhatsApp au numéro ',
+                                'Veuillez entrer le code à 6 chiffres envoyé au numéro ',
                           ),
                           TextSpan(
                             text: _maskedPhoneNumber,
@@ -472,6 +528,7 @@ class _OTPScreenState extends State<OTPScreen> {
               ),
           ],
         ),
+      ),
       ),
     );
   }

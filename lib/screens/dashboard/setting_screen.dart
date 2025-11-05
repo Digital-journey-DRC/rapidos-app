@@ -1,12 +1,16 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../constants.dart';
 import '../../cubit/auth_cubit.dart';
 import '../../cubits/profile/profile_cubit.dart';
 import '../../services/profile_service.dart';
+import '../auth/login_screen.dart';
 
 class SettingScreen extends StatefulWidget {
   const SettingScreen({super.key});
@@ -47,27 +51,91 @@ class _SettingScreenState extends State<SettingScreen>
 
     // Get current user data from AuthCubit
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadUserData();
+      
+      // Écouter les changements de l'AuthCubit
+      context.read<AuthCubit>().stream.listen((authState) {
+        if (authState is AuthSuccess && authState.user != null) {
+          print('🔄 AuthCubit a changé, rechargement des données utilisateur');
+          _loadUserData();
+        }
+      });
+    });
+  }
+
+  // Méthode pour charger les données utilisateur
+  void _loadUserData() {
+    final authState = context.read<AuthCubit>().state;
+    if (authState is AuthSuccess && authState.user != null) {
+      print('🔄 Chargement des données utilisateur: ${authState.user}');
+      
+      // Mettre à jour les contrôleurs avec les données actuelles
+      _firstNameController.text = authState.user!['firstName'] ?? '';
+      _lastNameController.text = authState.user!['lastName'] ?? '';
+      _phoneController.text = authState.user!['phone'] ?? '';
+
+      // Injecter l'AuthCubit dans le ProfileCubit
+      _profileCubit.setAuthCubit(context.read<AuthCubit>());
+
+      // Set the correct number of tabs based on user role
+      final isProprietaire = authState.user!['role'] == 'proprietaire';
+      
+      // Only create TabController for proprietaire users
+      if (isProprietaire) {
+        _tabController = TabController(
+          length: 2,
+          vsync: this,
+        );
+        
+        // Load user financial data only for proprietaire
+        _loadUserFinancialData(authState.user!['id'], authState.token!);
+      }
+      
+      // Forcer la mise à jour de l'interface utilisateur
+      setState(() {});
+    }
+  }
+
+    Future<void> _fetchUserMedia() async {
+    try {
+      // Récupérer l'utilisateur connecté
       final authState = context.read<AuthCubit>().state;
       if (authState is AuthSuccess && authState.user != null) {
-        _firstNameController.text = authState.user!['firstName'] ?? '';
-        _lastNameController.text = authState.user!['lastName'] ?? '';
-        _phoneController.text = authState.user!['phone'] ?? '';
-
-        // Set the correct number of tabs based on user role
-        final isProprietaire = authState.user!['role'] == 'proprietaire';
+        final userId = authState.user!['id']?.toString() ?? '';
+        final token = authState.token;
         
-        // Only create TabController for proprietaire users
-        if (isProprietaire) {
-          _tabController = TabController(
-            length: 2,
-            vsync: this,
+        if (userId.isNotEmpty && token != null) {
+          print('🔄 Récupération des médias pour l\'utilisateur: $userId');
+          
+          // Requête pour récupérer les médias de l'utilisateur
+          final response = await http.get(
+            Uri.parse('http://24.144.87.127:3333/users/me'),
+            headers: {
+              'Authorization': 'Bearer $token',
+              'Content-Type': 'application/json',
+            },
           );
           
-          // Load user financial data only for proprietaire
-          _loadUserFinancialData(authState.user!['id'], authState.token!);
+          if (response.statusCode == 200) {
+            final data = jsonDecode(response.body);
+            print('✅ Médias récupérés: ${data['data']['media']}');
+            
+            // Mettre à jour les données utilisateur avec les médias
+            if (data['data']['media'] != null) {
+              final updatedUser = Map<String, dynamic>.from(authState.user!);
+              updatedUser['media'] = data['data']['media'];
+              
+              // Mettre à jour l'état de l'authentification
+              context.read<AuthCubit>().updateUser(updatedUser, token);
+            }
+          } else {
+            print('❌ Erreur lors de la récupération des médias: ${response.statusCode}');
+          }
         }
       }
-    });
+    } catch (e) {
+      print('❌ Erreur lors de la récupération des médias: $e');
+    }
   }
 
   @override
@@ -290,6 +358,87 @@ class _SettingScreenState extends State<SettingScreen>
     );
   }
 
+  // Méthode pour uploader l'image au serveur
+  Future<void> _uploadImageToServer(File imageFile) async {
+    try {
+      // Récupérer le token de l'utilisateur connecté
+      final authState = context.read<AuthCubit>().state;
+      if (authState is! AuthSuccess || authState.token == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Erreur: Utilisateur non connecté'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
+      // Afficher un indicateur de chargement
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Upload de l\'image en cours...'),
+          backgroundColor: Colors.green,
+        ),
+      );
+
+      // Préparer la requête multipart
+      var headers = {
+        'Authorization': 'Bearer ${authState.token}',
+      };
+      
+      var request = http.MultipartRequest(
+        'POST', 
+        Uri.parse('http://24.144.87.127:3333/users/update-profil')
+      );
+      
+      // Ajouter le fichier image
+      request.files.add(
+        await http.MultipartFile.fromPath('avatar', imageFile.path)
+      );
+      
+      // Ajouter les headers
+      request.headers.addAll(headers);
+
+      // Envoyer la requête
+      http.StreamedResponse response = await request.send();
+
+      if (response.statusCode == 200) {
+        final responseBody = await response.stream.bytesToString();
+        print('Upload réussi: $responseBody');
+        _fetchUserMedia();
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Image uploadée avec succès !'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        
+        // Mettre à jour l'interface si nécessaire
+        setState(() {
+          // L'image sera mise à jour via le ProfileCubit
+        });
+        
+      } else {
+        print('Erreur upload: ${response.reasonPhrase}');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur lors de l\'upload: ${response.reasonPhrase}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      print('Erreur lors de l\'upload: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erreur lors de l\'upload: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
   void _showImageSourceDialog() {
     showModalBottomSheet(
       context: context,
@@ -309,9 +458,11 @@ class _SettingScreenState extends State<SettingScreen>
                   setState(() {
                     _selectedImage = File(image.path);
                   });
+                  // Uploader l'image au serveur
+                  await _uploadImageToServer(File(image.path));
                 }
               },
-              child: Column(
+              child: const Column(
                 mainAxisSize: MainAxisSize.min,
                 children: const [
                   Icon(Icons.photo_library, size: 40, color: AppColors.buttonColor),
@@ -328,9 +479,11 @@ class _SettingScreenState extends State<SettingScreen>
                   setState(() {
                     _selectedImage = File(photo.path);
                   });
+                  // Uploader l'image au serveur
+                  await _uploadImageToServer(File(photo.path));
                 }
               },
-              child: Column(
+              child: const Column(
                 mainAxisSize: MainAxisSize.min,
                 children: const [
                   Icon(Icons.camera_alt, size: 40, color: AppColors.buttonColor),
@@ -482,7 +635,7 @@ class _SettingScreenState extends State<SettingScreen>
   }
 
   Widget _buildProfileHeader(Map<String, dynamic> user) {
-    String profileImage = user['profileImage'] ?? '';
+    String profileImage = user['media'] ?? '';
     String fullName = '${user['firstName'] ?? ''} ${user['lastName'] ?? ''}';
     bool isProprietaire = user['role'] == 'proprietaire';
     return Container(
@@ -537,7 +690,7 @@ class _SettingScreenState extends State<SettingScreen>
                     border: Border.all(color: AppColors.buttonColor, width: 2),
                   ),
                   child: const Icon(
-                    Icons.camera_alt,
+                    Icons.edit,
                     color: AppColors.buttonColor,
                     size: 20,
                   ),
@@ -713,6 +866,61 @@ class _SettingScreenState extends State<SettingScreen>
                             ),
                           ),
                           child: const Text('Déconnexion'),
+                        ),
+                      ],
+                    );
+                  },
+                );
+              },
+            ),
+            const SizedBox(height: 8),
+            ListTile(
+              leading: const Icon(Icons.delete_forever, color: Colors.red),
+              title: const Text(
+                'Supprimer le compte',
+                style: TextStyle(
+                  color: Colors.red,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              onTap: () {
+                // Show confirmation dialog before account deletion
+                showDialog(
+                  context: context,
+                  builder: (BuildContext context) {
+                    return AlertDialog(
+                      title: const Text('Suppression du compte'),
+                      content: const Text(
+                        'Êtes-vous sûr de vouloir supprimer votre compte ? Cette action est irréversible.',
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () {
+                            Navigator.of(context).pop(); // Close dialog
+                          },
+                          child: const Text(
+                            'Annuler',
+                            style: TextStyle(
+                              color: Colors.grey,
+                            ),
+                          ),
+                        ),
+                        ElevatedButton(
+                          onPressed: () {
+                            Navigator.of(context).pop(); // Close dialog
+                            _deleteAccount();
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.red,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          child: const Text('Supprimer'),
                         ),
                       ],
                     );
@@ -1103,29 +1311,136 @@ class _SettingScreenState extends State<SettingScreen>
     );
   }
 
+  /// Supprime le compte et redirige vers LoginScreen
+  Future<void> _deleteAccount() async {
+    try {
+      print('🗑️ Suppression du compte en cours...');
+      
+      // Récupérer les données utilisateur actuelles
+      final authState = context.read<AuthCubit>().state;
+      Map<String, dynamic> user = {};
+      
+      if (authState is AuthSuccess && authState.user != null) {
+        user = authState.user!;
+      }
+      
+      // Effacer toutes les données de session D'ABORD
+      context.read<AuthCubit>().logout();
+      
+      // PUIS enregistrer dans SharedPreferences la marque de suppression de compte
+      final prefs = await SharedPreferences.getInstance();
+      final removeAccountData = {
+        'phone': user['phone'] ?? '',
+        'isRemove': true,
+      };
+      
+      await prefs.setString('removeAccount', jsonEncode(removeAccountData));
+      print('✅ removeAccount enregistré: $removeAccountData');
+      
+      // Afficher un message de confirmation
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Compte supprimé avec succès'),
+          backgroundColor: Colors.green,
+        ),
+      );
+      
+      // Rediriger vers LoginScreen
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(
+          builder: (context) => const LoginScreen(),
+        ),
+        (route) => false,
+      );
+      
+      print('✅ Redirection vers LoginScreen effectuée');
+    } catch (e) {
+      print('❌ Erreur lors de la suppression du compte: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erreur lors de la suppression: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
   Future<void> _updateProfile() async {
+    print('🔄 Début de la mise à jour du profil');
+    
     if (_formKey.currentState!.validate()) {
+      print('✅ Validation du formulaire réussie');
+      
       final authState = context.read<AuthCubit>().state;
       if (authState is AuthSuccess && authState.user != null) {
-        // Conserver les valeurs à mettre à jour pour confirmer qu'elles sont correctement sauvegardées
-        final String firstName = _firstNameController.text;
-        final String lastName = _lastNameController.text;
-        final String phone = _phoneController.text;
+        print('✅ Utilisateur authentifié trouvé');
         
-        // Appeler la mise à jour du profil
-        await _profileCubit.updateProfile(
-          userId: authState.user!['id'],
-          token: authState.token!,
-          firstName: firstName,
-          lastName: lastName,
-          phone: phone,
+        // Récupérer les valeurs des inputs
+        final String firstName = _firstNameController.text.trim();
+        final String lastName = _lastNameController.text.trim();
+        final String phone = _phoneController.text.trim();
+        final String email = authState.user!['email'] ?? ''; // Récupérer l'email depuis l'état actuel
+        final String userId = authState.user!['id'].toString();
+        final String token = authState.token!;
+        
+        print('📝 Données du formulaire:');
+        print('  - userId: $userId');
+        print('  - firstName: $firstName');
+        print('  - lastName: $lastName');
+        print('  - email: $email');
+        print('  - phone: $phone');
+        print('  - token: ${token.substring(0, 20)}...');
+        
+        try {
+          // Appeler la mise à jour du profil
+          print('🔄 Appel de _profileCubit.updateProfile...');
+          await _profileCubit.updateProfile(
+            userId: userId,
+            token: token,
+            firstName: firstName,
+            lastName: lastName,
+            email: email,
+            phone: phone,
+          );
+          print('✅ Mise à jour du profil terminée avec succès');
+          
+          // Recharger les données utilisateur pour refléter les changements
+          _loadUserData();
+          
+          // Afficher un message de succès
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Profil mis à jour avec succès'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          
+        } catch (e) {
+          print('❌ Erreur lors de la mise à jour du profil: $e');
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Erreur lors de la mise à jour: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      } else {
+        print('❌ Utilisateur non authentifié');
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Erreur: Utilisateur non connecté'),
+            backgroundColor: Colors.red,
+          ),
         );
-        
-        // Mettre à jour directement l'UI avec les nouvelles valeurs en attendant la confirmation API
-        setState(() {
-          // Les données seront officiellement mises à jour via le listener du ProfileCubit
-        });
       }
+    } else {
+      print('❌ Validation du formulaire échouée');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Veuillez corriger les erreurs dans le formulaire'),
+          backgroundColor: Colors.orange,
+        ),
+      );
     }
   }
 }

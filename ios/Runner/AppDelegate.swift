@@ -15,7 +15,7 @@ import UserNotifications
     FirebaseApp.configure()
     
     // Configure Google Maps
-    GMSServices.provideAPIKey("AIzaSyCuLBjM3oTYfFSbJwXccj4xP8oynDV5JnM")
+    GMSServices.provideAPIKey("AIzaSyCpJzuEa7jLAcP8ub8AVM8flT2aK5cPdh0")
     
     // Set up Firebase Messaging
     Messaging.messaging().delegate = self

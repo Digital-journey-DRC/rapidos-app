@@ -1,10 +1,13 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:country_picker/country_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:immo/screens/auth/forget_password_step1.dart';
 import '../../constants.dart';
 import '../../cubit/auth_cubit.dart';
 import 'package:immo/widgets/custom_skeletons.dart';
+import '../../services/version_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -31,6 +34,15 @@ class _LoginScreenState extends State<LoginScreen> {
   );
 
   @override
+  void initState() {
+    super.initState();
+    // Vérifier la version au démarrage
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      VersionService.checkForUpdate(context);
+    });
+  }
+
+  @override
   void dispose() {
     _phoneController.dispose();
     _passwordController.dispose();
@@ -42,16 +54,17 @@ class _LoginScreenState extends State<LoginScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
-        child: Center(
+        child: Container(
           child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 24.0),
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisAlignment: MainAxisAlignment.start,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [  
-                Image.asset(AppAssets.logo, width: 100, height: 100),
+                const SizedBox(height: 50),
+                Image.asset(AppAssets.newLogo, width: 200, height: 200),
 
-                const SizedBox(height: 8),
+                // const SizedBox(height: 8),
                 Text(
                   'Connectez-vous pour continuer',
                   style: AppStyles.body.copyWith(color: AppColors.textLight),
@@ -190,9 +203,36 @@ class _LoginScreenState extends State<LoginScreen> {
                             child: ElevatedButton(
                               onPressed: state is AuthLoading
                                   ? null
-                                  : () {
+                                  : () async {
                                       final phoneNumber =
                                           '+${_selectedCountry.phoneCode}${_phoneController.text}';
+                                      
+                                      // Vérifier si le compte a été supprimé AVANT de tenter la connexion
+                                      final prefs = await SharedPreferences.getInstance();
+                                      final removeAccountStr = prefs.getString('removeAccount');
+                                      
+                                      if (removeAccountStr != null) {
+                                        try {
+                                          final removeAccountData = jsonDecode(removeAccountStr);
+                                          final isRemove = removeAccountData['isRemove'] ?? false;
+                                          final phone = removeAccountData['phone'] ?? '';
+                                          
+                                          if (isRemove == true && phone == phoneNumber) {
+                                            // Afficher un message d'erreur
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              const SnackBar(
+                                                content: Text('Numéro de téléphone ou mot de passe incorrect'),
+                                                backgroundColor: Colors.red,
+                                              ),
+                                            );
+                                            return; // Arrêter ici, ne pas faire la connexion
+                                          }
+                                        } catch (e) {
+                                          print('Erreur lors du parsing removeAccount: $e');
+                                        }
+                                      }
+                                      
+                                      // Si pas de blocage, procéder à la connexion
                                       context.read<AuthCubit>().login(
                                             uid: phoneNumber,
                                             password: _passwordController.text,

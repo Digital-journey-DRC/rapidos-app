@@ -1,16 +1,13 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.CAMERA" />
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
-    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+    <!-- <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" /> -->
 
     <application
-        android:label="Rapidos"
+        android:label="Rapidons"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:usesCleartextTraffic="true">
@@ -18,7 +15,12 @@
         <!-- Google Maps API Key -->
         <meta-data
             android:name="com.google.android.geo.API_KEY"
-            android:value="AIzaSyCuLBjM3oTYfFSbJwXccj4xP8oynDV5JnM"/>
+            android:value="AIzaSyCpJzuEa7jLAcP8ub8AVM8flT2aK5cPdh0"/>
+
+        <!-- Mapbox Access Token -->
+        <meta-data
+            android:name="com.mapbox.token"
+            android:value="pk.eyJ1Ijoic3R5bm9zIiwiYSI6ImNtY21ncHRsZjAyemYyanNlM3lxd2R6d28ifQ.X2fT6wYbpn3QvTSdQCCYgw"/>
 
         <activity
             android:name=".MainActivity"
@@ -53,6 +55,46 @@
 
         </activity>
 
+        <!-- 🔒 Receivers avec attribut exported requis pour Android 12+ -->
+
+        <!-- Pour flutter_mapbox_navigation -->
+        <receiver
+            android:name="com.eopeter.fluttermapboxnavigation.broadcastReceiver"
+            android:enabled="true"
+            android:exported="false" />
+
+        <!-- Pour firebase_messaging -->
+        <receiver
+            android:name="com.google.firebase.iid.FirebaseInstanceIdReceiver"
+            android:exported="true"
+            android:enabled="true">
+            <intent-filter>
+                <action android:name="com.google.android.c2dm.intent.RECEIVE" />
+                <category android:name="${applicationId}" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Pour flutter_local_notifications -->
+        <receiver
+            android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver"
+            android:exported="false"
+            android:enabled="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
+            </intent-filter>
+        </receiver>
+
+        <receiver
+            android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver"
+            android:exported="false"
+            android:enabled="true" />
+
+        <receiver
+            android:name="com.dexterous.flutterlocalnotifications.NotificationPublisher"
+            android:exported="false"
+            android:enabled="true" />
+
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
@@ -63,6 +105,9 @@
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE" />
         </intent>
     </queries>
 </manifest>

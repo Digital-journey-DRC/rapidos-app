@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Rapidos</string>
+	<string>Rapidons</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -15,7 +15,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>Rapidos</string>
+	<string>Rapidons</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -42,11 +42,16 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
-	<string>Cette application a besoin d'accéder à votre caméra pour prendre des photos</string>
-	<key>NSLocationAlwaysUsageDescription</key>
-	<string>Cette application nécessite l'accès à la localisation pour afficher votre position sur la carte.</string>
+	<string>Rapidos uses the camera for your profile photo, product photos, and to scan QR codes during deliveries (e.g., proof of handoff).</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Rapidos utilise votre position en arrière-plan uniquement pendant une livraison active afin d'assurer le suivi en temps réel et des ETA précis, même si l'app n'est pas à l'écran. Par exemple, le client voit l'avancement du livreur après avoir quitté l'app.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Cette application nécessite l'accès à la localisation pour afficher votre position sur la carte.</string>
+	<string>Rapidos utilise votre position pour afficher les boutiques proches, calculer l'itinéraire et estimer l'heure d'arrivée. Par exemple, nous affichons les vendeurs autour de vous et le suivi en direct de la commande quand l'app est ouverte.</string>
+	<key>NSLocationTemporaryUsageDescriptionDictionary</key>
+	<dict>
+		<key>DeliveryTracking</key>
+		<string>Rapidos demande temporairement la position précise pour améliorer l'itinéraire et l'ETA pendant une livraison en cours.</string>
+	</dict>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Cette application a besoin d'accéder à votre microphone pour les vidéos</string>
 	<key>NSPhotoLibraryUsageDescription</key>
@@ -63,6 +68,8 @@
 	<array>
 		<string>fetch</string>
 		<string>remote-notification</string>
+		<string>audio</string>
+		<string>location</string>
 	</array>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
@@ -87,5 +94,9 @@
 	</array>
 	<key>FirebaseAppDelegateProxyEnabled</key>
 	<false/>
+	<key>MBXAccessToken</key>
+	<string>pk.eyJ1Ijoic3R5bm9zIiwiYSI6ImNtY21ncHRsZjAyemYyanNlM3lxd2R6d28ifQ.X2fT6wYbpn3QvTSdQCCYgw</string>
+	<key>io.flutter.embedded_views_preview</key>
+	<true/>
 </dict>
 </plist>
