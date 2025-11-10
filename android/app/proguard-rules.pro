@@ -34,6 +34,6 @@
 -keepattributes SourceFile,LineNumberTable
 -renamesourcefileattribute SourceFile
 
-# ===== Keep Play Core classes for Flutter Deferred Components =====
--keep class com.google.android.play.core.** { *; }
--keep interface com.google.android.play.core.** { *; }
+# ===== Ignore Play Core classes (not used, Flutter references them but we don't use deferred components) =====
+-dontwarn com.google.android.play.core.**
+-dontwarn com.google.android.play.core.splitcompat.SplitCompatApplication
