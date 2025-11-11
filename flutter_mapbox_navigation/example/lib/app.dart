@@ -4,8 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_mapbox_navigation/flutter_mapbox_navigation.dart';
 
-import '../../lib/flutter_mapbox_navigation.dart';
-
 class SampleNavigationApp extends StatefulWidget {
   const SampleNavigationApp({super.key});
 

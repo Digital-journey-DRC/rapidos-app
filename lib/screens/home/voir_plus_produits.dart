@@ -158,7 +158,7 @@ class _VoirPlusProduitsScreenState extends State<VoirPlusProduitsScreen> {
                       itemBuilder: (context, index) {
                         final product = filteredProducts[index];
                         return _ProductCard(
-                          badge: 'Nouveau',
+                          badge: product.category?.name ?? '',
                           name: product.name,
                           stock: product.stock.toString(),
                           price: product.price.toString(),

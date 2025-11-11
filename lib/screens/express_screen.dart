@@ -369,7 +369,7 @@ class _ExpressScreenState extends State<ExpressScreen> with SingleTickerProvider
     final orderData = {
       'clientId': _selectedClient?['id'] ?? '',
       'clientName': '${_firstNameController.text.trim()} ${_lastNameController.text.trim()}',
-      'clientPhone': '+${_selectedCountry.phoneCode}${_phoneController.text.trim()}',
+      'clientPhone': _selectedClient?['phone'] ?? '+${_selectedCountry.phoneCode}${_phoneController.text.trim()}',
       'packageValue': _packageValueController.text.trim(),
       'packageDescription': _packageDescriptionController.text.trim(),
       'pickupAddress': _pickupAddressController.text.trim(),
@@ -964,6 +964,7 @@ class _ExpressScreenState extends State<ExpressScreen> with SingleTickerProvider
                 // Option Appel normal
                 InkWell(
                   onTap: () async {
+                    print(clientPhone);
                     Navigator.pop(context);
                     final phoneNumber = clientPhone.startsWith('+') ? clientPhone : '+$clientPhone';
                     final uri = Uri.parse('tel:$phoneNumber');
