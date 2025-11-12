@@ -2419,6 +2419,7 @@ class _OrderScreenState extends State<OrderScreen> {
           });
 
         return Column(
+          mainAxisSize: MainAxisSize.min,
           children: sortedDocs.map((doc) {
             try {
               final data = doc.data() as Map<String, dynamic>;
@@ -2951,6 +2952,7 @@ class _OrderScreenState extends State<OrderScreen> {
         }
 
         return Column(
+          mainAxisSize: MainAxisSize.min,
           children: orders.map((doc) {
             final data = doc.data() as Map<String, dynamic>;
             final items = data['items'] as List? ?? [];
