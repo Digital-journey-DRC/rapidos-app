@@ -36,40 +36,24 @@ class AuthGateService {
         return false;
       }
 
-      // Vérifier l'expiration du token si disponible
+      // 📌 Ancien contrôle d'expiration désactivé pour conserver la session indefinitely.
+      // Nous conservons les logs pour le suivi et la compatibilité.
       if (expiryStr != null) {
         try {
           final expiry = DateTime.parse(expiryStr);
-          if (DateTime.now().isAfter(expiry)) {
-            print('⏰ Token expiré');
-            await clearSession();
-            return false;
-          }
+          print('ℹ️ Expiration enregistrée: $expiry');
         } catch (e) {
           print('❌ Erreur lors du parsing de l\'expiration: $e');
         }
       }
 
-      // Vérifier si la session n'a pas expiré (24 heures)
       if (lastLoginStr != null) {
         try {
           final lastLogin = DateTime.parse(lastLoginStr);
-          final now = DateTime.now();
-          final difference = now.difference(lastLogin);
-          final hoursSinceLastLogin = difference.inHours;
-          
-          print('⏰ Heures depuis la dernière connexion: $hoursSinceLastLogin');
-          
-          // Session expire après 24 heures
-          if (hoursSinceLastLogin >= 24) {
-            print('⏰ Session expirée, nettoyage des données');
-            await clearSession();
-            return false;
-          }
+          final hoursSinceLastLogin = DateTime.now().difference(lastLogin).inHours;
+          print('ℹ️ Heures depuis la dernière connexion: $hoursSinceLastLogin');
         } catch (e) {
           print('❌ Erreur lors du parsing de la date de connexion: $e');
-          await clearSession();
-          return false;
         }
       }
 
