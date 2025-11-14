@@ -94,6 +94,14 @@ android {
     buildFeatures{
         viewBinding = true
     }
+    
+    // Support for 16KB page size devices (required by Play Store before November 1, 2025)
+    // With AGP 8.1+, setting useLegacyPackaging = false enables automatic 16KB page size support
+    packaging {
+        jniLibs {
+            useLegacyPackaging = false
+        }
+    }
 }
 
 dependencies {

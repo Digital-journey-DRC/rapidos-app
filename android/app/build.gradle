@@ -35,6 +35,9 @@ android {
         multiDexEnabled true
     }
 
+    // Support for 16KB page size devices (required by Play Store before November 1, 2025)
+    // With AGP 8.1+, setting useLegacyPackaging = false enables automatic 16KB page size support
+    // This ensures native libraries are properly aligned for 16KB page size devices
     packaging {
         jniLibs {
             useLegacyPackaging = false
