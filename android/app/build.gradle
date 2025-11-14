@@ -1,10 +1,7 @@
 plugins {
     id "com.android.application"
-    // START: FlutterFire Configuration
     id 'com.google.gms.google-services'
-    // END: FlutterFire Configuration
     id "kotlin-android"
-    // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id "dev.flutter.flutter-gradle-plugin"
 }
 
@@ -37,10 +34,7 @@ android {
         versionName = flutter.versionName
         multiDexEnabled true
     }
-    
-    // Support for 16KB page size devices (required by Play Store before November 1, 2025)
-    // With AGP 8.1+, 16KB page size support is automatic when useLegacyPackaging = false
-    // This ensures native libraries are properly aligned for 16KB page size devices
+
     packaging {
         jniLibs {
             useLegacyPackaging = false
@@ -74,4 +68,8 @@ dependencies {
     implementation platform("org.jetbrains.kotlin:kotlin-bom:2.1.0")
     coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.4'
     implementation 'androidx.multidex:multidex:2.0.1'
+
+    configurations.all {
+        exclude group: 'com.jakewharton.timber', module: 'timber-lint'
+    }
 }
