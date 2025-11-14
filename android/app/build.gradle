@@ -37,9 +37,9 @@ android {
         versionName = flutter.versionName
         multiDexEnabled true
         
-        // Support for 16KB page size devices (required by Play Store)
+        // ABI 32 et 64 bits pour maximiser la compatibilité des appareils
         ndk {
-            abiFilters 'armeabi-v7a', 'arm64-v8a', 'x86', 'x86_64'
+            abiFilters "armeabi-v7a", "arm64-v8a"
         }
     }
     
