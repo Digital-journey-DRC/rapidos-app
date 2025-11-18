@@ -63,7 +63,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '664352144036',
     projectId: 'rapidos-21203',
     storageBucket: 'rapidos-21203.firebasestorage.app',
-    iosBundleId: 'com.rapidosdrc.app',
+    iosBundleId: 'com.rapidoscdkin.app',
   );
 
 }
