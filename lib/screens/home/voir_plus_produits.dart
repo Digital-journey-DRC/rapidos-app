@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:immo/constants.dart';
 import 'package:immo/screens/home/detail_produit_marchant.dart';
+import 'package:immo/widgets/app_logo.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:immo/cubit/product_cubit.dart';
@@ -31,10 +32,10 @@ class _VoirPlusProduitsScreenState extends State<VoirPlusProduitsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Mes Produits', style: TextStyle(color: Colors.black, ),),
-        backgroundColor: Colors.white12,
-        foregroundColor: Colors.white,
+      appBar: AppBarWithLogo(
+        title: 'Mes Produits',
+        backgroundColor: Colors.white,
+        elevation: 0,
       ),
       body: Column(
         children: [

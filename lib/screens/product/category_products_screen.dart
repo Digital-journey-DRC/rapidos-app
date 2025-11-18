@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:immo/constants.dart';
+import 'package:immo/widgets/app_logo.dart';
 import 'package:immo/cubit/auth_cubit.dart';
 import 'package:immo/models/category.dart';
 import 'package:immo/models/product.dart';
@@ -32,11 +33,10 @@ class _CategoryProductsScreenState extends State<CategoryProductsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.category.name),
+      appBar: AppBarWithLogo(
+        title: widget.category.name,
         backgroundColor: Colors.white,
         elevation: 0,
-        iconTheme: const IconThemeData(color: AppColors.primary),
       ),
       backgroundColor: const Color(0xFFF7F8FA),
       body: Column(

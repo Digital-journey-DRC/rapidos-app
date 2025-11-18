@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_mapbox_navigation/flutter_mapbox_navigation.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:immo/constants.dart';
+import 'package:immo/widgets/app_logo.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:immo/cubit/auth_cubit.dart';
@@ -633,16 +634,16 @@ class _NavigationExampleState extends State<NavigationExample> {
     final bool isLivreur = userRole == 'livreur';
 
     return Scaffold(
-      appBar: AppBar(
+      appBar: AppBarWithLogo(
         leading: widget.backNavigation == true ? IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.black),
           onPressed: () {
             Navigator.pop(context);
           },
         ) : null,
-        title: const Text('Navigation Avancée', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),),
-        // backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
+        title: 'Navigation Avancée',
+        backgroundColor: Colors.white,
+        elevation: 0,
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh, color: Colors.black),

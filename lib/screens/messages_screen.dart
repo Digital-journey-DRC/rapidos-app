@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:immo/constants.dart';
+import 'package:immo/widgets/app_logo.dart';
 import 'package:intl/intl.dart';
 import 'dart:async';
 import '../cubits/message/message_cubit.dart';
@@ -134,10 +135,10 @@ class _MessagesScreenState extends State<MessagesScreen> {
           _loadConversations();
           return Scaffold(
             backgroundColor: Colors.white,
-            appBar: AppBar(
+            appBar: AppBarWithLogo(
+              title: 'Messages',
               backgroundColor: Colors.white,
               automaticallyImplyLeading: false,
-              title: const Text('Messages'),
               elevation: 0,
             ),
             body: Padding(
@@ -174,10 +175,10 @@ class _MessagesScreenState extends State<MessagesScreen> {
 
         if (state is MessageLoading) {
           return Scaffold(
-            appBar: AppBar(
+            appBar: AppBarWithLogo(
+              title: 'Messages',
               backgroundColor: Colors.white,
               automaticallyImplyLeading: false,
-              title: const Text('Messages'),
               elevation: 0,
             ),
             body: Padding(
@@ -214,10 +215,10 @@ class _MessagesScreenState extends State<MessagesScreen> {
 
         if (state is MessageError) {
           return Scaffold(
-            appBar: AppBar(
+            appBar: AppBarWithLogo(
+              title: 'Messages',
               backgroundColor: Colors.white,
               automaticallyImplyLeading: false,
-              title: const Text('Messages'),
               elevation: 0,
             ),
             body: Center(
@@ -242,7 +243,11 @@ class _MessagesScreenState extends State<MessagesScreen> {
           if (conversations.isEmpty) {
             return Scaffold(
               backgroundColor: Colors.white,
-              appBar: AppBar(
+              appBar: AppBarWithLogo(
+                title: 'Messages',
+                backgroundColor: Colors.white,
+                elevation: 0,
+                automaticallyImplyLeading: false,
                 leading: BlocBuilder<AuthCubit, AuthState>(
                   builder: (context, state) {
                     if (state is AuthSuccess && 
@@ -339,12 +344,6 @@ class _MessagesScreenState extends State<MessagesScreen> {
                     }
                   },
                 ),
-                backgroundColor: Colors.white,
-                automaticallyImplyLeading: false,
-                title: const Text('Messages',
-                    style:
-                        TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                elevation: 0,
               ),
               body: Center(
                 child: Column(
@@ -372,9 +371,9 @@ class _MessagesScreenState extends State<MessagesScreen> {
           }
 
           return Scaffold(
-            appBar: AppBar(
+            appBar: AppBarWithLogo(
+              title: 'Messages',
               automaticallyImplyLeading: false,
-              title: const Text('Messages'),
               elevation: 0,
             ),
             body: RefreshIndicator(
@@ -480,10 +479,10 @@ class _MessagesScreenState extends State<MessagesScreen> {
         }
 
         return Scaffold(
-          appBar: AppBar(
+          appBar: AppBarWithLogo(
+            title: 'Messages',
             backgroundColor: Colors.white,
             automaticallyImplyLeading: false,
-            title: const Text('Messages'),
             elevation: 0,
           ),
           body: const Center(
@@ -828,22 +827,18 @@ class _ChatScreenState extends State<ChatScreen> {
         }
 
         return Scaffold(
-          appBar: AppBar(
-            titleSpacing: 0,
-            title: Row(
-              children: [
-                CircleAvatar(
-                  backgroundColor: AppColors.buttonColor,
-                  child: Text(
-                    widget.conversation['otherParticipantName']
-                        .substring(0, 1)
-                        .toUpperCase(),
-                    style: const TextStyle(color: Colors.white),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Text(widget.conversation['otherParticipantName']),
-              ],
+          appBar: AppBarWithLogo(
+            title: widget.conversation['otherParticipantName'],
+            backgroundColor: Colors.white,
+            elevation: 0,
+            leading: CircleAvatar(
+              backgroundColor: AppColors.buttonColor,
+              child: Text(
+                widget.conversation['otherParticipantName']
+                    .substring(0, 1)
+                    .toUpperCase(),
+                style: const TextStyle(color: Colors.white),
+              ),
             ),
           ),
           body: body,

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:immo/constants.dart';
+import 'package:immo/widgets/app_logo.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -81,10 +82,10 @@ class OrderDetailsScreen extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF7F8FA),
-      appBar: AppBar(
+      appBar: AppBarWithLogo(
+        title: 'Détails de la commande',
         backgroundColor: Colors.white,
         elevation: 0,
-        title: const Text('Détails de la commande'),
         centerTitle: true,
       ),
       body: SingleChildScrollView(

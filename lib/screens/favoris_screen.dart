@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:immo/constants.dart';
 import 'package:immo/cubit/favorites_cubit.dart';
 import 'package:immo/screens/product/product_detail_screen.dart';
+import 'package:immo/widgets/app_logo.dart';
 
 class FavorisScreen extends StatelessWidget {
   const FavorisScreen({Key? key}) : super(key: key);
@@ -11,11 +12,10 @@ class FavorisScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      appBar: AppBar(
-        title: const Text('Mes Favoris', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+      appBar: AppBarWithLogo(
+        title: 'Mes Favoris',
         backgroundColor: Colors.white,
         elevation: 0,
-        iconTheme: const IconThemeData(color: AppColors.primary),
       ),
       body: BlocBuilder<FavoritesCubit, FavoritesState>(
         builder: (context, state) {

@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../constants.dart';
 import '../../cubit/auth_cubit.dart';
 import '../../cubits/profile/profile_cubit.dart';
+import '../../widgets/app_logo.dart';
 import '../../services/profile_service.dart';
 import '../auth/login_screen.dart';
 
@@ -503,21 +504,16 @@ class _SettingScreenState extends State<SettingScreen>
     return BlocProvider.value(
       value: _profileCubit,
       child: Scaffold(
-        appBar: AppBar(
+        appBar: AppBarWithLogo(
           leading: InkWell(
               onTap: () {
                 Navigator.pop(context);
               },
               child: const Icon(Icons.arrow_back_ios, color: Colors.white)),
-          title: const Text(
-            'Paramètres du compte',
-            style: TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
+          title: 'Paramètres du compte',
           backgroundColor: AppColors.buttonColor,
           elevation: 0,
+          useWhiteLogo: true,
         ),
         body: BlocConsumer<ProfileCubit, ProfileState>(
           listener: (context, state) {

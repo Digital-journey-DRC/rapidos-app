@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:immo/constants.dart';
+import 'package:immo/widgets/app_logo.dart';
 import '../merchant/merchant_profile_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
@@ -156,15 +157,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      appBar: AppBar(
-        title: Text(
-          widget.name,
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-            color: AppColors.primary,
-            fontSize: 16,
-          ),
-        ),
+      appBar: AppBarWithLogo(
+        title: widget.name,
         backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
@@ -187,7 +181,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           children: [
             // Product Image
             Hero(
-              tag: widget.imagePath,
+              tag: 'product_${widget.id}_${widget.imagePath}',
               child: Container(
                 height: 250,
                 width: double.infinity,

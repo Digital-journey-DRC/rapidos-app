@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:immo/cubit/merchant_cubit.dart';
 import '../merchant/merchant_profile_screen.dart';
 import 'package:immo/constants.dart';
+import 'package:immo/widgets/app_logo.dart';
 
 class AllMerchantsScreen extends StatefulWidget {
   const AllMerchantsScreen({Key? key}) : super(key: key);
@@ -17,10 +18,9 @@ class _AllMerchantsScreenState extends State<AllMerchantsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Tous les marchands', style: TextStyle(color: AppColors.primary)),
+      appBar: AppBarWithLogo(
+        title: 'Tous les marchands',
         backgroundColor: Colors.white,
-        iconTheme: const IconThemeData(color: AppColors.primary),
         elevation: 0,
       ),
       backgroundColor: Colors.white,

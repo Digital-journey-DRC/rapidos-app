@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:immo/constants.dart';
+import 'package:immo/widgets/app_logo.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:immo/cubit/auth_cubit.dart';
 import 'package:immo/screens/dashboard/setting_screen.dart';
@@ -342,12 +343,7 @@ class _HomeLivreurScreenState extends State<HomeLivreurScreen> {
         backgroundColor: Colors.white,
         automaticallyImplyLeading: false,
         elevation: 0,
-        title: Row(
-          children: [
-            Image.asset(AppAssets.logo, width: 60, height: 60),
-            
-          ],
-        ),
+        title: const AppLogo(),
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 12),

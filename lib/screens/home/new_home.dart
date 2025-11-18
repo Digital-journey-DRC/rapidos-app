@@ -536,26 +536,35 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Responsive logo sizing
+    final screenWidth = MediaQuery.of(context).size.width;
+    final logoSize = screenWidth < 600 ? 80.0 : 100.0; // Plus petit sur mobile
+    
     return Scaffold(
       backgroundColor: Colors.white,
-      body: Column(
-        children: [
-          // Orange Header Section (Talabat style)
-          Stack(
-            children: [
-              Container(
-                color: AppColors.primary,
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-                child: Column(
-                  children: [
-                    // Top row with profile
-
-                    const SizedBox(height: 50),
-                    
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Image.asset(AppAssets.logoWhite, width: 100, height: 100),
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
+            // Orange Header Section (Talabat style) - Now scrollable
+            Stack(
+              children: [
+                Container(
+                  color: AppColors.primary,
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                  child: Column(
+                    children: [
+                      // Top row with profile and logo
+                      const SizedBox(height: 50),
+                      
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Image.asset(
+                            AppAssets.logoWhite, 
+                            width: logoSize, 
+                            height: logoSize,
+                            fit: BoxFit.contain,
+                          ),
                                                   Row(
                             mainAxisAlignment: MainAxisAlignment.end,
                             children: [
@@ -709,17 +718,18 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
             ],
           ),
 
-          // Categories Section (Horizontal Scroll)
-          Container(
-            color: Colors.white,
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            child: SizedBox(
-              height: 120,
-              child: BlocBuilder<CategoryCubit, CategoryState>(
+            // Categories Section (Horizontal Scroll) - Now scrollable with the page
+            Container(
+              color: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              child: SizedBox(
+                height: 120,
+                child: BlocBuilder<CategoryCubit, CategoryState>(
                 builder: (context, state) {
                   if (state is CategoryLoading) {
                     return ListView.separated(
                       scrollDirection: Axis.horizontal,
+                      physics: const ClampingScrollPhysics(),
                       padding: const EdgeInsets.symmetric(horizontal: 16.0),
                       itemCount: 6,
                       separatorBuilder: (_, __) => const SizedBox(width: 12),
@@ -745,6 +755,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
 
                     return ListView.separated(
                       scrollDirection: Axis.horizontal,
+                      physics: const ClampingScrollPhysics(),
                       padding: const EdgeInsets.symmetric(horizontal: 16.0),
                       itemCount: sortedCategories.length,
                       separatorBuilder: (_, __) => const SizedBox(width: 12),
@@ -827,16 +838,14 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                   }
                   return const SizedBox.shrink();
                 },
+                ),
               ),
             ),
-          ),
 
-          // Scrollable Content
-          Expanded(
-            child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
+            // Content Section - Now part of the same scroll view
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
                   // "Hey there!" Section (if not logged in or for promotions)
                   BlocBuilder<AuthCubit, AuthState>(
                     builder: (context, state) {
@@ -1392,12 +1401,11 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                       ),
                     ),
 
-                  const SizedBox(height: 20), // Bottom padding
-                ],
-              ),
+                const SizedBox(height: 20), // Bottom padding
+              ],
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -1452,7 +1460,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                   children: [
                     // Product image
                     Hero(
-                      tag: imagePath,
+                      tag: 'product_${id}_${imagePath}',
                       child: ClipRRect(
                         borderRadius: const BorderRadius.only(
                           topLeft: Radius.circular(4),

@@ -272,22 +272,28 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    const Text(
+                    Text(
                       'Vous n\'avez pas de compte ? ',
-                      style: TextStyle(color: AppColors.textLight),
+                      style: const TextStyle(color: AppColors.textLight),
+                      textAlign: TextAlign.center,
                     ),
                     TextButton(
                       onPressed: () {
                         Navigator.pushNamed(context, AppRoutes.register);
                       },
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
                       child: const Text(
                         'Créer un compte',
                         style: TextStyle(color: AppColors.primary),
                       ),
-
                     ),
                   ],
                 ),

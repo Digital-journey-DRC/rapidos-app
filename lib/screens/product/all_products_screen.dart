@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:immo/constants.dart';
+import 'package:immo/widgets/app_logo.dart';
 import 'package:immo/models/product.dart';
 import 'package:immo/screens/product/product_detail_screen.dart';
 
@@ -22,11 +23,10 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
     ).toList();
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Tous les produits'),
+      appBar: AppBarWithLogo(
+        title: 'Tous les produits',
         backgroundColor: Colors.white,
         elevation: 0,
-        iconTheme: const IconThemeData(color: AppColors.primary),
       ),
       backgroundColor: const Color(0xFFF7F8FA),
       body: Column(

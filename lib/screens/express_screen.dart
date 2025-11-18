@@ -10,6 +10,7 @@ import '../cubits/express/express_state.dart';
 import '../cubit/auth_cubit.dart';
 import '../constants.dart';
 import '../services/express_service.dart';
+import '../widgets/app_logo.dart';
 
 class ExpressScreen extends StatefulWidget {
   const ExpressScreen({super.key});
@@ -415,16 +416,10 @@ class _ExpressScreenState extends State<ExpressScreen> with SingleTickerProvider
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
+      appBar: AppBarWithLogo(
+        title: 'Commande Express',
+        backgroundColor: Colors.white,
         elevation: 0,
-        title: const Text(
-          'Commande Express',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: Colors.black87,
-          ),
-        ),
         centerTitle: true,
         automaticallyImplyLeading: false,
         actions: [

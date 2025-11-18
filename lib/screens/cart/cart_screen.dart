@@ -4,6 +4,7 @@ import 'package:immo/constants.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'package:immo/widgets/cart_badge.dart';
+import 'package:immo/widgets/app_logo.dart';
 import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:immo/cubit/cart_cubit.dart';
@@ -2259,15 +2260,8 @@ class _CartScreenState extends State<CartScreen> {
           return sum + (price * (item['quantity'] as int));
         });
         return Scaffold(
-          appBar: AppBar(
-            title: const Text(
-              'Mon Panier',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: Colors.black,
-                fontSize: 16,
-              ),
-            ),
+          appBar: AppBarWithLogo(
+            title: 'Mon Panier',
             backgroundColor: Colors.white,
             elevation: 0,
             leading: widget.backNavigaton

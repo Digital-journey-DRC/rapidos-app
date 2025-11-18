@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:immo/constants.dart';
+import 'package:immo/widgets/app_logo.dart';
 import 'package:immo/screens/home/voir_plus_produits.dart';
 import 'package:immo/screens/home/detail_produit_marchant.dart';
 import 'package:http/http.dart' as http;
@@ -440,11 +441,7 @@ void saveCommande() async {
         automaticallyImplyLeading: false,
         backgroundColor: Colors.white,
         elevation: 0,
-        title: Row(
-          children: [
-            Image.asset(AppAssets.logo, width: 80, height: 80),
-          ],
-        ),
+        title: const AppLogo(),
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 12),

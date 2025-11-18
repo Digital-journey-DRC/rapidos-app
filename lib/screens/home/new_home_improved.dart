@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:immo/constants.dart';
+import 'package:immo/widgets/app_logo.dart';
 
 class NewHomeScreen extends StatelessWidget {
   const NewHomeScreen({Key? key}) : super(key: key);
@@ -6,18 +8,9 @@ class NewHomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'RAPIDOS',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: Colors.black,
-            fontSize: 16,
-          ),
-        ),
+      appBar: AppBarWithLogo(
         backgroundColor: Colors.white,
         elevation: 0,
-        centerTitle: false,
       ),
       body: SingleChildScrollView(
         child: Column(

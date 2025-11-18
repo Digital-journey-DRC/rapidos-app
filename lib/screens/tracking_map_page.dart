@@ -3,6 +3,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:immo/constants.dart';
+import 'package:immo/widgets/app_logo.dart';
 import 'package:immo/cubit/auth_cubit.dart';
 import 'package:flutter/services.dart';
 import 'dart:typed_data';
@@ -1323,14 +1324,13 @@ class _TrackingMapPageState extends State<TrackingMapPage> {
     final bool isLivreur = userRole == 'livreur';
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Suivi de livraison',style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+      appBar: AppBarWithLogo(
+        title: 'Suivi de livraison',
         backgroundColor: Colors.white,
         elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.black),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh),
+            icon: const Icon(Icons.refresh, color: Colors.black),
             onPressed: () {
               setState(() {
                 _isLoading = true;

@@ -8,6 +8,7 @@ import '../cubits/express/express_state.dart';
 import '../cubit/auth_cubit.dart';
 import '../constants.dart';
 import '../services/express_service.dart';
+import '../widgets/app_logo.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class ExpressLivreur extends StatefulWidget {
@@ -388,16 +389,10 @@ class _ExpressLivreurState extends State<ExpressLivreur> with SingleTickerProvid
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
+      appBar: AppBarWithLogo(
+        title: 'Livraison Express',
+        backgroundColor: Colors.white,
         elevation: 0,
-        title: const Text(
-          'Livraison Express',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: Colors.black87,
-          ),
-        ),
         centerTitle: true,
         automaticallyImplyLeading: false,
         actions: [

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:immo/constants.dart';
+import 'package:immo/widgets/app_logo.dart';
 import 'package:flutter/services.dart';
 import 'package:immo/services/product_service.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -317,14 +318,10 @@ class _DetailProduitMarchantScreenState extends State<DetailProduitMarchantScree
             : 'http://24.144.87.127:3333/${widget.productImageUrl}';
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          'Détails du produit',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-        ),
+      appBar: AppBarWithLogo(
+        title: 'Détails du produit',
         backgroundColor: Colors.white,
         elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.black),
         actions: [
           IconButton(
             icon: const Icon(Icons.edit),

@@ -1778,6 +1778,7 @@ import 'package:immo/constants.dart';
 import 'package:immo/cubit/auth_cubit.dart';
 import 'package:immo/cubit/order_cubit.dart';
 import 'package:immo/widgets/shimmer_loading.dart';
+import 'package:immo/widgets/app_logo.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:immo/screens/order_details_screen.dart';
@@ -2305,17 +2306,17 @@ class _OrderScreenState extends State<OrderScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF7F8FA),
-      appBar: AppBar(
+      appBar: AppBarWithLogo(
         leading: widget.backNavigation
             ? IconButton(
                 icon: const Icon(Icons.arrow_back),
                 onPressed: () => Navigator.pushNamed(context, AppRoutes.main),
               )
             : null,
+        title: 'Commandes',
+        centerTitle: true,
         backgroundColor: Colors.white,
         elevation: 0,
-        title: const Text('Commandes'),
-        centerTitle: true,
       ),
       body: Column(
         children: [
@@ -2348,8 +2349,14 @@ class _OrderScreenState extends State<OrderScreen> {
   Widget _buildClientOrders() {
     final authState = context.read<AuthCubit>().state;
     if (authState is! AuthSuccess || authState.user == null) {
-      return const Center(
-        child: Text('Veuillez vous connecter pour voir vos commandes'),
+      return Padding(
+        padding: const EdgeInsets.all(32.0),
+        child: Center(
+          child: Text(
+            'Veuillez vous connecter pour voir vos commandes',
+            textAlign: TextAlign.center,
+          ),
+        ),
       );
     }
 
@@ -2363,9 +2370,10 @@ class _OrderScreenState extends State<OrderScreen> {
       builder: (context, snapshot) {
         if (snapshot.hasError) {
           print('Erreur Firestore: ${snapshot.error}');
-          return Center(
+          return Padding(
+            padding: const EdgeInsets.all(32.0),
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 const Icon(Icons.error_outline, size: 50, color: Colors.red),
                 const SizedBox(height: 16),
@@ -2384,9 +2392,10 @@ class _OrderScreenState extends State<OrderScreen> {
         }
 
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return Center(
+          return Padding(
+            padding: const EdgeInsets.all(32.0),
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(Icons.inbox,
                     size: 80, color: AppColors.buttonColor.withOpacity(0.3)),
@@ -2397,6 +2406,7 @@ class _OrderScreenState extends State<OrderScreen> {
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
                       color: AppColors.primary),
+                  textAlign: TextAlign.center,
                 ),
               ],
             ),
@@ -2908,7 +2918,15 @@ class _OrderScreenState extends State<OrderScreen> {
 
     final authState = context.read<AuthCubit>().state;
     if (authState is! AuthSuccess) {
-      return const Center(child: Text('Non authentifié'));
+      return Padding(
+        padding: const EdgeInsets.all(32.0),
+        child: Center(
+          child: Text(
+            'Non authentifié',
+            textAlign: TextAlign.center,
+          ),
+        ),
+      );
     }
 
     return StreamBuilder<QuerySnapshot>(
@@ -2916,11 +2934,20 @@ class _OrderScreenState extends State<OrderScreen> {
           whereIn: ['prêt à expédier', 'en route pour livraison', 'delivered']).snapshots(),
       builder: (context, snapshot) {
         if (snapshot.hasError) {
-          return Center(child: Text('Erreur: ${snapshot.error}'));
+          return Padding(
+            padding: const EdgeInsets.all(32.0),
+            child: Center(
+              child: Text(
+                'Erreur: ${snapshot.error}',
+                textAlign: TextAlign.center,
+              ),
+            ),
+          );
         }
 
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
               const OrderCardShimmer(),
               const SizedBox(height: 10),
@@ -2932,9 +2959,10 @@ class _OrderScreenState extends State<OrderScreen> {
         final orders = snapshot.data!.docs;
 
         if (orders.isEmpty) {
-          return Center(
+          return Padding(
+            padding: const EdgeInsets.all(32.0),
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(Icons.local_shipping_outlined,
                     size: 80, color: AppColors.buttonColor.withOpacity(0.3)),
@@ -2945,6 +2973,7 @@ class _OrderScreenState extends State<OrderScreen> {
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
                       color: AppColors.primary),
+                  textAlign: TextAlign.center,
                 ),
               ],
             ),
@@ -3283,8 +3312,14 @@ class _OrderScreenState extends State<OrderScreen> {
   Widget _buildVendeurOrders() {
     final authState = context.read<AuthCubit>().state;
     if (authState is! AuthSuccess || authState.user == null) {
-      return const Center(
-        child: Text('Veuillez vous connecter pour voir vos commandes'),
+      return Padding(
+        padding: const EdgeInsets.all(32.0),
+        child: Center(
+          child: Text(
+            'Veuillez vous connecter pour voir vos commandes',
+            textAlign: TextAlign.center,
+          ),
+        ),
       );
     }
 
@@ -3295,9 +3330,10 @@ class _OrderScreenState extends State<OrderScreen> {
       builder: (context, snapshot) {
         if (snapshot.hasError) {
           print('Erreur Firestore: ${snapshot.error}');
-          return Center(
+          return Padding(
+            padding: const EdgeInsets.all(32.0),
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 const Icon(Icons.error_outline, size: 50, color: Colors.red),
                 const SizedBox(height: 16),
@@ -3316,9 +3352,10 @@ class _OrderScreenState extends State<OrderScreen> {
         }
 
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return Center(
+          return Padding(
+            padding: const EdgeInsets.all(32.0),
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(Icons.inbox,
                     size: 80, color: AppColors.buttonColor.withOpacity(0.3)),
@@ -3329,6 +3366,7 @@ class _OrderScreenState extends State<OrderScreen> {
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
                       color: AppColors.primary),
+                  textAlign: TextAlign.center,
                 ),
               ],
             ),
@@ -3350,9 +3388,10 @@ class _OrderScreenState extends State<OrderScreen> {
         }).toList();
 
         if (filteredDocs.isEmpty) {
-          return Center(
+          return Padding(
+            padding: const EdgeInsets.all(32.0),
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(Icons.inbox,
                     size: 80, color: AppColors.buttonColor.withOpacity(0.3)),
@@ -3363,6 +3402,7 @@ class _OrderScreenState extends State<OrderScreen> {
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
                       color: AppColors.primary),
+                  textAlign: TextAlign.center,
                 ),
               ],
             ),
