@@ -14,7 +14,8 @@ if (keystorePropertiesFile.exists()) {
 android {
     namespace = "com.rapidosdrc.app"
     compileSdk = 36
-    ndkVersion = flutter.ndkVersion
+    // Force NDK r26+ pour le support 16KB (requis par Google Play)
+    ndkVersion = "26.1.10909125"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
