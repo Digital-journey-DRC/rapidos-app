@@ -66,6 +66,8 @@ apply plugin: 'kotlin-android'
 android {
     namespace 'com.eopeter.fluttermapboxnavigation'
     compileSdkVersion 36
+    // Force NDK r26+ pour le support 16KB (requis par Google Play)
+    ndkVersion "26.1.10909125"
 
     sourceSets {
         main.java.srcDirs += 'src/main/kotlin'
