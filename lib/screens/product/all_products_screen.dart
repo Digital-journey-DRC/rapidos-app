@@ -53,7 +53,7 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
                       crossAxisCount: 2,
                       crossAxisSpacing: 12,
                       mainAxisSpacing: 12,
-                      childAspectRatio: 0.75,
+                      childAspectRatio: 0.72,
                     ),
                     itemCount: filtered.length,
                     itemBuilder: (context, index) {
@@ -103,6 +103,7 @@ class _TwitterStyleProductCard extends StatelessWidget {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         elevation: 1,
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             ClipRRect(
@@ -129,39 +130,39 @@ class _TwitterStyleProductCard extends StatelessWidget {
               ),
             ),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               child: Column(
+                mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     children: [
-                      Container(
-                        width: 100,
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          product.category?.name ?? '',
-                          style: TextStyle(color: Colors.white, fontSize: 11),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                      Flexible(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            product.category?.name ?? '',
+                            style: const TextStyle(color: Colors.white, fontSize: 9),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                       ),
-                      const Spacer(),
+                      const SizedBox(width: 4),
                       const Icon(Icons.star, color: AppColors.primary, size: 18),
                     ],
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
                   Text(
                     product.name,
                     style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 4),
-                  // Text(product.description, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13)),
                   const SizedBox(height: 4),
                   Text('${product.price} FC', style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
                 ],
