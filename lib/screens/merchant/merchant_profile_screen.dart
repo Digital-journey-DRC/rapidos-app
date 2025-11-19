@@ -646,7 +646,7 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> with Sing
           price: product['price'] != null ? double.tryParse(product['price'].toString()) ?? 0.0 : 0.0,
           imagePath: product['media'] != null && product['media']['mediaUrl'] != null
               ? product['media']['mediaUrl']
-              : 'https://via.placeholder.com/150',
+              : 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&h=400&fit=crop',
           tag: 'Produit',
           category: product['description']?.toString() ?? '',
         );

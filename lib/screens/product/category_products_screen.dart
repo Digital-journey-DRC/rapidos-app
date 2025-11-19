@@ -288,7 +288,7 @@ class _TwitterStyleProductCard extends StatelessWidget {
                 price: product.price,
                 imagePath: product.media?.mediaUrl != null
                     ? product.media!.mediaUrl
-                    : 'https://via.placeholder.com/150',
+                    : 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&h=400&fit=crop',
                 goToCartTab: () {
                   Navigator.of(context).popUntil((route) => route.isFirst);
                 },
@@ -312,7 +312,7 @@ class _TwitterStyleProductCard extends StatelessWidget {
               child: Image.network(
                 product.media?.mediaUrl != null
                     ? product.media!.mediaUrl
-                    : 'https://via.placeholder.com/150',
+                    : 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&h=400&fit=crop',
                 width: double.infinity,
                 height: 100,
                 fit: BoxFit.cover,

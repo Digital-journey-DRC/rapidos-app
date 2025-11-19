@@ -78,7 +78,7 @@ class _AllMerchantsScreenState extends State<AllMerchantsScreen> {
                         final media = merchants[index]['media'];
                         final image = media != null && media['mediaUrl'] != null
                             ? media['mediaUrl']
-                            : 'https://via.placeholder.com/150';
+                            : 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&h=400&fit=crop';
                         final name = '${vendeur['firstName']} ${vendeur['lastName']}';
                         return GestureDetector(
                           onTap: () {

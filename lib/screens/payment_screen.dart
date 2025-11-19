@@ -308,7 +308,7 @@ class _ListPaymentState extends State<ListPayment> {
                 final images = apartment['images'] as List?;
                 final image = (images != null && images.isNotEmpty)
                     ? images[0]
-                    : 'https://via.placeholder.com/150';
+                    : 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&h=400&fit=crop';
 
                 return Card(
                   color: Colors.grey.withOpacity(0.1),

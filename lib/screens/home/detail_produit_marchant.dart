@@ -312,7 +312,7 @@ class _DetailProduitMarchantScreenState extends State<DetailProduitMarchantScree
   @override
   Widget build(BuildContext context) {
     final String displayImageUrl = (widget.productImageUrl.isEmpty || widget.productImageUrl == 'null')
-        ? 'https://via.placeholder.com/300x200'
+        ? 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=600&h=400&fit=crop'
         : widget.productImageUrl.startsWith('http')
             ? widget.productImageUrl
             : 'http://24.144.87.127:3333/${widget.productImageUrl}';

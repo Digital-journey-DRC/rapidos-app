@@ -76,6 +76,10 @@ class _TwitterStyleProductCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: () {
+        // Version statique : données hardcodées pour la démonstration
+        // Le nom du marchand sera généré statiquement
+        final merchantName = 'Rapidos Store ${product.vendeurId}';
+        
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -90,10 +94,12 @@ class _TwitterStyleProductCard extends StatelessWidget {
               price: product.price,
               imagePath: product.media?.mediaUrl != null
                                     ? product.media!.mediaUrl
-                                    : 'https://via.placeholder.com/150',
+                                    : 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&h=400&fit=crop',
+              // Données statiques pour la démonstration
+              merchantName: merchantName,
+              productImages: [], // Liste vide, les images statiques seront utilisées dans ProductDetailScreen
               goToCartTab: () {
                 Navigator.of(context).popUntil((route) => route.isFirst);
-                // Utilise un event, Provider, ou autre pour changer l'onglet si besoin
               },
             ),
           ),
@@ -114,7 +120,7 @@ class _TwitterStyleProductCard extends StatelessWidget {
               child: Image.network(
                 product.media?.mediaUrl != null
                                   ? product.media!.mediaUrl
-                                  : 'https://via.placeholder.com/150',
+                                  : 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&h=400&fit=crop',
                 width: double.infinity,
                 height: 100,
                 fit: BoxFit.cover,
@@ -125,7 +131,7 @@ class _TwitterStyleProductCard extends StatelessWidget {
                     color: Colors.grey[200],
                     borderRadius: BorderRadius.circular(16),
                   ),
-                  child: const Icon(Icons.image, color: Colors.grey, size: 40),
+                  child: const Icon(Icons.image_not_supported, color: Colors.grey, size: 40),
                 ),
               ),
             ),

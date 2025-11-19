@@ -258,7 +258,7 @@ class OrderDetailsScreen extends StatelessWidget {
                           ClipRRect(
                             borderRadius: BorderRadius.circular(8),
                             child: Image.network(
-                              item['imagePath'] ?? 'https://via.placeholder.com/50',
+                              item['imagePath'] ?? 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=200&h=200&fit=crop',
                               width: 50,
                               height: 50,
                               fit: BoxFit.cover,

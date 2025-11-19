@@ -228,7 +228,7 @@ class _FacturePageState extends State<FacturePage> {
                 final building = state.buildings[index];
                 final image = (building.images != null && building.images!.isNotEmpty)
                     ? building.images![0]
-                    : 'https://via.placeholder.com/150';
+                    : 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&h=400&fit=crop';
 
                 return Card(
                   color: Colors.grey.withOpacity(0.1),

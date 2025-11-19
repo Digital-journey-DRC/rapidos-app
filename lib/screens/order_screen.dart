@@ -705,33 +705,35 @@ class _OrderScreenState extends State<OrderScreen> {
 
               return Padding(
                 padding: const EdgeInsets.only(bottom: 8),
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(18),
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => OrderDetailsScreen(
-                          orderData: data,
-                          orderId: doc.id,
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(18),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => OrderDetailsScreen(
+                            orderData: data,
+                            orderId: doc.id,
+                          ),
                         ),
-                      ),
-                    );
-                  },
-                  child: Stack(
-                    children: [
-                      Container(
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(18),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.06),
-                              blurRadius: 10,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
+                      );
+                    },
+                    child: Stack(
+                      children: [
+                        Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(18),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.06),
+                                blurRadius: 10,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
                         child: Column(
                           children: [
                             Row(
@@ -1023,6 +1025,7 @@ class _OrderScreenState extends State<OrderScreen> {
                       ),
                     ],
                   ),
+                    ),
                 ),
               );
             } catch (e) {
@@ -1293,8 +1296,8 @@ class _OrderScreenState extends State<OrderScreen> {
                             child: Image.network(
                               items.isNotEmpty
                                   ? (items[0]['imagePath'] ??
-                                      'https://via.placeholder.com/80')
-                                  : 'https://via.placeholder.com/80',
+                                      'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=200&h=200&fit=crop')
+                                  : 'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=200&h=200&fit=crop',
                               width: 70,
                               height: 70,
                               fit: BoxFit.cover,
@@ -1737,7 +1740,7 @@ class _OrderScreenState extends State<OrderScreen> {
                                       (data['items'] as List).isNotEmpty
                                   ? Image.network(
                                       (data['items'] as List)[0]['imagePath'] ??
-                                          'https://via.placeholder.com/80',
+                                          'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=200&h=200&fit=crop',
                                       width: 70,
                                       height: 70,
                                       fit: BoxFit.cover,

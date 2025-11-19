@@ -1258,7 +1258,7 @@ class _BuildingDetailScreenState extends State<BuildingDetailScreen> {
     final image =
         (apartment['images'] != null && apartment['images'].isNotEmpty)
             ? apartment['images'][0]
-            : 'https://via.placeholder.com/150';
+            : 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&h=400&fit=crop';
     return Card(
       color: Colors.white.withOpacity(0.8),
       shape: RoundedRectangleBorder(
@@ -1338,7 +1338,7 @@ class _BuildingDetailScreenState extends State<BuildingDetailScreen> {
   Widget build(BuildContext context) {
     final List<String> images = widget.building.images?.isNotEmpty == true
         ? widget.building.images!
-        : ['https://via.placeholder.com/400'];
+        : ['https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&h=600&fit=crop'];
 
     return BlocListener<ApartmentCubit, ApartmentState>(
       listener: (context, state) {

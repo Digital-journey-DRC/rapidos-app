@@ -1036,7 +1036,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                                       price: product.price,
                                       imagePath: product.media?.mediaUrl != null
                                           ? product.media!.mediaUrl
-                                          : 'https://via.placeholder.com/150',
+                                          : 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&h=400&fit=crop',
                                     );
                                   },
                                 ),
@@ -1118,7 +1118,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                                     final image = media != null &&
                                             media['mediaUrl'] != null
                                         ? media['mediaUrl']
-                                        : 'https://via.placeholder.com/150';
+                                        : 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&h=400&fit=crop';
                                     final name =
                                         '${vendeur['firstName']} ${vendeur['lastName']}';
                                     return GestureDetector(

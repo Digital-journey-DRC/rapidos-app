@@ -1370,8 +1370,8 @@ class _OrderScreenState extends State<OrderScreen> {
                                         data['items'] != null &&
                                                 (data['items'] as List).isNotEmpty
                                             ? (data['items'] as List)[0]['imagePath'] ??
-                                                'https://via.placeholder.com/80'
-                                            : 'https://via.placeholder.com/80',
+                                                'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=200&h=200&fit=crop'
+                                            : 'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=200&h=200&fit=crop',
                                         width: 70,
                                         height: 70,
                                         fit: BoxFit.cover,
@@ -1868,8 +1868,8 @@ class _OrderScreenState extends State<OrderScreen> {
                                               data['items'] != null &&
                                                       (data['items'] as List).isNotEmpty
                                                   ? (data['items'] as List)[0]['imagePath'] ??
-                                                      'https://via.placeholder.com/80'
-                                                  : 'https://via.placeholder.com/80',
+                                                      'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=200&h=200&fit=crop'
+                                                  : 'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=200&h=200&fit=crop',
                                               width: 70,
                                               height: 70,
                                               fit: BoxFit.cover,

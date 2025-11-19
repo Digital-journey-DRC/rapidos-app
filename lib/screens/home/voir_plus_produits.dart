@@ -164,7 +164,7 @@ class _VoirPlusProduitsScreenState extends State<VoirPlusProduitsScreen> {
                           stock: product.stock.toString(),
                           price: product.price.toString(),
                           isPromo: false,
-                          imageUrl: product.media?.mediaUrl ?? 'https://via.placeholder.com/150',
+                          imageUrl: product.media?.mediaUrl ?? 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&h=400&fit=crop',
                           productId: product.id,
                         );
                       },
@@ -245,7 +245,7 @@ class _ProductCardState extends State<_ProductCard> with SingleTickerProviderSta
   @override
   Widget build(BuildContext context) {
     final String displayImageUrl = (widget.imageUrl.isEmpty || widget.imageUrl == 'null')
-        ? 'https://via.placeholder.com/150'
+        ? 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&h=400&fit=crop'
         : widget.imageUrl.startsWith('http')
             ? widget.imageUrl
             : 'http://24.144.87.127:3333/${widget.imageUrl}';

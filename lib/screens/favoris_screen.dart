@@ -45,7 +45,7 @@ class FavorisScreen extends StatelessWidget {
                 final hasImage = product['media'] != null && product['media']['mediaUrl'] != null && product['media']['mediaUrl'].toString().isNotEmpty;
                 final imageUrl = hasImage
                   ? product['media']['mediaUrl']
-                  : 'https://via.placeholder.com/80';
+                  : 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=200&h=200&fit=crop';
                 return InkWell(
                   borderRadius: BorderRadius.circular(12),
                   onTap: () {
