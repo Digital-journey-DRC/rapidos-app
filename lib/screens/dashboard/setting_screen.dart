@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../constants.dart';
 import '../../cubit/auth_cubit.dart';
 import '../../cubits/profile/profile_cubit.dart';
@@ -636,109 +637,138 @@ class _SettingScreenState extends State<SettingScreen>
     bool isProprietaire = user['role'] == 'proprietaire';
     return Container(
       width: double.infinity,
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
             AppColors.buttonColor,
-            AppColors.buttonColor,
+            AppColors.buttonColor.withOpacity(0.9),
           ],
         ),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.buttonColor.withOpacity(0.3),
+            blurRadius: 15,
+            offset: const Offset(0, 5),
+          ),
+        ],
       ),
       child: Column(
         children: [
-          const SizedBox(height: 20),
+          const SizedBox(height: 24),
           Stack(
             alignment: Alignment.bottomRight,
             children: [
-              CircleAvatar(
-                radius: 55,
-                backgroundColor: AppColors.white,
+              Container(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.2),
+                      blurRadius: 20,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
                 child: CircleAvatar(
-                  radius: 52,
-                  backgroundColor: AppColors.buttonColor,
+                  radius: 55,
+                  backgroundColor: Colors.white,
                   child: CircleAvatar(
-                    radius: 50,
+                    radius: 52,
                     backgroundColor: Colors.white,
-                    backgroundImage: _selectedImage != null
-                        ? FileImage(_selectedImage!) as ImageProvider
-                        : (profileImage.isNotEmpty
-                            ? NetworkImage(profileImage)
-                            : null),
-                    child: _selectedImage == null && profileImage.isEmpty
-                        ? const Icon(
-                            Icons.person,
-                            size: 50,
-                            color: AppColors.buttonColor,
-                          )
-                        : null,
+                    child: CircleAvatar(
+                      radius: 50,
+                      backgroundColor: Colors.grey.shade100,
+                      backgroundImage: _selectedImage != null
+                          ? FileImage(_selectedImage!) as ImageProvider
+                          : (profileImage.isNotEmpty
+                              ? NetworkImage(profileImage)
+                              : null),
+                      child: _selectedImage == null && profileImage.isEmpty
+                          ? Icon(
+                              Icons.person,
+                              size: 50,
+                              color: AppColors.buttonColor.withOpacity(0.5),
+                            )
+                          : null,
+                    ),
                   ),
                 ),
               ),
               GestureDetector(
                 onTap: _showImageSourceDialog,
                 child: Container(
-                  padding: const EdgeInsets.all(8),
+                  padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     shape: BoxShape.circle,
-                    border: Border.all(color: AppColors.buttonColor, width: 2),
+                    border: Border.all(color: AppColors.buttonColor, width: 2.5),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.15),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.edit,
                     color: AppColors.buttonColor,
-                    size: 20,
+                    size: 18,
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 16),
           Text(
             fullName,
             style: const TextStyle(
               color: Colors.white,
-              fontSize: 20,
+              fontSize: 22,
               fontWeight: FontWeight.bold,
+              letterSpacing: 0.3,
             ),
           ),
-          const SizedBox(height: 5),
-          // Text(
-          //   user['role'] ?? 'Utilisateur',
-          //   style: const TextStyle(
-          //     color: Colors.white70,
-          //     fontSize: 16,
-          //   ),
-          // ),
           if (isProprietaire) ...[
-            const SizedBox(height: 5),
-            Text(
-              user['email'] ?? '',
-              style: const TextStyle(
-                color: Colors.white70,
-                fontSize: 14,
-              ),
+            const SizedBox(height: 6),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.email_outlined,
+                  size: 14,
+                  color: Colors.white.withOpacity(0.8),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  user['email'] ?? '',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.9),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
             ),
-          ] else
-            const SizedBox(height: 5),
-          const SizedBox(height: 20),
+          ],
+          const SizedBox(height: 24),
         ],
       ),
     );
   }
 
   Widget _buildProfileTab(Map<String, dynamic> user) {
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: ListView(
-        shrinkWrap: true,
-        physics: const ClampingScrollPhysics(),
-        children: [
-          const SizedBox(height: 8),
-          // Bloc blanc - Menu des options
-          _buildOptionsMenuBlock(user),
-        ],
+    return Container(
+      width: double.infinity,
+      height: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: _buildOptionsMenuBlock(user),
       ),
     );
   }
@@ -811,22 +841,30 @@ class _SettingScreenState extends State<SettingScreen>
                 children: [
                   // Carte de solde principale avec design amélioré
                   Card(
-                    elevation: 5,
+                    elevation: 8,
+                    shadowColor: AppColors.buttonColor.withOpacity(0.3),
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(15)),
+                        borderRadius: BorderRadius.circular(18)),
                     child: Container(
                       width: double.infinity,
-                      padding: const EdgeInsets.all(20),
+                      padding: const EdgeInsets.all(24),
                       decoration: BoxDecoration(
-                        gradient: const LinearGradient(
+                        gradient: LinearGradient(
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                           colors: [
                             AppColors.buttonColor,
-                            AppColors.buttonColor,
+                            AppColors.buttonColor.withOpacity(0.9),
                           ],
                         ),
-                        borderRadius: BorderRadius.circular(15),
+                        borderRadius: BorderRadius.circular(18),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.buttonColor.withOpacity(0.3),
+                            blurRadius: 15,
+                            offset: const Offset(0, 5),
+                          ),
+                        ],
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1015,6 +1053,8 @@ class _SettingScreenState extends State<SettingScreen>
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.buttonColor,
                       padding: const EdgeInsets.symmetric(vertical: 16),
+                      elevation: 4,
+                      shadowColor: AppColors.buttonColor.withOpacity(0.4),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
@@ -1022,7 +1062,7 @@ class _SettingScreenState extends State<SettingScreen>
                     child: const Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.refresh, color: Colors.white),
+                        Icon(Icons.refresh, color: Colors.white, size: 20),
                         SizedBox(width: 10),
                         Text(
                           'Actualiser les données financières',
@@ -1177,18 +1217,28 @@ class _SettingScreenState extends State<SettingScreen>
   /// Construit le bloc de menu des options avec design moderne
   Widget _buildOptionsMenuBlock(Map<String, dynamic> user) {
     return Container(
+      width: double.infinity,
+      height: double.infinity,
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.06),
-            blurRadius: 12,
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 16,
             offset: const Offset(0, 4),
+            spreadRadius: 0,
+          ),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
       child: Column(
+        mainAxisAlignment: MainAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           // Modifier informations personnelles
           _buildMenuItem(
@@ -1241,6 +1291,8 @@ class _SettingScreenState extends State<SettingScreen>
             },
             showDivider: false,
           ),
+          // Espace flexible pour occuper le reste de l'écran
+          const Spacer(),
         ],
       ),
     );
@@ -1258,41 +1310,61 @@ class _SettingScreenState extends State<SettingScreen>
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: iconColor.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(
-                  icon,
-                  color: iconColor,
-                  size: 22,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: iconColor == Colors.red ? Colors.red : Colors.grey.shade800,
+        borderRadius: BorderRadius.circular(18),
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(11),
+                    decoration: BoxDecoration(
+                      color: iconColor.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: iconColor.withOpacity(0.1),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Icon(
+                      icon,
+                      color: iconColor,
+                      size: 22,
+                    ),
                   ),
-                ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 15.5,
+                        fontWeight: FontWeight.w600,
+                        color: iconColor == Colors.red ? Colors.red.shade700 : Colors.grey.shade800,
+                        letterSpacing: 0.2,
+                      ),
+                    ),
+                  ),
+                  Icon(
+                    Icons.chevron_right,
+                    color: Colors.grey.shade400,
+                    size: 22,
+                  ),
+                ],
               ),
-              Icon(
-                Icons.chevron_right,
-                color: Colors.grey.shade400,
-                size: 20,
+            ),
+            if (showDivider)
+              Divider(
+                height: 1,
+                thickness: 0.5,
+                indent: 60,
+                endIndent: 20,
+                color: Colors.grey.shade200,
               ),
-            ],
-          ),
+          ],
         ),
       ),
     );
@@ -1317,6 +1389,10 @@ class _SettingScreenState extends State<SettingScreen>
               key: _formKey,
               child: Container(
                 padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1327,24 +1403,37 @@ class _SettingScreenState extends State<SettingScreen>
                         const Text(
                           'Modifier informations personnelles',
                           style: TextStyle(
-                            fontSize: 14,
+                            fontSize: 18,
                             fontWeight: FontWeight.bold,
+                            color: Colors.black87,
                           ),
                         ),
                         IconButton(
-                          icon: const Icon(Icons.close),
+                          icon: const Icon(Icons.close, color: Colors.grey),
                           onPressed: () => Navigator.pop(context),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 24),
                     // Champ Prénom
                     TextFormField(
                       controller: _firstNameController,
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         labelText: 'Prénom',
-                        border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.person),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: Colors.grey.shade300),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: AppColors.buttonColor, width: 2),
+                        ),
+                        filled: true,
+                        fillColor: Colors.grey.shade50,
+                        prefixIcon: Icon(Icons.person, color: AppColors.buttonColor),
                       ),
                       validator: (value) {
                         if (value == null || value.isEmpty) {
@@ -1357,10 +1446,22 @@ class _SettingScreenState extends State<SettingScreen>
                     // Champ Nom
                     TextFormField(
                       controller: _lastNameController,
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         labelText: 'Nom',
-                        border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.person),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: Colors.grey.shade300),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: AppColors.buttonColor, width: 2),
+                        ),
+                        filled: true,
+                        fillColor: Colors.grey.shade50,
+                        prefixIcon: Icon(Icons.person, color: AppColors.buttonColor),
                       ),
                       validator: (value) {
                         if (value == null || value.isEmpty) {
@@ -1373,10 +1474,22 @@ class _SettingScreenState extends State<SettingScreen>
                     // Champ Téléphone
                     TextFormField(
                       controller: _phoneController,
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         labelText: 'Téléphone',
-                        border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.phone),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: Colors.grey.shade300),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: AppColors.buttonColor, width: 2),
+                        ),
+                        filled: true,
+                        fillColor: Colors.grey.shade50,
+                        prefixIcon: Icon(Icons.phone, color: AppColors.buttonColor),
                       ),
                       validator: (value) {
                         if (value == null || value.isEmpty) {
@@ -1385,7 +1498,7 @@ class _SettingScreenState extends State<SettingScreen>
                         return null;
                       },
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 28),
                     // Bouton Mettre à jour le profil
                     SizedBox(
                       width: double.infinity,
@@ -1399,6 +1512,8 @@ class _SettingScreenState extends State<SettingScreen>
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.buttonColor,
                           padding: const EdgeInsets.symmetric(vertical: 16),
+                          elevation: 4,
+                          shadowColor: AppColors.buttonColor.withOpacity(0.4),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
@@ -1460,6 +1575,10 @@ class _SettingScreenState extends State<SettingScreen>
           ),
           child: Container(
             padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+            ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1470,27 +1589,41 @@ class _SettingScreenState extends State<SettingScreen>
                     const Text(
                       'Modifier mot de passe',
                       style: TextStyle(
-                        fontSize: 14,
+                        fontSize: 18,
                         fontWeight: FontWeight.bold,
+                        color: Colors.black87,
                       ),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.close),
+                      icon: const Icon(Icons.close, color: Colors.grey),
                       onPressed: () => Navigator.pop(context),
                     ),
                   ],
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 24),
                 TextFormField(
                   controller: oldPasswordController,
                   obscureText: obscureOldPassword,
                   decoration: InputDecoration(
                     labelText: 'Ancien mot de passe',
-                    border: const OutlineInputBorder(),
-                    prefixIcon: const Icon(Icons.lock_outline),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.grey.shade300),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: AppColors.buttonColor, width: 2),
+                    ),
+                    filled: true,
+                    fillColor: Colors.grey.shade50,
+                    prefixIcon: Icon(Icons.lock_outline, color: AppColors.buttonColor),
                     suffixIcon: IconButton(
                       icon: Icon(
                         obscureOldPassword ? Icons.visibility_off : Icons.visibility,
+                        color: Colors.grey.shade600,
                       ),
                       onPressed: () {
                         setState(() {
@@ -1506,11 +1639,24 @@ class _SettingScreenState extends State<SettingScreen>
                   obscureText: obscureNewPassword,
                   decoration: InputDecoration(
                     labelText: 'Nouveau mot de passe',
-                    border: const OutlineInputBorder(),
-                    prefixIcon: const Icon(Icons.lock),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.grey.shade300),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: AppColors.buttonColor, width: 2),
+                    ),
+                    filled: true,
+                    fillColor: Colors.grey.shade50,
+                    prefixIcon: Icon(Icons.lock, color: AppColors.buttonColor),
                     suffixIcon: IconButton(
                       icon: Icon(
                         obscureNewPassword ? Icons.visibility_off : Icons.visibility,
+                        color: Colors.grey.shade600,
                       ),
                       onPressed: () {
                         setState(() {
@@ -1526,11 +1672,24 @@ class _SettingScreenState extends State<SettingScreen>
                   obscureText: obscureConfirmPassword,
                   decoration: InputDecoration(
                     labelText: 'Confirmer le mot de passe',
-                    border: const OutlineInputBorder(),
-                    prefixIcon: const Icon(Icons.lock),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.grey.shade300),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: AppColors.buttonColor, width: 2),
+                    ),
+                    filled: true,
+                    fillColor: Colors.grey.shade50,
+                    prefixIcon: Icon(Icons.lock, color: AppColors.buttonColor),
                     suffixIcon: IconButton(
                       icon: Icon(
                         obscureConfirmPassword ? Icons.visibility_off : Icons.visibility,
+                        color: Colors.grey.shade600,
                       ),
                       onPressed: () {
                         setState(() {
@@ -1540,7 +1699,7 @@ class _SettingScreenState extends State<SettingScreen>
                     ),
                   ),
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 28),
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
@@ -1557,6 +1716,8 @@ class _SettingScreenState extends State<SettingScreen>
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.buttonColor,
                       padding: const EdgeInsets.symmetric(vertical: 16),
+                      elevation: 4,
+                      shadowColor: AppColors.buttonColor.withOpacity(0.4),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
@@ -1582,24 +1743,471 @@ class _SettingScreenState extends State<SettingScreen>
 
   /// Affiche le dialogue de gestion des adresses
   void _showAddressesDialog() {
-    showDialog(
+    final authState = context.read<AuthCubit>().state;
+    if (authState is! AuthSuccess || authState.user == null) {
+      return;
+    }
+    final userId = authState.user!['id']?.toString() ?? '';
+
+    showModalBottomSheet(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Modifier vos adresses'),
-        content: const Text(
-          'Cette fonctionnalité vous permettra de gérer vos adresses de livraison. Elle sera disponible prochainement.',
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => Container(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.8,
         ),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(15),
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Fermer'),
-          ),
-        ],
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Modifier vos adresses',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close, color: Colors.grey),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              height: MediaQuery.of(context).size.height * 0.5,
+              child: StreamBuilder<QuerySnapshot>(
+                stream: FirebaseFirestore.instance
+                    .collection('delivery_addresses')
+                    .where('userId', isEqualTo: userId)
+                    .orderBy('timestamp', descending: true)
+                    .snapshots(),
+                builder: (context, snapshot) {
+                  if (snapshot.hasError) {
+                    return Center(
+                      child: Text('Erreur: ${snapshot.error}'),
+                    );
+                  }
+
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(
+                      child: CircularProgressIndicator(),
+                    );
+                  }
+
+                  if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.location_off,
+                            size: 64,
+                            color: Colors.grey.shade400,
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Aucune adresse enregistrée',
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+
+                  final addresses = snapshot.data!.docs;
+
+                  return ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: addresses.length,
+                    itemBuilder: (context, index) {
+                      final addressDoc = addresses[index];
+                      final address = addressDoc.data() as Map<String, dynamic>;
+                      final addressId = addressDoc.id;
+
+                      return _buildAddressCard(address, addressId);
+                    },
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+        ),
       ),
     );
+  }
+
+  /// Construit une carte d'adresse cliquable
+  Widget _buildAddressCard(Map<String, dynamic> address, String addressId) {
+    final ville = address['ville'] ?? '';
+    final commune = address['commune'] ?? '';
+    final quartier = address['quartier'] ?? '';
+    final avenue = address['avenue'] ?? '';
+    final numero = address['numero'] ?? '';
+    final pays = address['pays'] ?? 'RDC';
+    
+    final fullAddress = '$numero, $avenue, $quartier, $commune, $ville, $pays';
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () {
+          Navigator.pop(context);
+          _showEditAddressDialog(address, addressId);
+        },
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.grey.shade50,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.grey.shade200),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 6,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppColors.buttonColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  Icons.location_on,
+                  color: AppColors.buttonColor,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      fullAddress,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black87,
+                      ),
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Appuyez pour modifier',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.edit_outlined,
+                color: AppColors.buttonColor,
+                size: 20,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Affiche le dialogue de modification d'une adresse
+  void _showEditAddressDialog(Map<String, dynamic> address, String addressId) {
+    final villeController = TextEditingController(text: address['ville'] ?? '');
+    final communeController = TextEditingController(text: address['commune'] ?? '');
+    final quartierController = TextEditingController(text: address['quartier'] ?? '');
+    final avenueController = TextEditingController(text: address['avenue'] ?? '');
+    final numeroController = TextEditingController(text: address['numero'] ?? '');
+    final paysController = TextEditingController(text: address['pays'] ?? 'RDC');
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+          ),
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+            ),
+            child: Form(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Modifier l\'adresse',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close, color: Colors.grey),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  // Champ Ville
+                  TextFormField(
+                    controller: villeController,
+                    decoration: InputDecoration(
+                      labelText: 'Ville',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.grey.shade300),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: AppColors.buttonColor, width: 2),
+                      ),
+                      filled: true,
+                      fillColor: Colors.grey.shade50,
+                      prefixIcon: Icon(Icons.location_city, color: AppColors.buttonColor),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  // Champ Commune
+                  TextFormField(
+                    controller: communeController,
+                    decoration: InputDecoration(
+                      labelText: 'Commune',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.grey.shade300),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: AppColors.buttonColor, width: 2),
+                      ),
+                      filled: true,
+                      fillColor: Colors.grey.shade50,
+                      prefixIcon: Icon(Icons.apartment, color: AppColors.buttonColor),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  // Champ Quartier
+                  TextFormField(
+                    controller: quartierController,
+                    decoration: InputDecoration(
+                      labelText: 'Quartier',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.grey.shade300),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: AppColors.buttonColor, width: 2),
+                      ),
+                      filled: true,
+                      fillColor: Colors.grey.shade50,
+                      prefixIcon: Icon(Icons.home, color: AppColors.buttonColor),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  // Champ Avenue
+                  TextFormField(
+                    controller: avenueController,
+                    decoration: InputDecoration(
+                      labelText: 'Avenue',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.grey.shade300),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: AppColors.buttonColor, width: 2),
+                      ),
+                      filled: true,
+                      fillColor: Colors.grey.shade50,
+                      prefixIcon: Icon(Icons.streetview, color: AppColors.buttonColor),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  // Champ Numéro
+                  TextFormField(
+                    controller: numeroController,
+                    decoration: InputDecoration(
+                      labelText: 'Numéro',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.grey.shade300),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: AppColors.buttonColor, width: 2),
+                      ),
+                      filled: true,
+                      fillColor: Colors.grey.shade50,
+                      prefixIcon: Icon(Icons.numbers, color: AppColors.buttonColor),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  // Champ Pays
+                  TextFormField(
+                    controller: paysController,
+                    decoration: InputDecoration(
+                      labelText: 'Pays',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.grey.shade300),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: AppColors.buttonColor, width: 2),
+                      ),
+                      filled: true,
+                      fillColor: Colors.grey.shade50,
+                      prefixIcon: Icon(Icons.public, color: AppColors.buttonColor),
+                    ),
+                  ),
+                  const SizedBox(height: 28),
+                  // Bouton Sauvegarder
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () async {
+                        await _updateAddress(
+                          addressId,
+                          villeController.text,
+                          communeController.text,
+                          quartierController.text,
+                          avenueController.text,
+                          numeroController.text,
+                          paysController.text,
+                        );
+                        Navigator.pop(context);
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.buttonColor,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        elevation: 4,
+                        shadowColor: AppColors.buttonColor.withOpacity(0.4),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text(
+                        'Sauvegarder les modifications',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Met à jour une adresse dans Firestore
+  Future<void> _updateAddress(
+    String addressId,
+    String ville,
+    String commune,
+    String quartier,
+    String avenue,
+    String numero,
+    String pays,
+  ) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('delivery_addresses')
+          .doc(addressId)
+          .update({
+        'ville': ville,
+        'commune': commune,
+        'quartier': quartier,
+        'avenue': avenue,
+        'numero': numero,
+        'pays': pays,
+        'timestamp': FieldValue.serverTimestamp(),
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Adresse modifiée avec succès'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur lors de la modification: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   /// Affiche la confirmation de déconnexion
