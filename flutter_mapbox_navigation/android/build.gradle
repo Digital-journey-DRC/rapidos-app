@@ -77,6 +77,7 @@ android {
         targetSdkVersion 36
         multiDexEnabled true
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        
     }
 
     lintOptions {
@@ -95,6 +96,13 @@ android {
 
     buildFeatures{
         viewBinding = true
+    }
+    
+    // Support for 16KB page size devices (requis par Google Play)
+    packagingOptions {
+        jniLibs {
+            useLegacyPackaging = true
+        }
     }
 }
 
