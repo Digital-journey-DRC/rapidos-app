@@ -11,6 +11,7 @@ import 'package:immo/cubit/featured_product_cubit.dart';
 import 'package:immo/screens/product/all_products_screen.dart';
 import 'package:immo/screens/product/category_products_screen.dart';
 import 'package:immo/screens/product/promo_products_section.dart';
+import 'package:immo/screens/product/recommended_products_section.dart';
 import 'package:immo/cubit/category_cubit.dart';
 import 'package:immo/widgets/shimmer_loading.dart';
 import 'package:immo/cubit/merchant_cubit.dart';
@@ -947,6 +948,9 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                       return const SizedBox.shrink();
                     },
                   ),
+
+                  // Produits recommandés section
+                  const RecommendedProductsSection(),
 
                   // Featured products section
                   Padding(
