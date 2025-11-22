@@ -275,6 +275,7 @@ class _ProductCardState extends State<_ProductCard> with SingleTickerProviderSta
         builder: (context, child) {
           return Transform.scale(
             scale: _scaleAnimation.value,
+            alignment: Alignment.center,
             child: Container(
               decoration: BoxDecoration(
                 color: Colors.white,

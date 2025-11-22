@@ -271,7 +271,7 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> with Sing
         slivers: [
           // App Bar with merchant cover image
           SliverAppBar(
-            expandedHeight: 200.0,
+            expandedHeight: 180.0,
             pinned: true,
             systemOverlayStyle: SystemUiOverlayStyle.light,
             backgroundColor: AppColors.primary,
@@ -335,98 +335,114 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> with Sing
           // Merchant profile information
           SliverToBoxAdapter(
             child: Container(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Profile image and name
                   Row(
                     children: [
-                      CircleAvatar(
-                        radius: 40,
-                        backgroundImage: NetworkImage(widget.imagePath),
-                        onBackgroundImageError: (_, __) {},
-                        child: ClipOval(
-                          child: Image.network(
-                            widget.imagePath,
-                            width: 80,
-                            height: 80,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) {
-                              return Container(
-                                color: Colors.grey.shade200,
-                                child: Icon(Icons.store, color: Colors.grey.shade400, size: 40),
-                              );
-                            },
+                      Container(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: AppColors.primary.withOpacity(0.2),
+                            width: 2,
+                          ),
+                        ),
+                        child: CircleAvatar(
+                          radius: 32,
+                          backgroundColor: Colors.grey.shade100,
+                          backgroundImage: NetworkImage(widget.imagePath),
+                          onBackgroundImageError: (_, __) {},
+                          child: ClipOval(
+                            child: Image.network(
+                              widget.imagePath,
+                              width: 64,
+                              height: 64,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) {
+                                return Container(
+                                  color: Colors.grey.shade200,
+                                  child: Icon(Icons.store, color: Colors.grey.shade400, size: 32),
+                                );
+                              },
+                            ),
                           ),
                         ),
                       ),
-                      const SizedBox(width: 16),
+                      const SizedBox(width: 12),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Row(
                               children: [
-                                Text(
-                                  widget.name,
-                                  style: const TextStyle(
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.bold,
+                                Flexible(
+                                  child: Text(
+                                    widget.name,
+                                    style: const TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: -0.5,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
-                                if (widget.isVerified) const SizedBox(width: 4),
-                                if (widget.isVerified)
+                                if (widget.isVerified) ...[
+                                  const SizedBox(width: 6),
                                   const Icon(
                                     Icons.verified,
                                     color: AppColors.primary,
-                                    size: 20,
+                                    size: 18,
                                   ),
+                                ],
                               ],
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              '@${widget.name.toLowerCase().replaceAll(' ', '_')}',
+                              widget.category,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
-                                fontSize: 16,
+                                fontSize: 13,
                                 color: Colors.grey.shade600,
+                                fontWeight: FontWeight.w500,
                               ),
                             ),
-                            
-                  
                           ],
                         ),
                       ),
                     ],
                   ),
                   
+                  const SizedBox(height: 16),
                   
-                  
-                  // Followers, Following, Likes
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      _buildStatColumn(_formatCount(followersCount), 'Abonnés'),
-                      // Widget de débogage pour voir les valeurs
-                      if (isLoadingSubscribers)
-                        const Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            ),
-                            SizedBox(height: 4),
-                            Text('Chargement...', style: TextStyle(fontSize: 12)),
-                          ],
-                        ),
-                    ],
+                  // Stats card
+                  Container(
+                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade50,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.grey.shade200),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        if (isLoadingSubscribers)
+                          const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        else
+                          _buildStatColumn(_formatCount(followersCount), 'Abonnés'),
+                      ],
+                    ),
                   ),
                   
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 16),
                   
                   // Follow/Message buttons
                   Row(
@@ -436,35 +452,55 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> with Sing
                           onPressed: _toggleSubscription,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: isFollowing ? Colors.grey.shade200 : AppColors.primary,
-                            foregroundColor: isFollowing ? Colors.black : Colors.white,
+                            foregroundColor: isFollowing ? Colors.black87 : Colors.white,
                             padding: const EdgeInsets.symmetric(vertical: 12),
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(4),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            elevation: 0,
+                          ),
+                          child: Text(
+                            isFollowing ? 'Abonné' : 'S\'abonner',
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
-                          child: Text(isFollowing ? 'Abonné' : 'S\'abonner'),
                         ),
                       ),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: 10),
                       Container(
                         decoration: BoxDecoration(
                           border: Border.all(color: Colors.grey.shade300),
-                          borderRadius: BorderRadius.circular(4),
+                          borderRadius: BorderRadius.circular(10),
+                          color: Colors.white,
                         ),
                         child: IconButton(
-                          icon: const Icon(Icons.message_outlined),
+                          icon: const Icon(Icons.message_outlined, size: 20),
                           onPressed: () {},
+                          color: Colors.grey.shade700,
                         ),
                       ),
                     ],
                   ),
                   
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 14),
                   
                   // Description
-                  Text(
-                    'Vendeur officiel de ${widget.category.toLowerCase()}. Livraison rapide et produits de qualité garantis.',
-                    style: TextStyle(fontSize: 16, color: Colors.grey.shade800),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade50,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      'Vendeur officiel de ${widget.category.toLowerCase()}. Livraison rapide et produits de qualité garantis.',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey.shade700,
+                        height: 1.4,
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -477,11 +513,26 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> with Sing
               TabBar(
                 controller: _tabController,
                 labelColor: AppColors.primary,
-                unselectedLabelColor: Colors.grey,
+                unselectedLabelColor: Colors.grey.shade600,
                 indicatorColor: AppColors.primary,
+                indicatorWeight: 3,
+                labelStyle: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+                unselectedLabelStyle: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                ),
                 tabs: const [
-                  Tab(icon: Icon(Icons.grid_on), text: 'Produits'),
-                  Tab(icon: Icon(Icons.favorite_border), text: 'Abonnés'),
+                  Tab(
+                    icon: Icon(Icons.grid_on, size: 20),
+                    text: 'Produits',
+                  ),
+                  Tab(
+                    icon: Icon(Icons.favorite_border, size: 20),
+                    text: 'Abonnés',
+                  ),
                 ],
               ),
             ),
@@ -510,16 +561,18 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> with Sing
         Text(
           count,
           style: const TextStyle(
-            fontSize: 18,
+            fontSize: 20,
             fontWeight: FontWeight.bold,
+            color: AppColors.primary,
           ),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 2),
         Text(
           label,
           style: TextStyle(
-            fontSize: 14,
+            fontSize: 12,
             color: Colors.grey.shade600,
+            fontWeight: FontWeight.w500,
           ),
         ),
       ],
@@ -572,7 +625,7 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> with Sing
     }
     
     return ListView.builder(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       itemCount: subscribersList.length,
       itemBuilder: (context, index) {
         final subscriber = subscribersList[index];
@@ -580,29 +633,28 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> with Sing
         final date = timestamp?.toDate();
         
         return Card(
-          margin: const EdgeInsets.only(bottom: 12),
-          elevation: 2,
+          margin: const EdgeInsets.only(bottom: 8),
+          elevation: 0,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
+            side: BorderSide(color: Colors.grey.shade200, width: 1),
           ),
           child: ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             leading: CircleAvatar(
-              backgroundColor: AppColors.primary,
+              radius: 24,
+              backgroundColor: AppColors.primary.withOpacity(0.1),
               backgroundImage: NetworkImage(subscriber['userImage'] ?? 'https://www.shutterstock.com/image-vector/vector-flat-illustration-grayscale-avatar-600nw-2281862025.jpg'),
-              // child: Text(
-              //   subscriber['userName']?.toString().substring(0, 1).toUpperCase() ?? 'U',
-              //   style: const TextStyle(
-              //     color: Colors.white,
-              //     fontWeight: FontWeight.bold,
-              //   ),
-              // ),
+              onBackgroundImageError: (_, __) {},
             ),
             title: Text(
               subscriber['userName']?.toString() ?? 'Utilisateur inconnu',
               style: const TextStyle(
                 fontWeight: FontWeight.w600,
-                fontSize: 16,
+                fontSize: 14,
               ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
             subtitle: Text(
               date != null 
@@ -610,13 +662,13 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> with Sing
                 : 'Abonné récemment',
               style: TextStyle(
                 color: Colors.grey.shade600,
-                fontSize: 14,
+                fontSize: 12,
               ),
             ),
             trailing: Icon(
               Icons.check_circle,
               color: Colors.green.shade600,
-              size: 20,
+              size: 18,
             ),
           ),
         );
@@ -626,13 +678,32 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> with Sing
 
   Widget _buildProductsGrid() {
     final List<Map<String, dynamic>> products = widget.products;
+    if (products.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.inventory_2_outlined, size: 64, color: Colors.grey.shade400),
+            const SizedBox(height: 16),
+            Text(
+              'Aucun produit disponible',
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.grey.shade600,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
     return GridView.builder(
-      padding: const EdgeInsets.all(8),
+      padding: const EdgeInsets.all(12),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
-        childAspectRatio: 0.75,
-        crossAxisSpacing: 10,
-        mainAxisSpacing: 10,
+        childAspectRatio: 0.68,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
       ),
       itemCount: products.length,
       itemBuilder: (context, index) {
@@ -685,129 +756,134 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> with Sing
         );
       },
       child: Card(
-        elevation: 1,
-        
+        elevation: 0,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(color: Colors.grey.shade200, width: 1),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-          // Product image with tag
-          Stack(
-            children: [
-              Container(
-                height: 130,
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(8),
-                    topRight: Radius.circular(8),
-                  ),
-                  color: Colors.grey.shade200,
-                ),
-                child: ClipRRect(
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(8),
-                    topRight: Radius.circular(8),
-                  ),
-                  child: Image.network(
-                    imagePath,
-                    fit: BoxFit.cover,
+            // Product image with tag
+            Expanded(
+              flex: 3,
+              child: Stack(
+                children: [
+                  Container(
                     width: double.infinity,
-                    height: 140,
-                    loadingBuilder: (BuildContext context, Widget child, ImageChunkEvent? loadingProgress) {
-                      if (loadingProgress == null) {
-                        return child;
-                      }
-                      return Center(
-                        child: CircularProgressIndicator(
-                          value: loadingProgress.expectedTotalBytes != null
-                            ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
-                            : null,
-                          color: AppColors.primary,
-                          strokeWidth: 2,
-                        ),
-                      );
-                    },
-                    errorBuilder: (context, error, stackTrace) {
-                      return Center(
-                        child: Icon(Icons.image_not_supported, color: Colors.grey.shade400, size: 40),
-                      );
-                    },
-                  ),
-                ),
-              ),
-              Positioned(
-                top: 8,
-                left: 8,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    tag,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
+                    decoration: BoxDecoration(
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(12),
+                        topRight: Radius.circular(12),
+                      ),
+                      color: Colors.grey.shade100,
                     ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          
-          // Product info
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  name,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  "$price FC",
-                  style: TextStyle(
-                    color: Colors.grey.shade800,
-                    fontSize: 14,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    const Icon(
-                      Icons.star,
-                      color: Colors.amber,
-                      size: 14,
-                    ),
-                    const SizedBox(width: 2),
-                    Text(
-                      '5',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey.shade600,
+                    child: ClipRRect(
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(12),
+                        topRight: Radius.circular(12),
+                      ),
+                      child: Image.network(
+                        imagePath,
+                        fit: BoxFit.cover,
+                        width: double.infinity,
+                        height: double.infinity,
+                        loadingBuilder: (BuildContext context, Widget child, ImageChunkEvent? loadingProgress) {
+                          if (loadingProgress == null) {
+                            return child;
+                          }
+                          return Center(
+                            child: CircularProgressIndicator(
+                              value: loadingProgress.expectedTotalBytes != null
+                                ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+                                : null,
+                              color: AppColors.primary,
+                              strokeWidth: 2,
+                            ),
+                          );
+                        },
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            color: Colors.grey.shade100,
+                            child: Icon(Icons.image_not_supported, color: Colors.grey.shade400, size: 32),
+                          );
+                        },
                       ),
                     ),
-                    const SizedBox(width: 4),
+                  ),
+                  Positioned(
+                    top: 6,
+                    left: 6,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        tag,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 9,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            
+            // Product info
+            Expanded(
+              flex: 2,
+              child: Padding(
+                padding: const EdgeInsets.all(10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      name,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                        height: 1.2,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      "$price FC",
+                      style: TextStyle(
+                        color: AppColors.primary,
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Row(
+                      children: [
+                        Icon(Icons.star, color: Colors.amber.shade600, size: 12),
+                        const SizedBox(width: 2),
+                        Text(
+                          '5.0',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.grey.shade600,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
-              ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
-    ));
+    );
   }
 }
 
@@ -827,6 +903,16 @@ class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
   Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
     return Container(
       color: Colors.white,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
       child: tabBar,
     );
   }

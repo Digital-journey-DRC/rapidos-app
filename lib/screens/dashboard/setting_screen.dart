@@ -13,6 +13,15 @@ import '../../cubits/profile/profile_cubit.dart';
 import '../../widgets/app_logo.dart';
 import '../../services/profile_service.dart';
 import '../auth/login_screen.dart';
+import '../../widgets/merchant_section_card.dart';
+import '../../widgets/merchant_closed_banner.dart';
+import '../product/merchant_all_products_screen.dart';
+import '../product/merchant_promo_products_screen.dart';
+import '../product/merchant_recommended_products_screen.dart';
+import '../merchant/merchant_service_hours_screen.dart';
+import '../../cubit/product_cubit.dart';
+import '../../services/promotion_service.dart';
+import '../../models/promotion.dart';
 
 class SettingScreen extends StatefulWidget {
   const SettingScreen({super.key});
@@ -42,6 +51,12 @@ class _SettingScreenState extends State<SettingScreen>
   // ProfileCubit instance
   late final ProfileCubit _profileCubit;
 
+  // Données dynamiques pour les marchands
+  int _allProductsCount = 0;
+  int _promoProductsCount = 0;
+  int _recommendedProductsCount = 0;
+  bool _isLoadingCounts = false;
+
   @override
   void initState() {
     super.initState();
@@ -65,6 +80,53 @@ class _SettingScreenState extends State<SettingScreen>
     });
   }
 
+  /// Charge les compteurs dynamiques pour les marchands
+  Future<void> _loadMerchantCounts() async {
+    final authState = context.read<AuthCubit>().state;
+    if (authState is! AuthSuccess || authState.user == null) return;
+    
+    if (authState.user!['role'] != 'vendeur') return;
+
+    setState(() => _isLoadingCounts = true);
+
+    try {
+      // Charger les produits
+      await context.read<ProductCubit>().fetchProducts();
+      
+      // Charger les promotions
+      final promotionService = PromotionService();
+      final promoResult = await promotionService.getPromotions();
+      
+      if (mounted) {
+        setState(() {
+          // Compter les produits depuis ProductCubit
+          final productState = context.read<ProductCubit>().state;
+          if (productState is ProductLoaded) {
+            _allProductsCount = productState.products.length;
+            // Pour les produits recommandés, on peut utiliser une logique similaire
+            // Pour l'instant, on utilise les produits avec un rating élevé
+            _recommendedProductsCount = productState.products
+                .where((p) => p.stock > 20 && p.price > 0 && p.price < 50000)
+                .length;
+          }
+          
+          // Compter les promotions actives
+          if (promoResult['success'] == true) {
+            final promotions = promoResult['promotions'] as List<Promotion>;
+            _promoProductsCount = promotions.where((p) => p.isActive).length;
+          }
+          
+          _isLoadingCounts = false;
+        });
+      }
+    } catch (e) {
+      print('Erreur lors du chargement des compteurs: $e');
+      if (mounted) {
+        setState(() => _isLoadingCounts = false);
+      }
+    }
+  }
+
   // Méthode pour charger les données utilisateur
   void _loadUserData() {
     final authState = context.read<AuthCubit>().state;
@@ -81,6 +143,7 @@ class _SettingScreenState extends State<SettingScreen>
 
       // Set the correct number of tabs based on user role
       final isProprietaire = authState.user!['role'] == 'proprietaire';
+      final isVendeur = authState.user!['role'] == 'vendeur';
       
       // Only create TabController for proprietaire users
       if (isProprietaire) {
@@ -91,6 +154,11 @@ class _SettingScreenState extends State<SettingScreen>
         
         // Load user financial data only for proprietaire
         _loadUserFinancialData(authState.user!['id'], authState.token!);
+      }
+      
+      // Charger les compteurs pour les marchands
+      if (isVendeur) {
+        _loadMerchantCounts();
       }
       
       // Forcer la mise à jour de l'interface utilisateur
@@ -1216,31 +1284,183 @@ class _SettingScreenState extends State<SettingScreen>
 
   /// Construit le bloc de menu des options avec design moderne
   Widget _buildOptionsMenuBlock(Map<String, dynamic> user) {
-    return Container(
-      width: double.infinity,
-      height: double.infinity,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
-            spreadRadius: 0,
-          ),
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
+    final isVendeur = user['role'] == 'vendeur';
+    
+    return SingleChildScrollView(
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Modifier informations personnelles
+          // Bannière de fermeture pour les marchands
+          if (isVendeur) const MerchantClosedBanner(),
+          
+          // Sections marchand
+          if (isVendeur) ...[
+            Container(
+              margin: const EdgeInsets.only(bottom: 16),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(18),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.08),
+                    blurRadius: 16,
+                    offset: const Offset(0, 4),
+                    spreadRadius: 0,
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Gestion des produits',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  BlocBuilder<ProductCubit, ProductState>(
+                    builder: (context, productState) {
+                      // Mettre à jour le compteur si les produits sont chargés
+                      if (productState is ProductLoaded) {
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          if (mounted && _allProductsCount != productState.products.length) {
+                            setState(() {
+                              _allProductsCount = productState.products.length;
+                              _recommendedProductsCount = productState.products
+                                  .where((p) => p.stock > 20 && p.price > 0 && p.price < 50000)
+                                  .length;
+                            });
+                          }
+                        });
+                      }
+                      
+                      return MerchantSectionCard(
+                        title: 'Tous les produits',
+                        subtitle: 'Voir et gérer tous vos produits',
+                        icon: Icons.inventory_2_outlined,
+                        iconColor: AppColors.primary,
+                        count: _isLoadingCounts ? null : _allProductsCount,
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const MerchantAllProductsScreen(),
+                            ),
+                          ).then((_) {
+                            // Rafraîchir les compteurs après retour
+                            _loadMerchantCounts();
+                          });
+                        },
+                      );
+                    },
+                  ),
+                  FutureBuilder<Map<String, dynamic>>(
+                    future: PromotionService().getPromotions(),
+                    builder: (context, snapshot) {
+                      if (snapshot.hasData && snapshot.data!['success'] == true) {
+                        final promotions = snapshot.data!['promotions'] as List<Promotion>;
+                        final activePromos = promotions.where((p) => p.isActive).length;
+                        if (mounted && _promoProductsCount != activePromos) {
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            if (mounted) {
+                              setState(() {
+                                _promoProductsCount = activePromos;
+                              });
+                            }
+                          });
+                        }
+                      }
+                      
+                      return MerchantSectionCard(
+                        title: 'Produits en promotions',
+                        subtitle: 'Gérer vos produits en promotion',
+                        icon: Icons.local_offer_outlined,
+                        iconColor: Colors.red,
+                        count: _isLoadingCounts ? null : _promoProductsCount,
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const MerchantPromoProductsScreen(),
+                            ),
+                          ).then((_) {
+                            // Rafraîchir les compteurs après retour
+                            _loadMerchantCounts();
+                          });
+                        },
+                      );
+                    },
+                  ),
+                  BlocBuilder<ProductCubit, ProductState>(
+                    builder: (context, productState) {
+                      return MerchantSectionCard(
+                        title: 'Produits recommandés',
+                        subtitle: 'Mettre en avant vos meilleurs produits',
+                        icon: Icons.star_outline,
+                        iconColor: Colors.amber,
+                        count: _isLoadingCounts ? null : _recommendedProductsCount,
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const MerchantRecommendedProductsScreen(),
+                            ),
+                          ).then((_) {
+                            // Rafraîchir les compteurs après retour
+                            _loadMerchantCounts();
+                          });
+                        },
+                      );
+                    },
+                  ),
+                  MerchantSectionCard(
+                    title: 'Configurer heures de service',
+                    subtitle: 'Définir vos heures d\'ouverture',
+                    icon: Icons.access_time,
+                    iconColor: Colors.blue,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const MerchantServiceHoursScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ],
+          
+          // Options de profil
+          Container(
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(18),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.08),
+                  blurRadius: 16,
+                  offset: const Offset(0, 4),
+                  spreadRadius: 0,
+                ),
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.04),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Modifier informations personnelles
           _buildMenuItem(
             icon: Icons.edit_outlined,
             iconColor: AppColors.buttonColor,
@@ -1291,8 +1511,9 @@ class _SettingScreenState extends State<SettingScreen>
             },
             showDivider: false,
           ),
-          // Espace flexible pour occuper le reste de l'écran
-          const Spacer(),
+        ],
+      ),
+    ),
         ],
       ),
     );

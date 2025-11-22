@@ -82,21 +82,18 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
   /// Retourne les 4 images secondaires qui défilent horizontalement
   List<String> _getSecondaryImages() {
-    // Images secondaires statiques (4 images qui défilent)
-    const secondaryImages = [
-      'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&h=400&fit=crop', // Image secondaire 1 - Casque
-      'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400&h=400&fit=crop', // Image secondaire 2 - Montre
-      'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=400&h=400&fit=crop', // Image secondaire 3 - Chaussures
-      'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=400&h=400&fit=crop', // Image secondaire 4 - Électronique
-    ];
-    
     // Si productImages est fourni, utiliser ces images
     if (widget.productImages != null && widget.productImages!.isNotEmpty) {
-      return widget.productImages!.take(4).toList();
+      final images = widget.productImages!.take(4).toList();
+      // Si on a moins de 4 images, compléter avec l'image principale
+      while (images.length < 4) {
+        images.add(widget.imagePath);
+      }
+      return images;
     }
     
-    // Sinon, utiliser les images statiques
-    return secondaryImages;
+    // Si aucune image secondaire n'est fournie, utiliser l'image principale 4 fois
+    return List.filled(4, widget.imagePath);
   }
 
   /// Récupère les informations du marchand (version statique)

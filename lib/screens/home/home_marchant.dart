@@ -836,11 +836,13 @@ class _ProductCardState extends State<_ProductCard> with SingleTickerProviderSta
       child: AnimatedBuilder(
         animation: _scaleAnimation,
         builder: (context, child) {
-          return Transform.scale(
-            scale: _scaleAnimation.value,
-            child: Container(
-              width: 220,
+          return SizedBox(
+            width: 220,
+            child: Transform.scale(
+              scale: _scaleAnimation.value,
+              alignment: Alignment.center,
               child: Container(
+                width: 220,
                 height: 110,
                 margin: const EdgeInsets.only(bottom: 8),
                 decoration: BoxDecoration(

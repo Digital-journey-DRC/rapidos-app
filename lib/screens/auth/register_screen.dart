@@ -75,13 +75,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back, color: Colors.grey.shade800),
+          onPressed: () => Navigator.pop(context),
+        ),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16.0),
           child: BlocConsumer<AuthCubit, AuthState>(
             listener: (context, state) {
               if (state is AuthSuccess) {
@@ -118,227 +122,334 @@ class _RegisterScreenState extends State<RegisterScreen> {
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Image.asset(AppAssets.logo, width: 100, height: 100),
-                  Text(
-                    'Mbangu na confiance',
-                    style: AppStyles.body.copyWith(color: AppColors.textLight),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 32),
-                  TextFormField(
-                    controller: _firstNameController,
-                    decoration: InputDecoration(
-                      labelText: 'Prénom',
-                      prefixIcon: const Icon(Icons.person_outline),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  TextFormField(
-                    controller: _lastNameController,
-                    decoration: InputDecoration(
-                      labelText: 'Nom',
-                      prefixIcon: const Icon(Icons.person_outline),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  TextFormField(
-                    controller: _emailController,
-                    keyboardType: TextInputType.emailAddress,
-                    decoration: InputDecoration(
-                      labelText: 'Email',
-                      prefixIcon: const Icon(Icons.email_outlined),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  TextFormField(
-                    controller: _phoneController,
-                    keyboardType: TextInputType.phone,
-                    decoration: InputDecoration(
-                      labelText: 'Numéro de téléphone',
-                      hintText: '826016607',
-                      prefixIcon: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 6),
-                        margin: const EdgeInsets.symmetric(horizontal: 8),
-                        child: InkWell(
-                          onTap: () {
-                            showCountryPicker(
-                              context: context,
-                              showPhoneCode: true,
-                              favorite: ['CD', 'RW', 'BI', 'UG', 'KE', 'TZ'],
-                              countryListTheme: CountryListThemeData(
-                                borderRadius: BorderRadius.circular(12),
-                                inputDecoration: InputDecoration(
-                                  labelText: 'Rechercher un pays',
-                                  prefixIcon: const Icon(Icons.search),
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                ),
-                              ),
-                              onSelect: (Country country) {
-                                setState(() {
-                                  _selectedCountry = country;
-                                });
-                              },
-                            );
-                          },
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                _selectedCountry.flagEmoji,
-                                style: const TextStyle(fontSize: 20),
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                '+${_selectedCountry.phoneCode}',
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  color: Colors.black,
-                                ),
-                              ),
-                              const Icon(Icons.arrow_drop_down),
-                            ],
-                          ),
-                        ),
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  DropdownButtonFormField<String>(
-                    value: _selectedRole,
-                    decoration: InputDecoration(
-                      labelText: 'Rôle',
-                      prefixIcon: const Icon(Icons.person_outline),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    items: const [
-                      DropdownMenuItem(
-                          value: 'acheteur', child: Text('Acheteur')),
-                      DropdownMenuItem(
-                          value: 'vendeur', child: Text('Vendeur')),
-                      DropdownMenuItem(
-                          value: 'livreur', child: Text('Livreur')),
-                    ],
-                    onChanged: (value) {
-                      if (value != null) {
-                        setState(() {
-                          _selectedRole = value;
-                        });
-                      }
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  TextFormField(
-                    controller: _passwordController,
-                    obscureText: _obscurePassword,
-                    decoration: InputDecoration(
-                      labelText: 'Mot de passe',
-                      prefixIcon: const Icon(Icons.lock_outline),
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _obscurePassword
-                              ? Icons.visibility_off
-                              : Icons.visibility,
-                          color: AppColors.textLight,
-                        ),
-                        onPressed: () {
-                          setState(() {
-                            _obscurePassword = !_obscurePassword;
-                          });
-                        },
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(
-                            color: AppColors.secondary, width: 1.0),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(
-                            color: AppColors.primary, width: 2.0),
-                      ),
-                      filled: true,
-                      fillColor: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  // Indicateurs de validation du mot de passe
+                  // Header avec logo et titre
                   Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[50],
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.grey[300]!),
-                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 24),
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        Image.asset(AppAssets.logo, width: 100, height: 100),
+                        const SizedBox(height: 20),
                         Text(
-                          'Critères de sécurité :',
+                          'Créer un compte',
                           style: TextStyle(
-                            fontSize: 14,
+                            fontSize: 28,
                             fontWeight: FontWeight.bold,
-                            color: Colors.grey[700],
+                            color: Colors.grey.shade900,
+                            letterSpacing: 0.5,
                           ),
                         ),
                         const SizedBox(height: 8),
-                        _buildValidationRow(
-                          'Au moins 12 caractères',
-                          _hasMinLength,
-                          Icons.check_circle,
-                          Icons.cancel,
-                        ),
-                        _buildValidationRow(
-                          'Au moins un chiffre',
-                          _hasNumber,
-                          Icons.check_circle,
-                          Icons.cancel,
-                        ),
-                        _buildValidationRow(
-                          'Au moins une majuscule',
-                          _hasUppercase,
-                          Icons.check_circle,
-                          Icons.cancel,
-                        ),
-                        _buildValidationRow(
-                          'Au moins une minuscule',
-                          _hasLowercase,
-                          Icons.check_circle,
-                          Icons.cancel,
-                        ),
-                        _buildValidationRow(
-                          'Au moins un caractère spécial',
-                          _hasSpecialChar,
-                          Icons.check_circle,
-                          Icons.cancel,
+                        Text(
+                          'Rejoignez-nous pour commencer',
+                          style: TextStyle(
+                            fontSize: 15,
+                            color: Colors.grey.shade600,
+                          ),
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 24),
-                  ElevatedButton(
-                    onPressed: state is AuthLoading
-                        ? null
-                        : () {
+                  // Formulaire dans une carte
+                  Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 20),
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.05),
+                          blurRadius: 20,
+                          offset: const Offset(0, 10),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        TextFormField(
+                          controller: _firstNameController,
+                          decoration: InputDecoration(
+                            labelText: 'Prénom',
+                            labelStyle: TextStyle(color: Colors.grey.shade600),
+                            prefixIcon: Icon(Icons.person_outline, color: AppColors.primary),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: BorderSide(color: Colors.grey.shade300),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: BorderSide(color: Colors.grey.shade300),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: BorderSide(color: AppColors.primary, width: 2),
+                            ),
+                            filled: true,
+                            fillColor: Colors.grey.shade50,
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          controller: _lastNameController,
+                          decoration: InputDecoration(
+                            labelText: 'Nom',
+                            labelStyle: TextStyle(color: Colors.grey.shade600),
+                            prefixIcon: Icon(Icons.person_outline, color: AppColors.primary),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: BorderSide(color: Colors.grey.shade300),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: BorderSide(color: Colors.grey.shade300),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: BorderSide(color: AppColors.primary, width: 2),
+                            ),
+                            filled: true,
+                            fillColor: Colors.grey.shade50,
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          controller: _emailController,
+                          keyboardType: TextInputType.emailAddress,
+                          decoration: InputDecoration(
+                            labelText: 'Email',
+                            labelStyle: TextStyle(color: Colors.grey.shade600),
+                            prefixIcon: Icon(Icons.email_outlined, color: AppColors.primary),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: BorderSide(color: Colors.grey.shade300),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: BorderSide(color: Colors.grey.shade300),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: BorderSide(color: AppColors.primary, width: 2),
+                            ),
+                            filled: true,
+                            fillColor: Colors.grey.shade50,
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          controller: _phoneController,
+                          keyboardType: TextInputType.phone,
+                          decoration: InputDecoration(
+                            labelText: 'Numéro de téléphone',
+                            labelStyle: TextStyle(color: Colors.grey.shade600),
+                            hintText: '826016607',
+                            hintStyle: TextStyle(color: Colors.grey.shade400),
+                            prefixIcon: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                              margin: const EdgeInsets.only(right: 8),
+                              child: InkWell(
+                                onTap: () {
+                                  showCountryPicker(
+                                    context: context,
+                                    showPhoneCode: true,
+                                    favorite: ['CD', 'RW', 'BI', 'UG', 'KE', 'TZ'],
+                                    countryListTheme: CountryListThemeData(
+                                      borderRadius: BorderRadius.circular(12),
+                                      inputDecoration: InputDecoration(
+                                        labelText: 'Rechercher un pays',
+                                        prefixIcon: const Icon(Icons.search),
+                                        border: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                      ),
+                                    ),
+                                    onSelect: (Country country) {
+                                      setState(() {
+                                        _selectedCountry = country;
+                                      });
+                                    },
+                                  );
+                                },
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      _selectedCountry.flagEmoji,
+                                      style: const TextStyle(fontSize: 20),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      '+${_selectedCountry.phoneCode}',
+                                      style: TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.grey.shade800,
+                                      ),
+                                    ),
+                                    Icon(Icons.arrow_drop_down, color: Colors.grey.shade600),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: BorderSide(color: Colors.grey.shade300),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: BorderSide(color: Colors.grey.shade300),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: BorderSide(color: AppColors.primary, width: 2),
+                            ),
+                            filled: true,
+                            fillColor: Colors.grey.shade50,
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        DropdownButtonFormField<String>(
+                          value: _selectedRole,
+                          decoration: InputDecoration(
+                            labelText: 'Rôle',
+                            labelStyle: TextStyle(color: Colors.grey.shade600),
+                            prefixIcon: Icon(Icons.person_outline, color: AppColors.primary),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: BorderSide(color: Colors.grey.shade300),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: BorderSide(color: Colors.grey.shade300),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: BorderSide(color: AppColors.primary, width: 2),
+                            ),
+                            filled: true,
+                            fillColor: Colors.grey.shade50,
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                          ),
+                          dropdownColor: Colors.white,
+                          style: TextStyle(color: Colors.grey.shade800, fontSize: 15),
+                          items: const [
+                            DropdownMenuItem(
+                                value: 'acheteur', child: Text('Acheteur')),
+                            DropdownMenuItem(
+                                value: 'vendeur', child: Text('Vendeur')),
+                            DropdownMenuItem(
+                                value: 'livreur', child: Text('Livreur')),
+                          ],
+                          onChanged: (value) {
+                            if (value != null) {
+                              setState(() {
+                                _selectedRole = value;
+                              });
+                            }
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          controller: _passwordController,
+                          obscureText: _obscurePassword,
+                          decoration: InputDecoration(
+                            labelText: 'Mot de passe',
+                            labelStyle: TextStyle(color: Colors.grey.shade600),
+                            prefixIcon: Icon(Icons.lock_outline, color: AppColors.primary),
+                            suffixIcon: IconButton(
+                              icon: Icon(
+                                _obscurePassword
+                                    ? Icons.visibility_off
+                                    : Icons.visibility,
+                                color: Colors.grey.shade600,
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  _obscurePassword = !_obscurePassword;
+                                });
+                              },
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: BorderSide(color: Colors.grey.shade300),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: BorderSide(color: Colors.grey.shade300),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: BorderSide(color: AppColors.primary, width: 2),
+                            ),
+                            filled: true,
+                            fillColor: Colors.grey.shade50,
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        // Indicateurs de validation du mot de passe
+                        Container(
+                          padding: const EdgeInsets.all(18),
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade50,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: Colors.grey.shade200),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(Icons.security, size: 18, color: AppColors.primary),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'Critères de sécurité',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.grey.shade800,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                              _buildValidationRow(
+                                'Au moins 12 caractères',
+                                _hasMinLength,
+                              ),
+                              const SizedBox(height: 6),
+                              _buildValidationRow(
+                                'Au moins un chiffre',
+                                _hasNumber,
+                              ),
+                              const SizedBox(height: 6),
+                              _buildValidationRow(
+                                'Au moins une majuscule',
+                                _hasUppercase,
+                              ),
+                              const SizedBox(height: 6),
+                              _buildValidationRow(
+                                'Au moins une minuscule',
+                                _hasLowercase,
+                              ),
+                              const SizedBox(height: 6),
+                              _buildValidationRow(
+                                'Au moins un caractère spécial',
+                                _hasSpecialChar,
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        ElevatedButton(
+                          onPressed: state is AuthLoading
+                              ? null
+                              : () {
                             // Validation des champs
                             if (_firstNameController.text.isEmpty ||
                                 _lastNameController.text.isEmpty ||
@@ -406,26 +517,69 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             //       phone: phoneNumber,
                             //     );
                           },
-                    style: ElevatedButton.styleFrom(
-                      elevation: 0,
-                      backgroundColor: AppColors.buttonColor,
-                      foregroundColor: AppColors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
+                          style: ElevatedButton.styleFrom(
+                            elevation: 4,
+                            shadowColor: AppColors.buttonColor.withOpacity(0.4),
+                            backgroundColor: AppColors.buttonColor,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 18),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
+                          child: state is AuthLoading
+                              ? const SizedBox(
+                                  height: 20,
+                                  width: 20,
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white,
+                                    strokeWidth: 2.5,
+                                  ),
+                                )
+                              : const Text(
+                                  'Créer mon compte',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                        ),
+                        const SizedBox(height: 20),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              'Vous avez déjà un compte ? ',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey.shade600,
+                              ),
+                            ),
+                            TextButton(
+                              onPressed: () {
+                                Navigator.pop(context);
+                              },
+                              style: TextButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                minimumSize: Size.zero,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                              child: Text(
+                                'Se connecter',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.primary,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
-                    child: state is AuthLoading
-                        ? const CircularProgressIndicator(color: Colors.white)
-                        : const Text('Suivant'),
                   ),
-                  const SizedBox(height: 16),
-                  TextButton(
-                    onPressed: () {
-                      Navigator.pop(context);
-                    },
-                    child: const Text('Déjà un compte ? Connectez-vous'),
-                  ),
+                  const SizedBox(height: 24),
                 ],
               );
             },
@@ -435,27 +589,33 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
-  Widget _buildValidationRow(String text, bool isValid, IconData validIcon, IconData invalidIcon) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
-      child: Row(
-        children: [
-          Icon(
-            isValid ? validIcon : invalidIcon,
-            size: 16,
-            color: isValid ? Colors.green : Colors.red,
+  Widget _buildValidationRow(String text, bool isValid) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            color: isValid ? Colors.green.shade50 : Colors.red.shade50,
+            shape: BoxShape.circle,
           ),
-          const SizedBox(width: 8),
-          Text(
+          child: Icon(
+            isValid ? Icons.check_circle : Icons.cancel,
+            size: 16,
+            color: isValid ? Colors.green : Colors.red.shade400,
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
             text,
             style: TextStyle(
               fontSize: 12,
-              color: isValid ? Colors.green[700] : Colors.red[700],
-              fontWeight: isValid ? FontWeight.w500 : FontWeight.normal,
+              color: isValid ? Colors.green.shade700 : Colors.grey.shade600,
+              fontWeight: isValid ? FontWeight.w600 : FontWeight.normal,
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
