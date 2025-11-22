@@ -162,6 +162,8 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   void _onItemTapped(int index) {
+    if (!mounted) return;
+    
     final authState = context.read<AuthCubit>().state;
     
     // Vérifier si l'utilisateur a le numéro spécifique
@@ -173,23 +175,27 @@ class _MainScreenState extends State<MainScreen> {
         print('🚫 MainScreen: Utilisateur avec numéro restreint détecté, redirection vers login');
         // Rediriger vers le login
         context.read<AuthCubit>().logout();
-        Navigator.of(context).pushNamedAndRemoveUntil(
-          AppRoutes.login,
-          (route) => false,
-        );
+        if (mounted) {
+          Navigator.of(context).pushNamedAndRemoveUntil(
+            AppRoutes.login,
+            (route) => false,
+          );
+        }
         return;
       }
     }
 
-    setState(() {
-      _previousIndex = _currentIndex;
-      _currentIndex = index;
+    if (mounted) {
+      setState(() {
+        _previousIndex = _currentIndex;
+        _currentIndex = index;
 
-      // Recharger les listings uniquement si on revient à la page d'accueil depuis une autre page
-      if (index == 0 && _previousIndex != 0) {
-        context.read<ListingCubit>().getListings();
-      }
-    });
+        // Recharger les listings uniquement si on revient à la page d'accueil depuis une autre page
+        if (index == 0 && _previousIndex != 0 && mounted) {
+          context.read<ListingCubit>().getListings();
+        }
+      });
+    }
   }
 
   @override

@@ -1,14 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:http/http.dart' as http;
 import 'dart:io';
-import 'dart:convert';
 import 'package:image/image.dart' as img;
 import '../../constants.dart';
 import '../../widgets/app_logo.dart';
 import '../../services/promotion_service.dart';
-import '../../services/storage_service.dart';
 import '../../cubit/product_cubit.dart';
 import '../../models/product.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -34,7 +31,8 @@ class _CreatePromotionScreenState extends State<CreatePromotionScreen> {
   
   DateTime? _delaiPromotion;
   List<File> _selectedImages = []; // Images secondaires (optionnelles)
-  String? _mainImageUrl; // Image principale du produit (pré-remplie)
+  String? _mainImageUrl; // Image principale du produit (pré-remplie) - pour affichage uniquement
+  File? _mainImageFile; // Fichier de l'image principale à envoyer
   final ImagePicker _picker = ImagePicker();
   bool _isLoading = false;
   List<Product> _products = [];
@@ -68,35 +66,58 @@ class _CreatePromotionScreenState extends State<CreatePromotionScreen> {
     }
   }
 
-  Future<void> _pickImages() async {
+  Future<void> _pickImages({bool isMain = false}) async {
     try {
-      final List<XFile> images = await _picker.pickMultiImage();
-      if (images.isNotEmpty) {
-        setState(() {
-          final newImages = images.map((xFile) => File(xFile.path)).toList();
-          // Limiter à 4 images secondaires (l'image principale est déjà définie)
-          final totalImages = _selectedImages.length + newImages.length;
-          if (totalImages > 4) {
-            final remainingSlots = 4 - _selectedImages.length;
-            _selectedImages.addAll(newImages.take(remainingSlots));
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Maximum 4 images secondaires autorisées'),
-                backgroundColor: Colors.orange,
-              ),
-            );
-          } else {
-            _selectedImages.addAll(newImages);
-          }
-        });
+      if (isMain) {
+        // Sélectionner l'image principale
+        final XFile? image = await _picker.pickImage(
+          source: ImageSource.gallery,
+          imageQuality: 85,
+          maxWidth: 800,
+        );
+        if (image != null && mounted) {
+          setState(() {
+            _mainImageFile = File(image.path);
+            _mainImageUrl = null; // Effacer l'URL si on sélectionne un nouveau fichier
+          });
+        }
+      } else {
+        // Sélectionner les images secondaires
+        final List<XFile> images = await _picker.pickMultiImage(
+          imageQuality: 85,
+          maxWidth: 800,
+        );
+        if (images.isNotEmpty && mounted) {
+          setState(() {
+            final newImages = images.map((xFile) => File(xFile.path)).toList();
+            // Limiter à 4 images secondaires
+            final totalImages = _selectedImages.length + newImages.length;
+            if (totalImages > 4) {
+              final remainingSlots = 4 - _selectedImages.length;
+              _selectedImages.addAll(newImages.take(remainingSlots));
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Maximum 4 images secondaires autorisées'),
+                    backgroundColor: Colors.orange,
+                  ),
+                );
+              }
+            } else {
+              _selectedImages.addAll(newImages);
+            }
+          });
+        }
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erreur lors de la sélection des images: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur lors de la sélection des images: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -136,55 +157,10 @@ class _CreatePromotionScreenState extends State<CreatePromotionScreen> {
     }
   }
 
-  Future<String?> _uploadImage(File imageFile) async {
-    try {
-      final token = await StorageService().getToken();
-      if (token == null) return null;
-
-      // Compresser l'image avant l'upload
-      final compressedFile = await _compressImage(imageFile);
-      final fileToUpload = compressedFile ?? imageFile;
-
-      var request = http.MultipartRequest(
-        'POST',
-        Uri.parse('http://24.144.87.127:3333/upload'), // URL d'upload - à ajuster selon votre API
-      );
-
-      request.headers.addAll({
-        'Authorization': 'Bearer $token',
-      });
-
-      request.files.add(
-        await http.MultipartFile.fromPath(
-          'file',
-          fileToUpload.path,
-        ),
-      );
-
-      var response = await request.send();
-      var responseData = await response.stream.bytesToString();
-
-      // Supprimer le fichier temporaire compressé s'il existe
-      if (compressedFile != null && compressedFile.existsSync()) {
-        try {
-          await compressedFile.delete();
-        } catch (e) {
-          print('Erreur suppression fichier temporaire: $e');
-        }
-      }
-
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        final data = jsonDecode(responseData);
-        return data['url'] ?? data['mediaUrl'] ?? data['imageUrl'];
-      }
-      return null;
-    } catch (e) {
-      print('Erreur upload image: $e');
-      return null;
-    }
-  }
 
   Future<void> _selectDate() async {
+    if (!mounted) return;
+    
     final DateTime? picked = await showDatePicker(
       context: context,
       initialDate: _delaiPromotion ?? DateTime.now().add(const Duration(days: 30)),
@@ -202,7 +178,7 @@ class _CreatePromotionScreenState extends State<CreatePromotionScreen> {
       },
     );
 
-    if (picked != null) {
+    if (picked != null && mounted) {
       final TimeOfDay? time = await showTimePicker(
         context: context,
         initialTime: TimeOfDay.now(),
@@ -218,7 +194,7 @@ class _CreatePromotionScreenState extends State<CreatePromotionScreen> {
         },
       );
 
-      if (time != null) {
+      if (time != null && mounted) {
         setState(() {
           _delaiPromotion = DateTime(
             picked.year,
@@ -237,76 +213,82 @@ class _CreatePromotionScreenState extends State<CreatePromotionScreen> {
       return;
     }
 
-    // Vérifier qu'on a au moins l'image principale ou des images sélectionnées
-    if (_mainImageUrl == null && _selectedImages.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Veuillez sélectionner un produit avec une image ou ajouter des images'),
-          backgroundColor: Colors.red,
-        ),
-      );
+    // Vérifier qu'on a l'image principale
+    if (_mainImageFile == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Veuillez sélectionner une image principale'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
       return;
     }
 
     if (_delaiPromotion == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Veuillez sélectionner une date de fin de promotion'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Veuillez sélectionner une date de fin de promotion'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
       return;
     }
 
     if (_selectedProduct == null && _productIdController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Veuillez sélectionner un produit'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Veuillez sélectionner un produit'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
       return;
     }
 
+    if (!mounted) return;
     setState(() => _isLoading = true);
 
     try {
-      // Upload des images secondaires (si sélectionnées)
-      final List<String> secondaryImageUrls = [];
+      // Compresser l'image principale si nécessaire
+      File? mainImageFile = _mainImageFile;
+      if (mainImageFile != null) {
+        final compressed = await _compressImage(mainImageFile);
+        mainImageFile = compressed ?? mainImageFile;
+      }
+
+      // Compresser les images secondaires
+      final List<File> compressedSecondaryImages = [];
       for (var image in _selectedImages) {
-        final url = await _uploadImage(image);
-        if (url != null) {
-          secondaryImageUrls.add(url);
-        } else {
-          throw Exception('Erreur lors de l\'upload d\'une image');
-        }
+        if (!mounted) break;
+        final compressed = await _compressImage(image);
+        compressedSecondaryImages.add(compressed ?? image);
       }
 
-      // Utiliser l'image principale du produit ou la première image uploadée
-      final mainImage = _mainImageUrl ?? (secondaryImageUrls.isNotEmpty ? secondaryImageUrls[0] : null);
-      
-      if (mainImage == null) {
-        throw Exception('Aucune image principale disponible');
-      }
-
-      // Créer la promotion
+      // Créer la promotion avec les fichiers directement
       final promotionService = PromotionService();
       final productId = _selectedProduct?.id ?? int.parse(_productIdController.text);
       
       final result = await promotionService.createPromotion(
         productId: productId,
-        image: mainImage, // Image principale (du produit ou uploadée)
-        image1: secondaryImageUrls.isNotEmpty ? secondaryImageUrls[0] : null,
-        image2: secondaryImageUrls.length > 1 ? secondaryImageUrls[1] : null,
-        image3: secondaryImageUrls.length > 2 ? secondaryImageUrls[2] : null,
-        image4: secondaryImageUrls.length > 3 ? secondaryImageUrls[3] : null,
+        image: mainImageFile!,
+        image1: compressedSecondaryImages.isNotEmpty ? compressedSecondaryImages[0] : null,
+        image2: compressedSecondaryImages.length > 1 ? compressedSecondaryImages[1] : null,
+        image3: compressedSecondaryImages.length > 2 ? compressedSecondaryImages[2] : null,
+        image4: compressedSecondaryImages.length > 3 ? compressedSecondaryImages[3] : null,
         libelle: _libelleController.text,
         delaiPromotion: _delaiPromotion!,
         nouveauPrix: double.parse(_nouveauPrixController.text),
         ancienPrix: double.parse(_ancienPrixController.text),
       );
 
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
 
       if (result['success'] == true) {
         if (mounted) {
@@ -322,8 +304,8 @@ class _CreatePromotionScreenState extends State<CreatePromotionScreen> {
         throw Exception(result['error'] ?? 'Erreur inconnue');
       }
     } catch (e) {
-      setState(() => _isLoading = false);
       if (mounted) {
+        setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Erreur: ${e.toString()}'),
@@ -709,54 +691,76 @@ class _CreatePromotionScreenState extends State<CreatePromotionScreen> {
               ),
               const SizedBox(height: 12),
 
-              // Image principale (du produit)
-              if (_mainImageUrl != null) ...[
-                const Text(
-                  'Image principale',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                  ),
+              // Image principale
+              const Text(
+                'Image principale',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
                 ),
-                const SizedBox(height: 6),
-                Container(
+              ),
+              const SizedBox(height: 4),
+              GestureDetector(
+                onTap: () => _pickImages(isMain: true),
+                child: Container(
                   height: 80,
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(color: Colors.grey.shade300),
                   ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child: Image.network(
-                      _mainImageUrl!,
-                      fit: BoxFit.cover,
-                      width: double.infinity,
-                      cacheWidth: 400, // Limiter la résolution pour économiser la mémoire
-                      errorBuilder: (context, error, stackTrace) {
-                        return Container(
-                          color: Colors.grey.shade200,
-                          child: Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.image_not_supported, color: Colors.grey.shade400, size: 20),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'Image du produit',
-                                  style: TextStyle(color: Colors.grey.shade600, fontSize: 10),
-                                ),
-                              ],
-                            ),
+                  child: _mainImageFile != null
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(10),
+                          child: Image.file(
+                            _mainImageFile!,
+                            fit: BoxFit.cover,
+                            width: double.infinity,
                           ),
-                        );
-                      },
-                    ),
-                  ),
+                        )
+                      : (_mainImageUrl != null
+                          ? ClipRRect(
+                              borderRadius: BorderRadius.circular(10),
+                              child: Image.network(
+                                _mainImageUrl!,
+                                fit: BoxFit.cover,
+                                width: double.infinity,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return Container(
+                                    color: Colors.grey.shade200,
+                                    child: Center(
+                                      child: Column(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          Icon(Icons.add_photo_alternate, color: Colors.grey.shade400, size: 20),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            'Sélectionner l\'image principale',
+                                            style: TextStyle(color: Colors.grey.shade600, fontSize: 11),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            )
+                          : Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.add_photo_alternate, color: Colors.grey.shade400, size: 20),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'Sélectionner l\'image principale',
+                                    style: TextStyle(color: Colors.grey.shade600, fontSize: 11),
+                                  ),
+                                ],
+                              ),
+                            )),
                 ),
-                const SizedBox(height: 12),
-              ],
-
+              ),
+              const SizedBox(height: 12),
               // Images secondaires (optionnelles)
               const Text(
                 'Images secondaires (optionnelles, max 4)',
@@ -775,7 +779,7 @@ class _CreatePromotionScreenState extends State<CreatePromotionScreen> {
               ),
               const SizedBox(height: 6),
               GestureDetector(
-                onTap: _pickImages,
+                onTap: () => _pickImages(isMain: false),
                 child: Container(
                   height: 80,
                   decoration: BoxDecoration(

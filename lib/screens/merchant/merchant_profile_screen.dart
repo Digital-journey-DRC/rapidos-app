@@ -792,10 +792,11 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> with Sing
                           if (loadingProgress == null) {
                             return child;
                           }
+                          final expectedTotalBytes = loadingProgress.expectedTotalBytes;
                           return Center(
                             child: CircularProgressIndicator(
-                              value: loadingProgress.expectedTotalBytes != null
-                                ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+                              value: expectedTotalBytes != null && expectedTotalBytes > 0
+                                ? loadingProgress.cumulativeBytesLoaded / expectedTotalBytes
                                 : null,
                               color: AppColors.primary,
                               strokeWidth: 2,

@@ -93,9 +93,20 @@ class _SettingScreenState extends State<SettingScreen>
       // Charger les produits
       await context.read<ProductCubit>().fetchProducts();
       
-      // Charger les promotions
+      // Charger les promotions filtrées par marchand
       final promotionService = PromotionService();
-      final promoResult = await promotionService.getPromotions();
+      int? merchantId;
+      final userId = authState.user!['id'];
+      if (userId != null) {
+        if (userId is int) {
+          merchantId = userId;
+        } else if (userId is String) {
+          merchantId = int.tryParse(userId);
+        } else if (userId is num) {
+          merchantId = userId.toInt();
+        }
+      }
+      final promoResult = await promotionService.getPromotions(merchantId: merchantId);
       
       if (mounted) {
         setState(() {
@@ -523,13 +534,19 @@ class _SettingScreenState extends State<SettingScreen>
             GestureDetector(
               onTap: () async {
                 Navigator.pop(context);
-                final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
-                if (image != null) {
+                final XFile? image = await _picker.pickImage(
+                  source: ImageSource.gallery,
+                  imageQuality: 85,
+                  maxWidth: 800,
+                );
+                if (image != null && context.mounted) {
                   setState(() {
                     _selectedImage = File(image.path);
                   });
                   // Uploader l'image au serveur
-                  await _uploadImageToServer(File(image.path));
+                  if (mounted) {
+                    await _uploadImageToServer(File(image.path));
+                  }
                 }
               },
               child: const Column(
@@ -544,13 +561,19 @@ class _SettingScreenState extends State<SettingScreen>
             GestureDetector(
               onTap: () async {
                 Navigator.pop(context);
-                final XFile? photo = await _picker.pickImage(source: ImageSource.camera);
-                if (photo != null) {
+                final XFile? photo = await _picker.pickImage(
+                  source: ImageSource.camera,
+                  imageQuality: 85,
+                  maxWidth: 800,
+                );
+                if (photo != null && context.mounted) {
                   setState(() {
                     _selectedImage = File(photo.path);
                   });
                   // Uploader l'image au serveur
-                  await _uploadImageToServer(File(photo.path));
+                  if (mounted) {
+                    await _uploadImageToServer(File(photo.path));
+                  }
                 }
               },
               child: const Column(
@@ -1296,8 +1319,8 @@ class _SettingScreenState extends State<SettingScreen>
           // Sections marchand
           if (isVendeur) ...[
             Container(
+              width: double.infinity,
               margin: const EdgeInsets.only(bottom: 16),
-              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(18),
@@ -1308,53 +1331,66 @@ class _SettingScreenState extends State<SettingScreen>
                     offset: const Offset(0, 4),
                     spreadRadius: 0,
                   ),
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.04),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
                 ],
               ),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Text(
-                    'Gestion des produits',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+                    child: const Text(
+                      'Gestion des produits',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 16),
                   BlocBuilder<ProductCubit, ProductState>(
                     builder: (context, productState) {
                       // Mettre à jour le compteur si les produits sont chargés
                       if (productState is ProductLoaded) {
                         WidgetsBinding.instance.addPostFrameCallback((_) {
                           if (mounted && _allProductsCount != productState.products.length) {
-                            setState(() {
-                              _allProductsCount = productState.products.length;
-                              _recommendedProductsCount = productState.products
-                                  .where((p) => p.stock > 20 && p.price > 0 && p.price < 50000)
-                                  .length;
-                            });
+                            if (mounted) {
+                              setState(() {
+                                _allProductsCount = productState.products.length;
+                                _recommendedProductsCount = productState.products
+                                    .where((p) => p.stock > 20 && p.price > 0 && p.price < 50000)
+                                    .length;
+                              });
+                            }
                           }
                         });
                       }
                       
-                      return MerchantSectionCard(
-                        title: 'Tous les produits',
-                        subtitle: 'Voir et gérer tous vos produits',
-                        icon: Icons.inventory_2_outlined,
-                        iconColor: AppColors.primary,
-                        count: _isLoadingCounts ? null : _allProductsCount,
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const MerchantAllProductsScreen(),
-                            ),
-                          ).then((_) {
-                            // Rafraîchir les compteurs après retour
-                            _loadMerchantCounts();
-                          });
-                        },
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child: MerchantSectionCard(
+                          title: 'Tous les produits',
+                          subtitle: 'Voir et gérer tous vos produits',
+                          icon: Icons.inventory_2_outlined,
+                          iconColor: AppColors.primary,
+                          count: _isLoadingCounts ? null : _allProductsCount,
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const MerchantAllProductsScreen(),
+                              ),
+                            ).then((_) {
+                              // Rafraîchir les compteurs après retour
+                              _loadMerchantCounts();
+                            });
+                          },
+                        ),
                       );
                     },
                   ),
@@ -1375,45 +1411,51 @@ class _SettingScreenState extends State<SettingScreen>
                         }
                       }
                       
-                      return MerchantSectionCard(
-                        title: 'Produits en promotions',
-                        subtitle: 'Gérer vos produits en promotion',
-                        icon: Icons.local_offer_outlined,
-                        iconColor: Colors.red,
-                        count: _isLoadingCounts ? null : _promoProductsCount,
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const MerchantPromoProductsScreen(),
-                            ),
-                          ).then((_) {
-                            // Rafraîchir les compteurs après retour
-                            _loadMerchantCounts();
-                          });
-                        },
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child: MerchantSectionCard(
+                          title: 'Produits en promotions',
+                          subtitle: 'Gérer vos produits en promotion',
+                          icon: Icons.local_offer_outlined,
+                          iconColor: Colors.red,
+                          count: _isLoadingCounts ? null : _promoProductsCount,
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const MerchantPromoProductsScreen(),
+                              ),
+                            ).then((_) {
+                              // Rafraîchir les compteurs après retour
+                              _loadMerchantCounts();
+                            });
+                          },
+                        ),
                       );
                     },
                   ),
                   BlocBuilder<ProductCubit, ProductState>(
                     builder: (context, productState) {
-                      return MerchantSectionCard(
-                        title: 'Produits recommandés',
-                        subtitle: 'Mettre en avant vos meilleurs produits',
-                        icon: Icons.star_outline,
-                        iconColor: Colors.amber,
-                        count: _isLoadingCounts ? null : _recommendedProductsCount,
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const MerchantRecommendedProductsScreen(),
-                            ),
-                          ).then((_) {
-                            // Rafraîchir les compteurs après retour
-                            _loadMerchantCounts();
-                          });
-                        },
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child: MerchantSectionCard(
+                          title: 'Produits recommandés',
+                          subtitle: 'Mettre en avant vos meilleurs produits',
+                          icon: Icons.star_outline,
+                          iconColor: Colors.amber,
+                          count: _isLoadingCounts ? null : _recommendedProductsCount,
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const MerchantRecommendedProductsScreen(),
+                              ),
+                            ).then((_) {
+                              // Rafraîchir les compteurs après retour
+                              _loadMerchantCounts();
+                            });
+                          },
+                        ),
                       );
                     },
                   ),
@@ -2007,8 +2049,43 @@ class _SettingScreenState extends State<SettingScreen>
               ],
             ),
             const SizedBox(height: 20),
+            // Bouton pour ajouter une nouvelle adresse
             SizedBox(
-              height: MediaQuery.of(context).size.height * 0.5,
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.pop(context);
+                  _showAddAddressDialog();
+                },
+                icon: const Icon(Icons.add_location_alt, color: Colors.white),
+                label: const Text(
+                  'Ajouter une nouvelle adresse',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.buttonColor,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'Vos adresses enregistrées',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: Colors.black87,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Expanded(
               child: StreamBuilder<QuerySnapshot>(
                 stream: FirebaseFirestore.instance
                     .collection('delivery_addresses')
@@ -2067,7 +2144,6 @@ class _SettingScreenState extends State<SettingScreen>
                 },
               ),
             ),
-            const SizedBox(height: 16),
           ],
         ),
       ),
@@ -2085,78 +2161,114 @@ class _SettingScreenState extends State<SettingScreen>
     
     final fullAddress = '$numero, $avenue, $quartier, $commune, $ville, $pays';
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: () {
-          Navigator.pop(context);
-          _showEditAddressDialog(address, addressId);
-        },
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        child: Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.grey.shade50,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.grey.shade200),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.04),
-                blurRadius: 6,
-                offset: const Offset(0, 2),
-              ),
-            ],
+        border: Border.all(color: Colors.grey.shade200, width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
           ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: AppColors.buttonColor.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(
-                  Icons.location_on,
-                  color: AppColors.buttonColor,
-                  size: 24,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
+        ],
+      ),
+      child: Column(
+        children: [
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () {
+                Navigator.pop(context);
+                _showEditAddressDialog(address, addressId);
+              },
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      fullAddress,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.black87,
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: AppColors.buttonColor.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(10),
                       ),
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
+                      child: Icon(
+                        Icons.location_on,
+                        color: AppColors.buttonColor,
+                        size: 24,
+                      ),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            fullAddress,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.black87,
+                            ),
+                            maxLines: 3,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Appuyez pour modifier',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Icon(
+                      Icons.edit_outlined,
+                      color: AppColors.buttonColor,
+                      size: 20,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Divider(height: 1, color: Colors.grey.shade200),
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () => _showDeleteAddressConfirmation(addressId, fullAddress),
+              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(12)),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.delete_outline,
+                      color: Colors.red.shade400,
+                      size: 18,
+                    ),
+                    const SizedBox(width: 8),
                     Text(
-                      'Appuyez pour modifier',
+                      'Supprimer cette adresse',
                       style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey.shade600,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.red.shade400,
                       ),
                     ),
                   ],
                 ),
               ),
-              Icon(
-                Icons.edit_outlined,
-                color: AppColors.buttonColor,
-                size: 20,
-              ),
-            ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -2424,6 +2536,376 @@ class _SettingScreenState extends State<SettingScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Erreur lors de la modification: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  /// Affiche la confirmation de suppression d'adresse
+  void _showDeleteAddressConfirmation(String addressId, String address) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Supprimer l\'adresse'),
+          content: Text('Êtes-vous sûr de vouloir supprimer cette adresse ?\n\n$address'),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(15),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: const Text(
+                'Annuler',
+                style: TextStyle(
+                  color: Colors.grey,
+                ),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.of(context).pop();
+                await _deleteAddress(addressId);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Text(
+                'Supprimer',
+                style: TextStyle(
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  /// Supprime une adresse de Firestore
+  Future<void> _deleteAddress(String addressId) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('delivery_addresses')
+          .doc(addressId)
+          .delete();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Adresse supprimée avec succès'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur lors de la suppression: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  /// Affiche le dialogue d'ajout d'une nouvelle adresse
+  void _showAddAddressDialog() {
+    final villeController = TextEditingController();
+    final communeController = TextEditingController();
+    final quartierController = TextEditingController();
+    final avenueController = TextEditingController();
+    final numeroController = TextEditingController();
+    final paysController = TextEditingController(text: 'RDC');
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+          ),
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+            ),
+            child: Form(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Ajouter une nouvelle adresse',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close, color: Colors.grey),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  // Champ Ville
+                  TextFormField(
+                    controller: villeController,
+                    decoration: InputDecoration(
+                      labelText: 'Ville',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.grey.shade300),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: AppColors.buttonColor, width: 2),
+                      ),
+                      filled: true,
+                      fillColor: Colors.grey.shade50,
+                      prefixIcon: Icon(Icons.location_city, color: AppColors.buttonColor),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  // Champ Commune
+                  TextFormField(
+                    controller: communeController,
+                    decoration: InputDecoration(
+                      labelText: 'Commune',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.grey.shade300),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: AppColors.buttonColor, width: 2),
+                      ),
+                      filled: true,
+                      fillColor: Colors.grey.shade50,
+                      prefixIcon: Icon(Icons.apartment, color: AppColors.buttonColor),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  // Champ Quartier
+                  TextFormField(
+                    controller: quartierController,
+                    decoration: InputDecoration(
+                      labelText: 'Quartier',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.grey.shade300),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: AppColors.buttonColor, width: 2),
+                      ),
+                      filled: true,
+                      fillColor: Colors.grey.shade50,
+                      prefixIcon: Icon(Icons.home, color: AppColors.buttonColor),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  // Champ Avenue
+                  TextFormField(
+                    controller: avenueController,
+                    decoration: InputDecoration(
+                      labelText: 'Avenue',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.grey.shade300),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: AppColors.buttonColor, width: 2),
+                      ),
+                      filled: true,
+                      fillColor: Colors.grey.shade50,
+                      prefixIcon: Icon(Icons.streetview, color: AppColors.buttonColor),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  // Champ Numéro
+                  TextFormField(
+                    controller: numeroController,
+                    decoration: InputDecoration(
+                      labelText: 'Numéro',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.grey.shade300),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: AppColors.buttonColor, width: 2),
+                      ),
+                      filled: true,
+                      fillColor: Colors.grey.shade50,
+                      prefixIcon: Icon(Icons.numbers, color: AppColors.buttonColor),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  // Champ Pays
+                  TextFormField(
+                    controller: paysController,
+                    decoration: InputDecoration(
+                      labelText: 'Pays',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.grey.shade300),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: AppColors.buttonColor, width: 2),
+                      ),
+                      filled: true,
+                      fillColor: Colors.grey.shade50,
+                      prefixIcon: Icon(Icons.public, color: AppColors.buttonColor),
+                    ),
+                  ),
+                  const SizedBox(height: 28),
+                  // Bouton Sauvegarder
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () async {
+                        if (villeController.text.isEmpty ||
+                            communeController.text.isEmpty ||
+                            quartierController.text.isEmpty ||
+                            avenueController.text.isEmpty ||
+                            numeroController.text.isEmpty) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Veuillez remplir tous les champs obligatoires'),
+                                backgroundColor: Colors.orange,
+                              ),
+                            );
+                          }
+                          return;
+                        }
+                        await _addAddress(
+                          villeController.text,
+                          communeController.text,
+                          quartierController.text,
+                          avenueController.text,
+                          numeroController.text,
+                          paysController.text,
+                        );
+                        if (context.mounted) {
+                          Navigator.pop(context);
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.buttonColor,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        elevation: 4,
+                        shadowColor: AppColors.buttonColor.withOpacity(0.4),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text(
+                        'Ajouter l\'adresse',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Ajoute une nouvelle adresse dans Firestore
+  Future<void> _addAddress(
+    String ville,
+    String commune,
+    String quartier,
+    String avenue,
+    String numero,
+    String pays,
+  ) async {
+    final authState = context.read<AuthCubit>().state;
+    if (authState is! AuthSuccess || authState.user == null) {
+      return;
+    }
+    final userId = authState.user!['id']?.toString() ?? '';
+    final userName =
+        '${authState.user!['firstName'] ?? ''} ${authState.user!['lastName'] ?? ''}'.trim();
+
+    try {
+      await FirebaseFirestore.instance.collection('delivery_addresses').add({
+        'timestamp': FieldValue.serverTimestamp(),
+        'userId': userId,
+        'userName': userName,
+        'ville': ville,
+        'commune': commune,
+        'quartier': quartier,
+        'avenue': avenue,
+        'numero': numero,
+        'pays': pays,
+        'phone': authState.user!['phone'] ?? '',
+        'latitude': 0.0,
+        'longitude': 0.0,
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Adresse ajoutée avec succès'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur lors de l\'ajout: $e'),
             backgroundColor: Colors.red,
           ),
         );

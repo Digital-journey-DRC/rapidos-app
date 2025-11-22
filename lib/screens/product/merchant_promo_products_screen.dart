@@ -6,6 +6,8 @@ import 'package:immo/screens/product/product_detail_screen.dart';
 import 'package:immo/screens/product/create_promotion_screen.dart';
 import 'package:immo/widgets/merchant_closed_banner.dart';
 import 'package:immo/services/promotion_service.dart';
+import 'package:immo/cubit/auth_cubit.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
 class MerchantPromoProductsScreen extends StatefulWidget {
   const MerchantPromoProductsScreen({Key? key}) : super(key: key);
@@ -29,7 +31,25 @@ class _MerchantPromoProductsScreenState extends State<MerchantPromoProductsScree
   Future<void> _loadPromotions() async {
     setState(() => _isLoading = true);
     try {
-      final result = await _promotionService.getPromotions();
+      // Récupérer l'ID du marchand connecté
+      final authState = context.read<AuthCubit>().state;
+      int? merchantId;
+      
+      if (authState is AuthSuccess && authState.user != null) {
+        final userId = authState.user!['id'];
+        if (userId != null) {
+          if (userId is int) {
+            merchantId = userId;
+          } else if (userId is String) {
+            merchantId = int.tryParse(userId);
+          } else if (userId is num) {
+            merchantId = userId.toInt();
+          }
+        }
+      }
+      
+      // Charger les promotions filtrées par marchand
+      final result = await _promotionService.getPromotions(merchantId: merchantId);
       if (result['success'] == true) {
         setState(() {
           _promotions = result['promotions'] as List<Promotion>;
@@ -230,18 +250,8 @@ class _PromoProductCard extends StatelessWidget {
         if (product != null) {
           // Préparer la liste des images (image principale + images secondaires)
           final List<String> productImages = [promotion.image];
-          if (promotion.image1 != null && promotion.image1!.isNotEmpty) {
-            productImages.add(promotion.image1!);
-          }
-          if (promotion.image2 != null && promotion.image2!.isNotEmpty) {
-            productImages.add(promotion.image2!);
-          }
-          if (promotion.image3 != null && promotion.image3!.isNotEmpty) {
-            productImages.add(promotion.image3!);
-          }
-          if (promotion.image4 != null && promotion.image4!.isNotEmpty) {
-            productImages.add(promotion.image4!);
-          }
+          // Utiliser le nouveau tableau images
+          productImages.addAll(promotion.images.where((img) => img.isNotEmpty));
 
           Navigator.push(
             context,

@@ -19,6 +19,10 @@ import 'package:immo/cubit/order_cubit.dart';
 import 'package:immo/widgets/shimmer_loading.dart';
 import 'package:immo/cubit/category_cubit.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:immo/screens/product/merchant_promo_products_screen.dart';
+import 'package:immo/screens/product/merchant_recommended_products_screen.dart';
+import 'package:immo/services/promotion_service.dart';
+import 'package:immo/models/promotion.dart';
 
 class HomeMarchantScreen extends StatefulWidget {
   const HomeMarchantScreen({Key? key}) : super(key: key);
@@ -392,8 +396,12 @@ void saveCommande() async {
             GestureDetector(
               onTap: () async {
                 Navigator.pop(context);
-                final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
-                if (image != null) {
+                final XFile? image = await _picker.pickImage(
+                  source: ImageSource.gallery,
+                  imageQuality: 85,
+                  maxWidth: 800,
+                );
+                if (image != null && context.mounted) {
                   setSheetState(() {
                     onImageSelected(File(image.path));
                   });
@@ -411,8 +419,12 @@ void saveCommande() async {
             GestureDetector(
               onTap: () async {
                 Navigator.pop(context);
-                final XFile? photo = await _picker.pickImage(source: ImageSource.camera);
-                if (photo != null) {
+                final XFile? photo = await _picker.pickImage(
+                  source: ImageSource.camera,
+                  imageQuality: 85,
+                  maxWidth: 800,
+                );
+                if (photo != null && context.mounted) {
                   setSheetState(() {
                     onImageSelected(File(photo.path));
                   });
@@ -621,6 +633,210 @@ void saveCommande() async {
                 return const SizedBox.shrink();
               },
             ),
+
+            const SizedBox(height: 20),
+            
+            // Section: Produits en promotions
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Produits en promotions',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+                TextButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const MerchantPromoProductsScreen(),
+                      ),
+                    );
+                  },
+                  child: const Text(
+                    'Voir tout',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            BlocBuilder<AuthCubit, AuthState>(
+              builder: (context, authState) {
+                int? merchantId;
+                if (authState is AuthSuccess && authState.user != null) {
+                  final userId = authState.user!['id'];
+                  if (userId != null) {
+                    if (userId is int) {
+                      merchantId = userId;
+                    } else if (userId is String) {
+                      merchantId = int.tryParse(userId);
+                    } else if (userId is num) {
+                      merchantId = userId.toInt();
+                    }
+                  }
+                }
+                
+                return FutureBuilder<Map<String, dynamic>>(
+                  future: PromotionService().getPromotions(merchantId: merchantId),
+                  builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const SizedBox(
+                    height: 120,
+                    child: Center(child: CircularProgressIndicator()),
+                  );
+                }
+                
+                if (snapshot.hasData && snapshot.data!['success'] == true) {
+                  final promotions = snapshot.data!['promotions'] as List<Promotion>;
+                  final activePromos = promotions.where((p) => p.isActive).toList();
+                  
+                  if (activePromos.isEmpty) {
+                    return const SizedBox(
+                      height: 60,
+                      child: Center(
+                        child: Text(
+                          'Aucune promotion active',
+                          style: TextStyle(color: Colors.grey),
+                        ),
+                      ),
+                    );
+                  }
+                  
+                  return SizedBox(
+                    height: 120,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: activePromos.length > 5 ? 5 : activePromos.length,
+                      separatorBuilder: (_, __) => const SizedBox(width: 12),
+                      itemBuilder: (context, index) {
+                        final promotion = activePromos[index];
+                        final product = promotion.product;
+                        if (product == null) return const SizedBox.shrink();
+                        
+                        return SizedBox(
+                          width: 220,
+                          child: _ProductCard(
+                            badge: 'PROMO',
+                            name: product.name,
+                            stock: product.stock.toString(),
+                            isPromo: true,
+                            price: promotion.nouveauPrix.toString(),
+                            imageUrl: promotion.image,
+                            productId: product.id,
+                          ),
+                        );
+                      },
+                    ),
+                  );
+                }
+                
+                return const SizedBox(
+                  height: 60,
+                  child: Center(
+                    child: Text(
+                      'Erreur chargement promotions',
+                      style: TextStyle(color: Colors.red),
+                    ),
+                  ),
+                );
+                  },
+                );
+              },
+            ),
+
+            const SizedBox(height: 20),
+            
+            // Section: Produits recommandés
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Produits recommandés',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+                TextButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const MerchantRecommendedProductsScreen(),
+                      ),
+                    );
+                  },
+                  child: const Text(
+                    'Voir tout',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            BlocBuilder<ProductCubit, ProductState>(
+              builder: (context, state) {
+                if (state is ProductLoaded && state.products.isNotEmpty) {
+                  // Filtrer les produits recommandés (logique simple basée sur le stock et prix)
+                  final recommended = state.products
+                      .where((p) => p.stock > 20 && p.price > 0 && p.price < 50000)
+                      .toList();
+                  
+                  if (recommended.isEmpty) {
+                    return const SizedBox(
+                      height: 60,
+                      child: Center(
+                        child: Text(
+                          'Aucun produit recommandé',
+                          style: TextStyle(color: Colors.grey),
+                        ),
+                      ),
+                    );
+                  }
+                  
+                  return SizedBox(
+                    height: 120,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: recommended.length > 5 ? 5 : recommended.length,
+                      separatorBuilder: (_, __) => const SizedBox(width: 12),
+                      itemBuilder: (context, index) {
+                        final product = recommended[index];
+                        return SizedBox(
+                          width: 220,
+                          child: _ProductCard(
+                            badge: product.category?.name ?? '',
+                            name: product.name,
+                            stock: product.stock.toString(),
+                            isPromo: false,
+                            price: product.price.toString(),
+                            imageUrl: product.media?.mediaUrl ?? 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&h=400&fit=crop',
+                            productId: product.id,
+                          ),
+                        );
+                      },
+                    ),
+                  );
+                }
+                return const SizedBox(
+                  height: 60,
+                  child: Center(
+                    child: Text(
+                      'Aucun produit recommandé',
+                      style: TextStyle(color: Colors.grey),
+                    ),
+                  ),
+                );
+              },
+            ),
+
+            const SizedBox(height: 20),
 
             // Livraisons en cours
             const Text('Position du livreur',

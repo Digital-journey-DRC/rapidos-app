@@ -51,7 +51,12 @@ class ListingService {
         Uri.parse('$baseUrl/api/v1/listings?page=$page&limit=$limit'),
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
+          if (token.isNotEmpty) 'Authorization': 'Bearer $token',
+        },
+      ).timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          throw Exception('Timeout: La connexion au serveur a pris trop de temps');
         },
       );
 
@@ -131,14 +136,28 @@ class ListingService {
       print('HTTP Error: ${response.statusCode} - ${response.body}');
       return {
         'success': false,
-        'message': 'Erreur lors de la récupération des annonces',
+        'message': 'Erreur lors de la récupération des annonces (${response.statusCode})',
+      };
+    } on http.ClientException catch (e) {
+      print('Connection error in getListings: $e');
+      return {
+        'success': false,
+        'message': 'Impossible de se connecter au serveur. Vérifiez votre connexion internet.',
+      };
+    } on Exception catch (e) {
+      print('Error in getListings: $e');
+      return {
+        'success': false,
+        'message': e.toString().contains('Timeout') 
+            ? 'La connexion au serveur a pris trop de temps. Veuillez réessayer.'
+            : 'Erreur de connexion: ${e.toString()}',
       };
     } catch (e, stackTrace) {
-      print('Error in getListings: $e');
+      print('Unexpected error in getListings: $e');
       print('Stack trace: $stackTrace');
       return {
         'success': false,
-        'message': 'Une erreur est survenue',
+        'message': 'Une erreur inattendue est survenue. Veuillez réessayer plus tard.',
       };
     }
   }
@@ -156,6 +175,11 @@ class ListingService {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
         },
+      ).timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          throw Exception('Timeout: La connexion au serveur a pris trop de temps');
+        },
       );
 
       if (response.statusCode == 200) {
@@ -167,12 +191,38 @@ class ListingService {
         'success': false,
         'message': 'Erreur lors de la récupération des annonces',
       };
-    } catch (e, stackTrace) {
-      print('Error in getUserListings: $e');
-      print('Stack trace: $stackTrace');
+    } on http.ClientException catch (e) {
+      print('Connection error in getUserListings: $e');
       return {
         'success': false,
-        'message': 'Une erreur est survenue',
+        'message': 'Impossible de se connecter au serveur. Vérifiez votre connexion internet.',
+      };
+    } on Exception catch (e) {
+      print('Error in getUserListings: $e');
+      return {
+        'success': false,
+        'message': e.toString().contains('Timeout') 
+            ? 'La connexion au serveur a pris trop de temps. Veuillez réessayer.'
+            : 'Erreur de connexion: ${e.toString()}',
+      };
+    } catch (e, stackTrace) {
+      print('Unexpected error in getUserListings: $e');
+      print('Stack trace: $stackTrace');
+      
+      // Gestion spécifique des erreurs de connexion
+      String errorMessage = 'Une erreur est survenue';
+      if (e.toString().contains('Connection refused') || 
+          e.toString().contains('SocketException')) {
+        errorMessage = 'Impossible de se connecter au serveur. Vérifiez votre connexion internet.';
+      } else if (e.toString().contains('Timeout')) {
+        errorMessage = 'La connexion au serveur a pris trop de temps. Veuillez réessayer.';
+      } else if (e.toString().contains('Failed host lookup')) {
+        errorMessage = 'Impossible de trouver le serveur. Vérifiez votre connexion internet.';
+      }
+      
+      return {
+        'success': false,
+        'message': errorMessage,
       };
     }
   }
