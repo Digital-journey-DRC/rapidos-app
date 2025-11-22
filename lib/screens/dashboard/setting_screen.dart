@@ -97,15 +97,22 @@ class _SettingScreenState extends State<SettingScreen>
       final promotionService = PromotionService();
       int? merchantId;
       final userId = authState.user!['id'];
+      print('🔍 setting_screen._loadMerchantCounts - userId brut: $userId (type: ${userId.runtimeType})');
       if (userId != null) {
         if (userId is int) {
           merchantId = userId;
+          print('🔍 setting_screen._loadMerchantCounts - userId est int: $merchantId');
         } else if (userId is String) {
           merchantId = int.tryParse(userId);
+          print('🔍 setting_screen._loadMerchantCounts - userId est String, parsé: $merchantId');
         } else if (userId is num) {
           merchantId = userId.toInt();
+          print('🔍 setting_screen._loadMerchantCounts - userId est num, converti: $merchantId');
         }
+      } else {
+        print('🔍 setting_screen._loadMerchantCounts - userId est null');
       }
+      print('🔍 setting_screen._loadMerchantCounts - merchantId final: $merchantId');
       final promoResult = await promotionService.getPromotions(merchantId: merchantId);
       
       if (mounted) {

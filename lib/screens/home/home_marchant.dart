@@ -670,16 +670,25 @@ void saveCommande() async {
                 int? merchantId;
                 if (authState is AuthSuccess && authState.user != null) {
                   final userId = authState.user!['id'];
+                  print('🔍 home_marchant - userId brut: $userId (type: ${userId.runtimeType})');
                   if (userId != null) {
                     if (userId is int) {
                       merchantId = userId;
+                      print('🔍 home_marchant - userId est int: $merchantId');
                     } else if (userId is String) {
                       merchantId = int.tryParse(userId);
+                      print('🔍 home_marchant - userId est String, parsé: $merchantId');
                     } else if (userId is num) {
                       merchantId = userId.toInt();
+                      print('🔍 home_marchant - userId est num, converti: $merchantId');
                     }
+                  } else {
+                    print('🔍 home_marchant - userId est null');
                   }
+                } else {
+                  print('🔍 home_marchant - authState n\'est pas AuthSuccess ou user est null');
                 }
+                print('🔍 home_marchant - merchantId final: $merchantId');
                 
                 return FutureBuilder<Map<String, dynamic>>(
                   future: PromotionService().getPromotions(merchantId: merchantId),

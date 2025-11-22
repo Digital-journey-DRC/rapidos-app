@@ -8,17 +8,49 @@ class PromotionService {
   // URL de base pour l'API - utiliser celle du code existant
   static const String baseUrl = 'http://24.144.87.127:3333';
   
-  /// Récupère une promotion par ID
-  Future<Map<String, dynamic>> getPromotionById(int promotionId) async {
+  /// Récupère une promotion par ID de l'utilisateur connecté
+  Future<Map<String, dynamic>> getPromotionById() async {
     try {
-      final token = await StorageService().getToken();
+      // Récupérer l'ID de l'utilisateur connecté
+      int? userId;
+      final storageService = StorageService();
+      final userDataStr = await storageService.getUserData();
+      
+      if (userDataStr != null) {
+        try {
+          final userData = jsonDecode(userDataStr);
+          final userIdValue = userData['id'];
+          print('🔍 promotion_service.getPromotionById - userId brut: $userIdValue (type: ${userIdValue.runtimeType})');
+          
+          if (userIdValue != null) {
+            if (userIdValue is int) {
+              userId = userIdValue;
+            } else if (userIdValue is String) {
+              userId = int.tryParse(userIdValue);
+            } else if (userIdValue is num) {
+              userId = userIdValue.toInt();
+            }
+          }
+        } catch (e) {
+          print('🔍 promotion_service.getPromotionById - Erreur parsing user data: $e');
+        }
+      }
+      
+      if (userId == null) {
+        throw Exception('ID utilisateur non trouvé. Veuillez vous reconnecter.');
+      }
+      
+      print('🔍 promotion_service.getPromotionById - userId final: $userId');
+      print('🔍 promotion_service.getPromotionById - URL: $baseUrl/promotions/$userId');
+      
+      final token = await storageService.getToken();
       
       if (token == null) {
         throw Exception('Token d\'authentification manquant');
       }
 
       final response = await http.get(
-        Uri.parse('$baseUrl/promotions/$promotionId'),
+        Uri.parse('$baseUrl/promotions/$userId'),
         headers: {
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
@@ -30,11 +62,21 @@ class PromotionService {
         },
       );
 
+      print('🔍 promotion_service.getPromotionById - Status code: ${response.statusCode}');
       final responseData = jsonDecode(response.body);
+      print('🔍 promotion_service.getPromotionById - Response data keys: ${responseData.keys.toList()}');
 
       if (response.statusCode == 200) {
         final promotionJson = responseData['promotion'];
+        print('🔍 promotion_service.getPromotionById - Promotion JSON keys: ${promotionJson?.keys.toList()}');
+        
+        if (promotionJson != null) {
+          print('🔍 promotion_service.getPromotionById - Promotion images: ${promotionJson['images']}');
+          print('🔍 promotion_service.getPromotionById - Promotion image (old format): ${promotionJson['image']}');
+        }
+        
         final Promotion promotion = Promotion.fromJson(promotionJson);
+        print('🔍 promotion_service.getPromotionById - Promotion parsée - ID: ${promotion.id}, Images count: ${promotion.images.length}');
         
         return {
           'success': true,
@@ -47,11 +89,13 @@ class PromotionService {
         );
       }
     } on http.ClientException catch (e) {
+      print('🔍 promotion_service.getPromotionById - ClientException: $e');
       return {
         'success': false,
         'error': 'Impossible de se connecter au serveur. Vérifiez votre connexion internet.',
       };
     } catch (e) {
+      print('🔍 promotion_service.getPromotionById - Exception: $e');
       return {
         'success': false,
         'error': e.toString(),
@@ -62,6 +106,8 @@ class PromotionService {
   /// Récupère toutes les promotions actives (filtrées par marchand si merchantId fourni)
   Future<Map<String, dynamic>> getPromotions({int? merchantId}) async {
     try {
+      print('🔍 promotion_service.getPromotions - merchantId reçu: $merchantId (type: ${merchantId.runtimeType})');
+      
       final token = await StorageService().getToken();
       
       if (token == null) {
@@ -89,11 +135,19 @@ class PromotionService {
             .map((json) => Promotion.fromJson(json))
             .toList();
         
+        print('🔍 promotion_service.getPromotions - Nombre de promotions avant filtrage: ${promotions.length}');
+        
         // Filtrer par marchand si merchantId est fourni
         if (merchantId != null) {
+          print('🔍 promotion_service.getPromotions - Filtrage par merchantId: $merchantId');
           promotions = promotions.where((promo) {
-            return promo.product?.vendeurId == merchantId;
+            final vendeurId = promo.product?.vendeurId;
+            print('🔍 promotion_service.getPromotions - Promotion ${promo.id}: vendeurId=$vendeurId (type: ${vendeurId.runtimeType}), match=${vendeurId == merchantId}');
+            return vendeurId == merchantId;
           }).toList();
+          print('🔍 promotion_service.getPromotions - Nombre de promotions après filtrage: ${promotions.length}');
+        } else {
+          print('🔍 promotion_service.getPromotions - Pas de filtrage (merchantId est null)');
         }
         
         return {

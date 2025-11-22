@@ -37,16 +37,26 @@ class _MerchantPromoProductsScreenState extends State<MerchantPromoProductsScree
       
       if (authState is AuthSuccess && authState.user != null) {
         final userId = authState.user!['id'];
+        print('🔍 merchant_promo_products_screen - userId brut: $userId (type: ${userId.runtimeType})');
         if (userId != null) {
           if (userId is int) {
             merchantId = userId;
+            print('🔍 merchant_promo_products_screen - userId est int: $merchantId');
           } else if (userId is String) {
             merchantId = int.tryParse(userId);
+            print('🔍 merchant_promo_products_screen - userId est String, parsé: $merchantId');
           } else if (userId is num) {
             merchantId = userId.toInt();
+            print('🔍 merchant_promo_products_screen - userId est num, converti: $merchantId');
           }
+        } else {
+          print('🔍 merchant_promo_products_screen - userId est null');
         }
+      } else {
+        print('🔍 merchant_promo_products_screen - authState n\'est pas AuthSuccess ou user est null');
       }
+      
+      print('🔍 merchant_promo_products_screen - merchantId final: $merchantId');
       
       // Charger les promotions filtrées par marchand
       final result = await _promotionService.getPromotions(merchantId: merchantId);
