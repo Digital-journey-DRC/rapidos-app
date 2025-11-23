@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:immo/constants.dart';
 import 'package:immo/screens/product/product_detail_screen.dart';
+import 'package:immo/screens/product/client_recommended_products_screen.dart';
+import 'package:immo/services/product_service.dart';
+import 'package:immo/models/product.dart';
 
 /// Widget réutilisable pour afficher la section "Produits recommandés"
 class RecommendedProductsSection extends StatelessWidget {
@@ -83,27 +86,109 @@ class RecommendedProductsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final recommendedProducts = _getValidRecommendedProducts();
+    return FutureBuilder<Map<String, dynamic>>(
+      future: ProductService().getRecommendedProducts(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16.0),
+                  child: Text(
+                    'Produits recommandés',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  height: 200,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                    itemCount: 3,
+                    separatorBuilder: (_, __) => const SizedBox(width: 16),
+                    itemBuilder: (context, index) {
+                      return Container(
+                        width: 150,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade200,
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: const Center(
+                          child: CircularProgressIndicator(),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
 
-    if (recommendedProducts.isEmpty) {
-      return const SizedBox.shrink();
-    }
+        if (snapshot.hasError || !snapshot.hasData || snapshot.data!['success'] != true) {
+          // En cas d'erreur, utiliser les données statiques comme fallback
+          final recommendedProducts = _getValidRecommendedProducts();
+          if (recommendedProducts.isEmpty) {
+            return const SizedBox.shrink();
+          }
+          return _buildPromoList(context, recommendedProducts);
+        }
 
+        final products = snapshot.data!['products'] as List<Product>;
+        
+        if (products.isEmpty) {
+          return const SizedBox.shrink();
+        }
+
+        return _buildPromoListFromProducts(context, products);
+      },
+    );
+  }
+
+  /// Construit la liste avec les données statiques (fallback)
+  Widget _buildPromoList(BuildContext context, List<Map<String, dynamic>> recommendedProducts) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 16.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16.0),
-            child: Text(
-              'Produits recommandés',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Colors.black,
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16.0),
+                child: Text(
+                  'Produits recommandés',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black,
+                  ),
+                ),
               ),
-            ),
+              TextButton(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const ClientRecommendedProductsScreen(),
+                    ),
+                  );
+                },
+                child: const Text(
+                  'Voir tout',
+                  style: TextStyle(color: AppColors.primary),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 16),
           SizedBox(
@@ -120,6 +205,226 @@ class RecommendedProductsSection extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// Construit la liste avec les produits dynamiques depuis l'API
+  Widget _buildPromoListFromProducts(BuildContext context, List<Product> products) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16.0),
+                child: Text(
+                  'Produits recommandés',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black,
+                  ),
+                ),
+              ),
+              TextButton(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const ClientRecommendedProductsScreen(),
+                    ),
+                  );
+                },
+                child: const Text(
+                  'Voir tout',
+                  style: TextStyle(color: AppColors.primary),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            height: 200,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              itemCount: products.length > 5 ? 5 : products.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 16),
+              itemBuilder: (context, index) {
+                final product = products[index];
+                return _buildRecommendedProductCardFromProduct(context, product);
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Construit une carte de produit recommandé depuis un objet Product
+  Widget _buildRecommendedProductCardFromProduct(
+    BuildContext context,
+    Product product,
+  ) {
+    final imageUrl = product.media?.mediaUrl ?? 
+        'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&h=400&fit=crop';
+
+    return GestureDetector(
+      onTap: () {
+        final List<String> productImages = [];
+        if (product.media != null && product.media!.mediaUrl.isNotEmpty) {
+          productImages.add(product.media!.mediaUrl);
+        }
+
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ProductDetailScreen(
+              description: product.description,
+              idVendeur: product.vendeurId.toString(),
+              id: product.id,
+              tag: 'RECOMMANDÉ',
+              category: product.category?.name ?? '',
+              stock: product.stock,
+              name: product.name,
+              price: product.price,
+              imagePath: imageUrl,
+              productImages: productImages.isNotEmpty ? productImages : null,
+            ),
+          ),
+        );
+      },
+      child: Container(
+        width: 150,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.06),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+            BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            // Zone image avec background blanc cassé
+            Container(
+              width: double.infinity,
+              height: 120,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade50,
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(16),
+                  topRight: Radius.circular(16),
+                ),
+              ),
+              child: Center(
+                child: Hero(
+                  tag: 'recommended_product_${product.id}_$imageUrl',
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Image.network(
+                      imageUrl,
+                      width: 100,
+                      height: 100,
+                      fit: BoxFit.contain,
+                      errorBuilder: (context, error, stackTrace) {
+                        return Container(
+                          width: 100,
+                          height: 100,
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade200,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(
+                            Icons.image,
+                            color: Colors.grey,
+                            size: 40,
+                          ),
+                        );
+                      },
+                      loadingBuilder: (context, child, loadingProgress) {
+                        if (loadingProgress == null) return child;
+                        return Container(
+                          width: 100,
+                          height: 100,
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade100,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Center(
+                            child: SizedBox(
+                              width: 30,
+                              height: 30,
+                              child: CircularProgressIndicator(
+                                value: loadingProgress.expectedTotalBytes != null
+                                    ? loadingProgress.cumulativeBytesLoaded /
+                                        loadingProgress.expectedTotalBytes!
+                                    : null,
+                                strokeWidth: 2.5,
+                                color: AppColors.primary,
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            // Informations du produit
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(12.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    // Nom du produit
+                    Text(
+                      product.name,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black87,
+                        height: 1.3,
+                      ),
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 8),
+                    // Prix
+                    Text(
+                      '${product.price.toStringAsFixed(0)} FC',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.primary,
+                      ),
+                      textAlign: TextAlign.center,
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

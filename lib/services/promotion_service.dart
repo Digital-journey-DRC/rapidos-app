@@ -104,10 +104,13 @@ class PromotionService {
   }
 
   /// Récupère toutes les promotions actives (pour les clients)
-  /// Accessible à: Tous utilisateurs authentifiés
+  /// Endpoint: GET /promotions
+  /// Accessible à: Tous utilisateurs authentifiés (clients)
+  /// Retourne: Toutes les promotions actives de tous les marchands
   Future<Map<String, dynamic>> getPromotions() async {
     try {
       print('🔍 promotion_service.getPromotions - Récupération de toutes les promotions actives (pour clients)');
+      print('🔍 promotion_service.getPromotions - URL: $baseUrl/promotions');
       
       final token = await StorageService().getToken();
       
@@ -136,6 +139,8 @@ class PromotionService {
         final List<dynamic> promotionsJson = responseData['promotions'] ?? [];
         List<Promotion> promotions = [];
         
+        print('🔍 promotion_service.getPromotions - Nombre de promotions reçues: ${promotionsJson.length}');
+        
         for (var json in promotionsJson) {
           try {
             final promoId = json['id']?.toString() ?? 'unknown';
@@ -155,7 +160,7 @@ class PromotionService {
           }
         }
         
-        print('🔍 promotion_service.getPromotions - Nombre de promotions récupérées: ${promotions.length}');
+        print('🔍 promotion_service.getPromotions - Nombre de promotions parsées avec succès: ${promotions.length}');
         
         return {
           'success': true,

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../services/storage_service.dart';
+import '../models/product.dart';
 
 class ProductService {
   final String baseUrl = 'http://24.144.87.127:3333';
@@ -139,6 +140,87 @@ class ProductService {
       return {
         'success': false,
         'message': 'Erreur de connexion: $e',
+      };
+    }
+  }
+
+  /// Récupère 5 produits recommandés basés sur les événements de l'acheteur
+  /// Endpoint: GET /products/recommended
+  /// Accessible à: Clients authentifiés
+  Future<Map<String, dynamic>> getRecommendedProducts() async {
+    try {
+      print('🔍 product_service.getRecommendedProducts - Récupération des produits recommandés');
+      print('🔍 product_service.getRecommendedProducts - URL: $baseUrl/products/recommended');
+      
+      final token = await StorageService().getToken();
+      
+      if (token == null) {
+        throw Exception('Token d\'authentification manquant');
+      }
+
+      final response = await http.get(
+        Uri.parse('$baseUrl/products/recommended'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      ).timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          throw Exception('Timeout: La connexion au serveur a pris trop de temps');
+        },
+      );
+
+      print('🔍 product_service.getRecommendedProducts - Status code: ${response.statusCode}');
+      final responseData = jsonDecode(response.body);
+      print('🔍 product_service.getRecommendedProducts - Response keys: ${responseData.keys.toList()}');
+
+      if (response.statusCode == 200) {
+        final List<dynamic> productsJson = responseData['products'] ?? responseData['data'] ?? [];
+        List<Product> products = [];
+        
+        print('🔍 product_service.getRecommendedProducts - Nombre de produits reçus: ${productsJson.length}');
+        
+        for (var json in productsJson) {
+          try {
+            final productId = json['id']?.toString() ?? 'unknown';
+            print('🔍 product_service.getRecommendedProducts - Parsing product ID: $productId');
+            final product = Product.fromJson(json);
+            products.add(product);
+            print('🔍 product_service.getRecommendedProducts - Product $productId parsé avec succès');
+          } catch (e, stackTrace) {
+            print('🔍 product_service.getRecommendedProducts - Erreur parsing product: $e');
+            print('🔍 product_service.getRecommendedProducts - Stack trace: $stackTrace');
+            print('🔍 product_service.getRecommendedProducts - JSON: $json');
+            // Continuer avec les autres produits même si un échoue
+          }
+        }
+        
+        print('🔍 product_service.getRecommendedProducts - Nombre de produits parsés avec succès: ${products.length}');
+        
+        return {
+          'success': true,
+          'products': products,
+        };
+      } else {
+        throw Exception(
+          responseData['message'] ?? 
+          'Erreur lors de la récupération des produits recommandés: ${response.statusCode}'
+        );
+      }
+    } on http.ClientException catch (e) {
+      print('🔍 product_service.getRecommendedProducts - ClientException: $e');
+      return {
+        'success': false,
+        'error': 'Impossible de se connecter au serveur. Vérifiez votre connexion internet.',
+        'products': <Product>[],
+      };
+    } catch (e) {
+      print('🔍 product_service.getRecommendedProducts - Exception: $e');
+      return {
+        'success': false,
+        'error': e.toString(),
+        'products': <Product>[],
       };
     }
   }

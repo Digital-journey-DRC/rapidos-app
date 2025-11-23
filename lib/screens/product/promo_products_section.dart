@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:immo/constants.dart';
 import 'package:immo/screens/product/product_detail_screen.dart';
+import 'package:immo/screens/product/client_promo_products_screen.dart';
 import 'package:immo/services/promotion_service.dart';
 import 'package:immo/models/promotion.dart';
 import 'package:intl/intl.dart';
@@ -270,7 +271,12 @@ class PromoProductsSection extends StatelessWidget {
               ),
               TextButton(
                 onPressed: () {
-                  // TODO: Naviguer vers une page listant tous les produits en promo
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const ClientPromoProductsScreen(),
+                    ),
+                  );
                 },
                 child: const Text(
                   'Voir tout',
@@ -321,7 +327,12 @@ class PromoProductsSection extends StatelessWidget {
               ),
               TextButton(
                 onPressed: () {
-                  // TODO: Naviguer vers une page listant tous les produits en promo
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const ClientPromoProductsScreen(),
+                    ),
+                  );
                 },
                 child: const Text(
                   'Voir tout',
