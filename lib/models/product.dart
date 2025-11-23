@@ -1,4 +1,5 @@
 import 'category.dart';
+import 'vendeur.dart';
 
 class Product {
   final int id;
@@ -12,6 +13,7 @@ class Product {
   final int categorieId;
   final Media? media;
   final Category? category;
+  final Vendeur? vendeur; // Informations du vendeur
 
   Product({
     required this.id,
@@ -25,6 +27,7 @@ class Product {
     required this.categorieId,
     this.media,
     this.category,
+    this.vendeur,
   });
 
   factory Product.fromJson(Map<String, dynamic> json) {
@@ -53,10 +56,15 @@ class Product {
 
     // Gérer vendeurId : peut être directement dans json ou dans un objet vendeur
     int vendeurIdValue = 0;
+    Vendeur? vendeur;
+    
     if (json['vendeurId'] != null) {
       vendeurIdValue = parseToInt(json['vendeurId'], 0);
     } else if (json['vendeur'] != null && json['vendeur'] is Map) {
-      vendeurIdValue = parseToInt(json['vendeur']['id'], 0);
+      final vendeurJson = json['vendeur'] as Map<String, dynamic>;
+      vendeurIdValue = parseToInt(vendeurJson['id'], 0);
+      // Parser les informations du vendeur si disponibles
+      vendeur = Vendeur.fromProductJson(vendeurJson);
     }
 
     return Product(
@@ -71,6 +79,7 @@ class Product {
       categorieId: parseToInt(json['categorieId'], 0),
       media: json['media'] != null ? Media.fromJson(json['media']) : null,
       category: json['category'] != null ? Category.fromJson(json['category']) : null,
+      vendeur: vendeur,
     );
   }
 }

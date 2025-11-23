@@ -191,6 +191,7 @@ class _PromoProductCard extends StatelessWidget {
               price: promotion.nouveauPrix,
               imagePath: imageUrl,
               productImages: productImages.length > 1 ? productImages : null,
+              product: product, // Passer le produit complet avec les infos du vendeur
             ),
           ),
         );

@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:immo/constants.dart';
 import 'package:immo/widgets/app_logo.dart';
-import '../merchant/merchant_profile_screen.dart';
+import '../merchant/vendeur_detail_screen.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:immo/cubit/cart_cubit.dart';
 import 'package:immo/cubit/merchant_cubit.dart';
 import 'package:immo/cubit/favorites_cubit.dart';
+import '../../models/product.dart';
+import '../../models/vendeur.dart';
 
 class ProductDetailScreen extends StatefulWidget {
   final int id;
@@ -21,6 +23,8 @@ class ProductDetailScreen extends StatefulWidget {
   final List<String>? productImages; // Liste des images (1 principale + 4 secondaires)
   final String? merchantName; // Nom du marchand
   final List<Map<String, dynamic>>? merchantProducts; // Produits du marchand pour navigation
+  final Product? product; // Produit complet avec informations du vendeur
+  final Vendeur? vendeur; // Informations du vendeur directement
   const ProductDetailScreen({
     Key? key,
     required this.id,
@@ -36,6 +40,8 @@ class ProductDetailScreen extends StatefulWidget {
     this.productImages,
     this.merchantName,
     this.merchantProducts,
+    this.product,
+    this.vendeur,
   }) : super(key: key);
 
   @override
@@ -771,12 +777,23 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     
                     const SizedBox(height: 18),
                     
-                    // Merchant Information (Cliquable) - Version statique
+                    // Merchant Information (Cliquable) - Version dynamique
                     Builder(
                       builder: (context) {
+                        // Utiliser l'ID du vendeur depuis le produit pour la redirection
+                        final vendeurId = widget.product?.vendeurId ?? 
+                                         (widget.idVendeur.isNotEmpty ? int.tryParse(widget.idVendeur) : null);
+                        
+                        // Prioriser les informations du vendeur depuis le produit
+                        if (widget.vendeur != null && vendeurId != null) {
+                          return _buildVendeurCard(widget.vendeur!, vendeurId);
+                        } else if (widget.product?.vendeur != null && vendeurId != null) {
+                          return _buildVendeurCard(widget.product!.vendeur!, vendeurId);
+                        }
+                        // Fallback vers l'ancienne méthode
                         final merchantInfo = _getMerchantInfo();
-                        if (merchantInfo != null) {
-                          return _buildMerchantCard(merchantInfo);
+                        if (merchantInfo != null && vendeurId != null) {
+                          return _buildMerchantCard(merchantInfo, vendeurId);
                         }
                         return const SizedBox.shrink();
                       },
@@ -1109,34 +1126,19 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
   }
 
-  /// Widget pour afficher la carte du marchand cliquable
-  Widget _buildMerchantCard(Map<String, dynamic> merchantInfo) {
-    final merchantName = merchantInfo['name'] as String;
-    // Convertir la liste en List<Map<String, dynamic>> de manière sûre
-    final productsList = merchantInfo['products'];
-    final merchantProducts = productsList is List
-        ? List<Map<String, dynamic>>.from(
-            productsList.map((item) => item is Map ? Map<String, dynamic>.from(item) : <String, dynamic>{}))
-        : <Map<String, dynamic>>[];
-    final merchantImagePath = merchantInfo['imagePath'] as String;
-    final merchantId = merchantInfo['merchantId'] as String;
-    final rating = merchantInfo['rating'] as double? ?? 4.5;
-    final isVerified = merchantInfo['isVerified'] as bool? ?? true;
+  /// Widget pour afficher la carte du vendeur cliquable (version dynamique)
+  Widget _buildVendeurCard(Vendeur vendeur, int vendeurId) {
+    final vendeurName = vendeur.fullName;
+    // Utiliser l'image de la boutique (media) au lieu de l'image du profil
+    final boutiqueImageUrl = vendeur.media?.mediaUrl ?? vendeur.profileImageUrl;
     
     return GestureDetector(
       onTap: () {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => MerchantProfileScreen(
-              name: merchantName,
-              imagePath: merchantImagePath,
-              category: widget.category,
-              rating: rating,
-              isVerified: isVerified,
-              products: merchantProducts,
-              description: widget.description,
-              merchantId: merchantId,
+            builder: (context) => VendeurDetailScreen(
+              vendeurId: vendeurId, // Utiliser l'ID du vendeur depuis le produit
             ),
           ),
         );
@@ -1150,6 +1152,133 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         ),
         child: Row(
           children: [
+            boutiqueImageUrl != null && boutiqueImageUrl.isNotEmpty
+                ? ClipOval(
+                    child: Image.network(
+                      boutiqueImageUrl,
+                      width: 52,
+                      height: 52,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return CircleAvatar(
+                          radius: 26,
+                          backgroundColor: AppColors.primary.withOpacity(0.1),
+                          child: Icon(
+                            Icons.store,
+                            color: AppColors.primary,
+                            size: 28,
+                          ),
+                        );
+                      },
+                      loadingBuilder: (context, child, loadingProgress) {
+                        if (loadingProgress == null) return child;
+                        return CircleAvatar(
+                          radius: 26,
+                          backgroundColor: AppColors.primary.withOpacity(0.1),
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            value: loadingProgress.expectedTotalBytes != null
+                                ? loadingProgress.cumulativeBytesLoaded /
+                                    loadingProgress.expectedTotalBytes!
+                                : null,
+                          ),
+                        );
+                      },
+                    ),
+                  )
+                : CircleAvatar(
+                    radius: 26,
+                    backgroundColor: AppColors.primary.withOpacity(0.1),
+                    child: Icon(
+                      Icons.store,
+                      color: AppColors.primary,
+                      size: 28,
+                    ),
+                  ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          'Vendu par',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          vendeurName,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                            color: AppColors.primary,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Icon(
+                        Icons.verified,
+                        color: AppColors.primary,
+                        size: 16,
+                      ),
+                      const SizedBox(width: 2),
+                      Icon(
+                        Icons.arrow_forward_ios,
+                        size: 12,
+                        color: AppColors.primary,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Widget pour afficher la carte du marchand cliquable (version statique - fallback)
+  Widget _buildMerchantCard(Map<String, dynamic> merchantInfo, int vendeurId) {
+    final merchantName = merchantInfo['name'] as String;
+    // Ne pas utiliser l'image du produit, mais chercher une image de boutique
+    // Pour l'instant, on n'affiche pas d'image de boutique dans le fallback, seulement l'icône store
+    
+    return GestureDetector(
+      onTap: () {
+        // Toujours utiliser VendeurDetailScreen avec l'ID du vendeur depuis le produit
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => VendeurDetailScreen(
+              vendeurId: vendeurId,
+            ),
+          ),
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.grey.shade50,
+          borderRadius: BorderRadius.circular(11),
+          border: Border.all(color: Colors.grey.shade200, width: 0.8),
+        ),
+        child: Row(
+          children: [
+            // Toujours afficher l'icône store pour le fallback (pas d'image de boutique disponible)
             CircleAvatar(
               radius: 26,
               backgroundColor: AppColors.primary.withOpacity(0.1),

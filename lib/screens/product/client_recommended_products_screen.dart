@@ -172,6 +172,7 @@ class _RecommendedProductCard extends StatelessWidget {
               price: product.price,
               imagePath: imageUrl,
               productImages: productImages.isNotEmpty ? productImages : null,
+              product: product, // Passer le produit complet avec les infos du vendeur
             ),
           ),
         );
