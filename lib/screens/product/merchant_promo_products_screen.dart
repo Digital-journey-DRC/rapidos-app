@@ -4,7 +4,7 @@ import 'package:immo/widgets/app_logo.dart';
 import 'package:immo/models/promotion.dart';
 import 'package:immo/screens/product/product_detail_screen.dart';
 import 'package:immo/screens/product/create_promotion_screen.dart';
-import 'package:immo/widgets/merchant_closed_banner.dart';
+import 'package:immo/screens/product/edit_promotion_screen.dart';
 import 'package:immo/services/promotion_service.dart';
 import 'package:immo/cubit/auth_cubit.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -193,7 +193,11 @@ class _MerchantPromoProductsScreenState extends State<MerchantPromoProductsScree
                     itemCount: filtered.length,
                     itemBuilder: (context, index) {
                       final promotion = filtered[index];
-                      return _PromoProductCard(promotion: promotion);
+                      return _PromoProductCard(
+                        promotion: promotion,
+                        onEdit: () => _loadPromotions(),
+                        onDelete: () => _loadPromotions(),
+                      );
                     },
                   ),
             ),
@@ -206,7 +210,89 @@ class _MerchantPromoProductsScreenState extends State<MerchantPromoProductsScree
 
 class _PromoProductCard extends StatelessWidget {
   final Promotion promotion;
-  const _PromoProductCard({required this.promotion});
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+  const _PromoProductCard({
+    required this.promotion,
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  void _showDeleteConfirmation(BuildContext context, Promotion promotion) {
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: const Text('Supprimer la promotion'),
+          content: Text(
+            'Êtes-vous sûr de vouloir supprimer la promotion "${promotion.libelle.isNotEmpty ? promotion.libelle : 'cette promotion'}" ?\n\nCette action est irréversible.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Annuler'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.pop(dialogContext);
+                await _deletePromotion(context, promotion);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Supprimer'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _deletePromotion(BuildContext context, Promotion promotion) async {
+    try {
+      // Afficher un loader
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(child: CircularProgressIndicator()),
+      );
+
+      final result = await PromotionService().deletePromotion(promotion.id);
+
+      if (context.mounted) {
+        Navigator.pop(context); // Fermer le loader
+
+        if (result['success'] == true) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Promotion supprimée avec succès'),
+              backgroundColor: AppColors.success,
+            ),
+          );
+          // Recharger la liste via le callback
+          onDelete();
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Erreur: ${result['error']}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (context.mounted) {
+        Navigator.pop(context); // Fermer le loader
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
 
   /// Calcule un rating dynamique basé sur les likes et le produit
   double _calculateRating() {
@@ -301,51 +387,51 @@ class _PromoProductCard extends StatelessWidget {
                   Image.network(
                     promotion.image,
                     width: double.infinity,
-                    height: 100,
+                    height: 90,
                     fit: BoxFit.cover,
                     errorBuilder: (context, error, stackTrace) => Container(
                       width: double.infinity,
-                      height: 100,
+                      height: 90,
                       decoration: BoxDecoration(
                         color: Colors.grey[200],
                         borderRadius: BorderRadius.circular(16),
                       ),
-                      child: const Icon(Icons.image_not_supported, color: Colors.grey, size: 40),
+                      child: const Icon(Icons.image_not_supported, color: Colors.grey, size: 30),
                     ),
                   ),
                   Positioned(
-                    top: 8,
-                    left: 8,
+                    top: 6,
+                    left: 6,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                       decoration: BoxDecoration(
-                        color: Colors.red,
-                        borderRadius: BorderRadius.circular(8),
+                        color: AppColors.primary,
+                        borderRadius: BorderRadius.circular(6),
                       ),
                       child: const Text(
                         'PROMO',
                         style: TextStyle(
                           color: Colors.white,
-                          fontSize: 10,
+                          fontSize: 9,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                     ),
                   ),
                   Positioned(
-                    top: 8,
-                    right: 8,
+                    top: 6,
+                    right: 6,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
                       decoration: BoxDecoration(
-                        color: Colors.green,
-                        borderRadius: BorderRadius.circular(8),
+                        color: AppColors.primary.withOpacity(0.9),
+                        borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
                         '-${promotion.discountPercentage.toStringAsFixed(0)}%',
                         style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 10,
+                          fontSize: 9,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -355,7 +441,7 @@ class _PromoProductCard extends StatelessWidget {
               ),
             ),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -364,64 +450,68 @@ class _PromoProductCard extends StatelessWidget {
                     children: [
                       Flexible(
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
                             color: AppColors.primary,
-                            borderRadius: BorderRadius.circular(8),
+                            borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
                             productCategory.isNotEmpty ? productCategory : 'Promotion',
-                            style: const TextStyle(color: Colors.white, fontSize: 9),
+                            style: const TextStyle(color: Colors.white, fontSize: 8),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ),
                       const SizedBox(width: 4),
-                      Icon(Icons.star, color: Colors.amber, size: 14),
+                      Icon(Icons.star, color: AppColors.primary, size: 12),
                       Text(
                         _calculateRating().toStringAsFixed(1),
-                        style: const TextStyle(fontSize: 11),
+                        style: const TextStyle(fontSize: 10),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 4),
                   Text(
                     productName,
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                    maxLines: 2,
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                    maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                   if (promotion.libelle.isNotEmpty) ...[
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 2),
                     Text(
                       promotion.libelle,
                       style: TextStyle(
-                        color: Colors.orange.shade700,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
+                        color: Colors.grey.shade700,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w500,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
                   ],
-                  const SizedBox(height: 4),
-                  Text(
-                    '${promotion.nouveauPrix.toStringAsFixed(0)} FC',
-                    style: const TextStyle(
-                      color: Colors.green,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '${promotion.ancienPrix.toStringAsFixed(0)} FC',
-                    style: TextStyle(
-                      color: Colors.grey.shade600,
-                      fontSize: 11,
-                      decoration: TextDecoration.lineThrough,
-                    ),
+                  const SizedBox(height: 3),
+                  Row(
+                    children: [
+                      Text(
+                        '${promotion.nouveauPrix.toStringAsFixed(0)} FC',
+                        style: const TextStyle(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        '${promotion.ancienPrix.toStringAsFixed(0)} FC',
+                        style: TextStyle(
+                          color: Colors.grey.shade500,
+                          fontSize: 9,
+                          decoration: TextDecoration.lineThrough,
+                        ),
+                      ),
+                    ],
                   ),
                   if (productStock > 0) ...[
                     const SizedBox(height: 2),
@@ -429,10 +519,67 @@ class _PromoProductCard extends StatelessWidget {
                       'Stock: $productStock',
                       style: TextStyle(
                         color: Colors.grey.shade600,
-                        fontSize: 11,
+                        fontSize: 9,
                       ),
                     ),
                   ],
+                  const SizedBox(height: 4),
+                  // Boutons d'action (icônes uniquement)
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      Expanded(
+                        child: InkWell(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => EditPromotionScreen(promotion: promotion),
+                              ),
+                            ).then((success) {
+                              if (success == true) {
+                                onEdit();
+                              }
+                            });
+                          },
+                          borderRadius: BorderRadius.circular(6),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 6),
+                            decoration: BoxDecoration(
+                              color: AppColors.primary,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Icon(
+                              Icons.edit,
+                              size: 16,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: InkWell(
+                          onTap: () {
+                            _showDeleteConfirmation(context, promotion);
+                          },
+                          borderRadius: BorderRadius.circular(6),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 6),
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade700,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Icon(
+                              Icons.delete,
+                              size: 16,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),

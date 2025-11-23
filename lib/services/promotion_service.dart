@@ -339,5 +339,211 @@ class PromotionService {
       };
     }
   }
+
+  /// Met à jour une promotion existante avec multipart/form-data
+  /// 
+  /// [promotionId] : ID de la promotion à mettre à jour
+  /// [libelle] : Nouveau libellé (optionnel)
+  /// [delaiPromotion] : Nouvelle date de fin (optionnel)
+  /// [nouveauPrix] : Nouveau prix en promotion (optionnel)
+  /// [ancienPrix] : Ancien prix avant promotion (optionnel)
+  /// [likes] : Nombre de likes (optionnel)
+  /// [image] : Nouvelle image principale (optionnel)
+  /// [image1-4] : Nouvelles images supplémentaires (optionnel)
+  /// [deleteImage1-4] : Indique si on doit supprimer l'image correspondante
+  Future<Map<String, dynamic>> updatePromotion({
+    required int promotionId,
+    String? libelle,
+    DateTime? delaiPromotion,
+    double? nouveauPrix,
+    double? ancienPrix,
+    int? likes,
+    File? image,
+    File? image1,
+    File? image2,
+    File? image3,
+    File? image4,
+    bool deleteImage1 = false,
+    bool deleteImage2 = false,
+    bool deleteImage3 = false,
+    bool deleteImage4 = false,
+  }) async {
+    try {
+      final token = await StorageService().getToken();
+      
+      if (token == null) {
+        throw Exception('Token d\'authentification manquant');
+      }
+
+      // Créer la requête multipart
+      var request = http.MultipartRequest(
+        'PUT',
+        Uri.parse('$baseUrl/promotions/$promotionId'),
+      );
+
+      // Ajouter les headers
+      request.headers.addAll({
+        'Authorization': 'Bearer $token',
+      });
+
+      // Ajouter les champs de formulaire (seulement ceux fournis)
+      if (libelle != null) {
+        request.fields['libelle'] = libelle;
+      }
+      if (delaiPromotion != null) {
+        request.fields['delaiPromotion'] = delaiPromotion.toUtc().toIso8601String();
+      }
+      if (nouveauPrix != null) {
+        request.fields['nouveauPrix'] = nouveauPrix.toString();
+      }
+      if (ancienPrix != null) {
+        request.fields['ancienPrix'] = ancienPrix.toString();
+      }
+      if (likes != null) {
+        request.fields['likes'] = likes.toString();
+      }
+
+      // Gérer la suppression d'images
+      if (deleteImage1) {
+        request.fields['deleteImage1'] = 'true';
+      }
+      if (deleteImage2) {
+        request.fields['deleteImage2'] = 'true';
+      }
+      if (deleteImage3) {
+        request.fields['deleteImage3'] = 'true';
+      }
+      if (deleteImage4) {
+        request.fields['deleteImage4'] = 'true';
+      }
+
+      // Ajouter l'image principale si fournie
+      if (image != null) {
+        request.files.add(
+          await http.MultipartFile.fromPath(
+            'image',
+            image.path,
+          ),
+        );
+      }
+
+      // Ajouter les images optionnelles si fournies
+      if (image1 != null) {
+        request.files.add(
+          await http.MultipartFile.fromPath(
+            'image1',
+            image1.path,
+          ),
+        );
+      }
+      if (image2 != null) {
+        request.files.add(
+          await http.MultipartFile.fromPath(
+            'image2',
+            image2.path,
+          ),
+        );
+      }
+      if (image3 != null) {
+        request.files.add(
+          await http.MultipartFile.fromPath(
+            'image3',
+            image3.path,
+          ),
+        );
+      }
+      if (image4 != null) {
+        request.files.add(
+          await http.MultipartFile.fromPath(
+            'image4',
+            image4.path,
+          ),
+        );
+      }
+
+      // Envoyer la requête
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+      final responseData = jsonDecode(response.body);
+
+      if (response.statusCode == 200) {
+        final promotionJson = responseData['promotion'];
+        final Promotion promotion = Promotion.fromJson(promotionJson);
+        
+        return {
+          'success': true,
+          'promotion': promotion,
+          'data': responseData,
+        };
+      } else {
+        throw Exception(
+          responseData['message'] ?? 
+          'Erreur lors de la mise à jour de la promotion: ${response.statusCode}'
+        );
+      }
+    } catch (e) {
+      return {
+        'success': false,
+        'error': e.toString(),
+      };
+    }
+  }
+
+  /// Supprime une promotion
+  /// 
+  /// [promotionId] : ID de la promotion à supprimer
+  Future<Map<String, dynamic>> deletePromotion(int promotionId) async {
+    try {
+      print('🔍 promotion_service.deletePromotion - promotionId: $promotionId');
+      
+      final token = await StorageService().getToken();
+      
+      if (token == null) {
+        throw Exception('Token d\'authentification manquant');
+      }
+
+      final response = await http.delete(
+        Uri.parse('$baseUrl/promotions/$promotionId'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      ).timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          throw Exception('Timeout: La connexion au serveur a pris trop de temps');
+        },
+      );
+
+      print('🔍 promotion_service.deletePromotion - Status code: ${response.statusCode}');
+      final responseData = jsonDecode(response.body);
+      print('🔍 promotion_service.deletePromotion - Response: $responseData');
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'message': responseData['message'] ?? 'Promotion supprimée avec succès',
+          'data': responseData,
+        };
+      } else {
+        throw Exception(
+          responseData['message'] ?? 
+          'Erreur lors de la suppression de la promotion: ${response.statusCode}'
+        );
+      }
+    } on http.ClientException catch (e) {
+      print('🔍 promotion_service.deletePromotion - ClientException: $e');
+      return {
+        'success': false,
+        'error': 'Impossible de se connecter au serveur. Vérifiez votre connexion internet.',
+      };
+    } catch (e) {
+      print('🔍 promotion_service.deletePromotion - Exception: $e');
+      return {
+        'success': false,
+        'error': e.toString(),
+      };
+    }
+  }
 }
 
