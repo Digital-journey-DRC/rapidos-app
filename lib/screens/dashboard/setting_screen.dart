@@ -2099,10 +2099,47 @@ class _SettingScreenState extends State<SettingScreen>
                 stream: FirebaseFirestore.instance
                     .collection('delivery_addresses')
                     .where('userId', isEqualTo: userId)
-                    .orderBy('timestamp', descending: true)
                     .snapshots(),
                 builder: (context, snapshot) {
                   if (snapshot.hasError) {
+                    // Gérer l'erreur d'index manquant de manière gracieuse
+                    final error = snapshot.error.toString();
+                    if (error.contains('index') || error.contains('FAILED_PRECONDITION')) {
+                      return Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.warning_amber_rounded,
+                                size: 48,
+                                color: Colors.orange.shade400,
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                'Index Firestore requis',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.grey.shade800,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Veuillez créer l\'index dans la console Firebase',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey.shade600,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }
                     return Center(
                       child: Text('Erreur: ${snapshot.error}'),
                     );
@@ -2137,7 +2174,18 @@ class _SettingScreenState extends State<SettingScreen>
                     );
                   }
 
-                  final addresses = snapshot.data!.docs;
+                  // Trier côté client par timestamp décroissant
+                  final addresses = snapshot.data!.docs.toList()
+                    ..sort((a, b) {
+                      final aTimestamp = a.data() as Map<String, dynamic>;
+                      final bTimestamp = b.data() as Map<String, dynamic>;
+                      final aTime = aTimestamp['timestamp'] as Timestamp?;
+                      final bTime = bTimestamp['timestamp'] as Timestamp?;
+                      if (aTime == null && bTime == null) return 0;
+                      if (aTime == null) return 1;
+                      if (bTime == null) return -1;
+                      return bTime.compareTo(aTime); // Décroissant
+                    });
 
                   return ListView.builder(
                     shrinkWrap: true,

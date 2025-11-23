@@ -153,15 +153,27 @@ class _CartScreenState extends State<CartScreen> {
         final snapshot = await FirebaseFirestore.instance
             .collection('delivery_addresses')
             .where('userId', isEqualTo: userId)
-            .orderBy('timestamp', descending: true)
             .get();
 
         print(
             'Nombre d\'adresses trouvées: ${snapshot.docs.length}'); // Debug log
 
         if (snapshot.docs.isNotEmpty) {
+          // Trier côté client par timestamp décroissant
+          final addresses = snapshot.docs.toList()
+            ..sort((a, b) {
+              final aData = a.data();
+              final bData = b.data();
+              final aTime = aData['timestamp'] as Timestamp?;
+              final bTime = bData['timestamp'] as Timestamp?;
+              if (aTime == null && bTime == null) return 0;
+              if (aTime == null) return 1;
+              if (bTime == null) return -1;
+              return bTime.compareTo(aTime); // Décroissant
+            });
+          
           setState(() {
-            savedAddresses = snapshot.docs.map((doc) => doc.data()).toList();
+            savedAddresses = addresses.map((doc) => doc.data()).toList();
           });
           print('Adresses chargées: $savedAddresses'); // Debug log
         } else {
@@ -170,6 +182,20 @@ class _CartScreenState extends State<CartScreen> {
         }
       } catch (e) {
         print('Erreur lors du chargement des adresses: $e');
+        // En cas d'erreur, essayer sans tri
+        try {
+          final snapshot = await FirebaseFirestore.instance
+              .collection('delivery_addresses')
+              .where('userId', isEqualTo: userId)
+              .get();
+          if (snapshot.docs.isNotEmpty) {
+            setState(() {
+              savedAddresses = snapshot.docs.map((doc) => doc.data()).toList();
+            });
+          }
+        } catch (e2) {
+          print('Erreur lors du chargement des adresses (sans tri): $e2');
+        }
       }
     } else {
       print('Utilisateur non connecté ou état invalide'); // Debug log
