@@ -1041,21 +1041,31 @@ class _ProductCardState extends State<_ProductCard> with SingleTickerProviderSta
             : 'http://24.144.87.127:3333/$widget.imageUrl';
     return GestureDetector(
       onTap: () {
-        // Navigation vers la page de détail du produit
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => DetailProduitMarchantScreen(
-              productName: widget.name,
-              productPrice: widget.price,
-              productStock: widget.stock,
-              productBadge: widget.badge,
-              productImageUrl: widget.imageUrl,
-              isPromo: widget.isPromo,
-              productId: widget.productId,
+        // Si c'est une promotion, rediriger vers la page des promotions
+        if (widget.isPromo) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const MerchantPromoProductsScreen(),
             ),
-          ),
-        );
+          );
+        } else {
+          // Sinon, navigation vers la page de détail du produit
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => DetailProduitMarchantScreen(
+                productName: widget.name,
+                productPrice: widget.price,
+                productStock: widget.stock,
+                productBadge: widget.badge,
+                productImageUrl: widget.imageUrl,
+                isPromo: widget.isPromo,
+                productId: widget.productId,
+              ),
+            ),
+          );
+        }
       },
       onTapDown: _onTapDown,
       onTapUp: _onTapUp,
