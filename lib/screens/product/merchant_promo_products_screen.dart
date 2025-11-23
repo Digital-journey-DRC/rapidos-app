@@ -59,7 +59,9 @@ class _MerchantPromoProductsScreenState extends State<MerchantPromoProductsScree
       print('🔍 merchant_promo_products_screen - merchantId final: $merchantId');
       
       // Charger les promotions filtrées par marchand
-      final result = await _promotionService.getPromotions(merchantId: merchantId);
+      final result = merchantId != null 
+          ? await _promotionService.getMerchantPromotions(merchantId)
+          : await _promotionService.getPromotions();
       if (result['success'] == true) {
         setState(() {
           _promotions = result['promotions'] as List<Promotion>;
@@ -127,7 +129,7 @@ class _MerchantPromoProductsScreenState extends State<MerchantPromoProductsScree
       backgroundColor: const Color(0xFFF7F8FA),
       body: Column(
         children: [
-          const MerchantClosedBanner(),
+         //s cons MerchantClosedBanner(),
           Padding(
             padding: const EdgeInsets.all(12.0),
             child: TextField(

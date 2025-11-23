@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:immo/constants.dart';
 import 'package:immo/screens/product/product_detail_screen.dart';
+import 'package:immo/services/promotion_service.dart';
+import 'package:immo/models/promotion.dart';
 import 'package:intl/intl.dart';
 
 /// Widget réutilisable pour afficher la section "Produits en promo"
 class PromoProductsSection extends StatelessWidget {
   const PromoProductsSection({Key? key}) : super(key: key);
 
-  /// Retourne une liste statique de 10 produits en promo
-  /// TODO: Remplacer par des données du backend
+  /// Retourne une liste statique de 10 produits en promo (fallback si API échoue)
   List<Map<String, dynamic>> _getPromoProducts() {
     final now = DateTime.now();
     return [
@@ -165,6 +166,76 @@ class PromoProductsSection extends StatelessWidget {
     ];
   }
 
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<Map<String, dynamic>>(
+      future: PromotionService().getPromotions(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Padding(
+                  padding: EdgeInsets.only(left: 16),
+                  child: Text(
+                    'Produits en promo',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  height: 180,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                    itemCount: 3,
+                    separatorBuilder: (_, __) => const SizedBox(width: 10),
+                    itemBuilder: (context, index) {
+                      return Container(
+                        width: 140,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade200,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Center(
+                          child: CircularProgressIndicator(),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
+        if (snapshot.hasError || !snapshot.hasData || snapshot.data!['success'] != true) {
+          // En cas d'erreur, utiliser les données statiques comme fallback
+          final promoProducts = _getValidPromoProducts();
+          if (promoProducts.isEmpty) {
+            return const SizedBox.shrink();
+          }
+          return _buildPromoList(context, promoProducts);
+        }
+
+        final promotions = snapshot.data!['promotions'] as List<Promotion>;
+        final activePromos = promotions.where((p) => p.isActive).toList();
+
+        if (activePromos.isEmpty) {
+          return const SizedBox.shrink();
+        }
+
+        return _buildPromoListFromPromotions(context, activePromos);
+      },
+    );
+  }
+
   /// Filtre les produits en promo valides (date actuelle entre startDate et endDate)
   List<Map<String, dynamic>> _getValidPromoProducts() {
     final now = DateTime.now();
@@ -176,14 +247,8 @@ class PromoProductsSection extends StatelessWidget {
     }).toList();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final promoProducts = _getValidPromoProducts();
-
-    if (promoProducts.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
+  /// Construit la liste avec les données statiques (fallback)
+  Widget _buildPromoList(BuildContext context, List<Map<String, dynamic>> promoProducts) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 16.0),
       child: Column(
@@ -216,15 +281,66 @@ class PromoProductsSection extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           SizedBox(
-            height: 220,
+            height: 180,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
               itemCount: promoProducts.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 12),
+              separatorBuilder: (_, __) => const SizedBox(width: 10),
               itemBuilder: (context, index) {
                 final product = promoProducts[index];
                 return _buildPromoProductCard(context, product);
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Construit la liste avec les promotions dynamiques depuis l'API
+  Widget _buildPromoListFromPromotions(BuildContext context, List<Promotion> promotions) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Padding(
+                padding: EdgeInsets.only(left: 16),
+                child: Text(
+                  'Produits en promo',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black,
+                  ),
+                ),
+              ),
+              TextButton(
+                onPressed: () {
+                  // TODO: Naviguer vers une page listant tous les produits en promo
+                },
+                child: const Text(
+                  'Voir tout',
+                  style: TextStyle(color: AppColors.primary),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 180,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              itemCount: promotions.length > 10 ? 10 : promotions.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 10),
+              itemBuilder: (context, index) {
+                final promotion = promotions[index];
+                return _buildPromoProductCardFromPromotion(context, promotion);
               },
             ),
           ),
@@ -274,14 +390,14 @@ class PromoProductsSection extends StatelessWidget {
         );
       },
       child: Container(
-        width: 160,
+        width: 140,
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(10),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.08),
-              blurRadius: 8,
+              color: Colors.black.withOpacity(0.06),
+              blurRadius: 6,
               offset: const Offset(0, 2),
             ),
           ],
@@ -296,20 +412,20 @@ class PromoProductsSection extends StatelessWidget {
                   tag: 'promo_product_${id}_${imagePath}',
                   child: ClipRRect(
                     borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(12),
-                      topRight: Radius.circular(12),
+                      topLeft: Radius.circular(10),
+                      topRight: Radius.circular(10),
                     ),
                     child: Image.network(
                       imagePath,
-                      height: 110,
-                      width: 160,
+                      height: 90,
+                      width: 140,
                       fit: BoxFit.cover,
                       errorBuilder: (context, error, stackTrace) {
                         return Container(
-                          height: 110,
-                          width: 160,
+                          height: 90,
+                          width: 140,
                           color: Colors.grey.shade300,
-                          child: const Icon(Icons.image, color: Colors.grey),
+                          child: const Icon(Icons.image, color: Colors.grey, size: 20),
                         );
                       },
                     ),
@@ -317,25 +433,25 @@ class PromoProductsSection extends StatelessWidget {
                 ),
                 // Badge promo en haut à droite
                 Positioned(
-                  top: 8,
-                  right: 8,
+                  top: 6,
+                  right: 6,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                     decoration: BoxDecoration(
                       color: Colors.red,
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(8),
                       boxShadow: [
                         BoxShadow(
                           color: Colors.red.withOpacity(0.3),
-                          blurRadius: 4,
-                          offset: const Offset(0, 2),
+                          blurRadius: 3,
+                          offset: const Offset(0, 1),
                         ),
                       ],
                     ),
                     child: Text(
                       '-$discount%',
                       style: const TextStyle(
-                        fontSize: 11,
+                        fontSize: 10,
                         fontWeight: FontWeight.bold,
                         color: Colors.white,
                       ),
@@ -344,18 +460,18 @@ class PromoProductsSection extends StatelessWidget {
                 ),
                 // Tag catégorie en haut à gauche
                 Positioned(
-                  top: 8,
-                  left: 8,
+                  top: 6,
+                  left: 6,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                     decoration: BoxDecoration(
                       color: AppColors.buttonColor2,
-                      borderRadius: BorderRadius.circular(6),
+                      borderRadius: BorderRadius.circular(5),
                     ),
                     child: Text(
                       tag,
                       style: const TextStyle(
-                        fontSize: 9,
+                        fontSize: 8,
                         color: Colors.white,
                         fontWeight: FontWeight.w600,
                       ),
@@ -366,7 +482,7 @@ class PromoProductsSection extends StatelessWidget {
             ),
             // Informations du produit
             Padding(
-              padding: const EdgeInsets.all(10),
+              padding: const EdgeInsets.all(8),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -374,28 +490,28 @@ class PromoProductsSection extends StatelessWidget {
                   Text(
                     name,
                     style: const TextStyle(
-                      fontSize: 13,
+                      fontSize: 12,
                       fontWeight: FontWeight.w600,
                       color: Colors.black87,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 4),
                   // Période de validité
                   Row(
                     children: [
                       Icon(
                         Icons.access_time,
-                        size: 10,
+                        size: 9,
                         color: Colors.grey.shade600,
                       ),
-                      const SizedBox(width: 4),
+                      const SizedBox(width: 3),
                       Flexible(
                         child: Text(
                           '${dateFormat.format(startDate)} - ${dateFormat.format(endDate)}',
                           style: TextStyle(
-                            fontSize: 9,
+                            fontSize: 8,
                             color: Colors.grey.shade600,
                           ),
                           maxLines: 1,
@@ -404,7 +520,7 @@ class PromoProductsSection extends StatelessWidget {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
                   // Prix
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.end,
@@ -414,7 +530,7 @@ class PromoProductsSection extends StatelessWidget {
                         child: Text(
                           '${promoPrice.toStringAsFixed(0)} FC',
                           style: const TextStyle(
-                            fontSize: 13,
+                            fontSize: 12,
                             fontWeight: FontWeight.bold,
                             color: AppColors.primary,
                           ),
@@ -422,13 +538,229 @@ class PromoProductsSection extends StatelessWidget {
                           maxLines: 1,
                         ),
                       ),
-                      const SizedBox(width: 4),
+                      const SizedBox(width: 3),
                       // Prix original barré
                       Flexible(
                         child: Text(
                           '${originalPrice.toStringAsFixed(0)} FC',
                           style: TextStyle(
-                            fontSize: 10,
+                            fontSize: 9,
+                            color: Colors.grey.shade500,
+                            decoration: TextDecoration.lineThrough,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Construit une carte de produit en promo depuis un objet Promotion
+  Widget _buildPromoProductCardFromPromotion(
+    BuildContext context,
+    Promotion promotion,
+  ) {
+    final product = promotion.product;
+    if (product == null) {
+      return const SizedBox.shrink();
+    }
+
+    final discount = promotion.discountPercentage.round();
+    final dateFormat = DateFormat('dd/MM/yyyy');
+    final imageUrl = promotion.image.isNotEmpty 
+        ? promotion.image 
+        : (product.media != null && product.media!.mediaUrl.isNotEmpty
+            ? product.media!.mediaUrl
+            : 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&h=400&fit=crop');
+
+    return GestureDetector(
+      onTap: () {
+        // Utiliser les images de la promotion si disponibles
+        final productImages = promotion.getAllImages();
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ProductDetailScreen(
+              description: product.description,
+              idVendeur: product.vendeurId.toString(),
+              id: product.id,
+              tag: 'PROMO',
+              category: product.category?.name ?? '',
+              stock: product.stock,
+              name: product.name,
+              price: promotion.nouveauPrix,
+              imagePath: imageUrl,
+              productImages: productImages.length > 1 ? productImages : null,
+            ),
+          ),
+        );
+      },
+      child: Container(
+        width: 140,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.06),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Image avec badge promo
+            Stack(
+              children: [
+                Hero(
+                  tag: 'promo_product_${promotion.id}_${imageUrl}',
+                  child: ClipRRect(
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(10),
+                      topRight: Radius.circular(10),
+                    ),
+                    child: Image.network(
+                      imageUrl,
+                      height: 90,
+                      width: 140,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return Container(
+                          height: 90,
+                          width: 140,
+                          color: Colors.grey.shade300,
+                          child: const Icon(Icons.image, color: Colors.grey, size: 20),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+                // Badge promo en haut à droite
+                Positioned(
+                  top: 6,
+                  right: 6,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: Colors.red,
+                      borderRadius: BorderRadius.circular(8),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.red.withOpacity(0.3),
+                          blurRadius: 3,
+                          offset: const Offset(0, 1),
+                        ),
+                      ],
+                    ),
+                    child: Text(
+                      '-$discount%',
+                      style: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+                // Tag catégorie en haut à gauche
+                Positioned(
+                  top: 6,
+                  left: 6,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: AppColors.buttonColor2,
+                      borderRadius: BorderRadius.circular(5),
+                    ),
+                    child: Text(
+                      promotion.libelle.isNotEmpty ? promotion.libelle : 'PROMO',
+                      style: const TextStyle(
+                        fontSize: 8,
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            // Informations du produit
+            Padding(
+              padding: const EdgeInsets.all(8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Nom du produit
+                  Text(
+                    product.name,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  // Période de validité
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.access_time,
+                        size: 9,
+                        color: Colors.grey.shade600,
+                      ),
+                      const SizedBox(width: 3),
+                      Flexible(
+                        child: Text(
+                          'Jusqu\'au ${dateFormat.format(promotion.delaiPromotion)}',
+                          style: TextStyle(
+                            fontSize: 8,
+                            color: Colors.grey.shade600,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  // Prix
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      // Prix promo
+                      Flexible(
+                        child: Text(
+                          '${promotion.nouveauPrix.toStringAsFixed(0)} FC',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.primary,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                        ),
+                      ),
+                      const SizedBox(width: 3),
+                      // Prix original barré
+                      Flexible(
+                        child: Text(
+                          '${promotion.ancienPrix.toStringAsFixed(0)} FC',
+                          style: TextStyle(
+                            fontSize: 9,
                             color: Colors.grey.shade500,
                             decoration: TextDecoration.lineThrough,
                           ),

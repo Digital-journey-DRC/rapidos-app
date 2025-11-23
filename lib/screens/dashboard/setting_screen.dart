@@ -113,7 +113,9 @@ class _SettingScreenState extends State<SettingScreen>
         print('🔍 setting_screen._loadMerchantCounts - userId est null');
       }
       print('🔍 setting_screen._loadMerchantCounts - merchantId final: $merchantId');
-      final promoResult = await promotionService.getPromotions(merchantId: merchantId);
+      final promoResult = merchantId != null
+          ? await promotionService.getMerchantPromotions(merchantId)
+          : await promotionService.getPromotions();
       
       if (mounted) {
         setState(() {

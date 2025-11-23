@@ -103,10 +103,11 @@ class PromotionService {
     }
   }
 
-  /// Récupère toutes les promotions actives (filtrées par marchand si merchantId fourni)
-  Future<Map<String, dynamic>> getPromotions({int? merchantId}) async {
+  /// Récupère toutes les promotions actives (pour les clients)
+  /// Accessible à: Tous utilisateurs authentifiés
+  Future<Map<String, dynamic>> getPromotions() async {
     try {
-      print('🔍 promotion_service.getPromotions - merchantId reçu: $merchantId (type: ${merchantId.runtimeType})');
+      print('🔍 promotion_service.getPromotions - Récupération de toutes les promotions actives (pour clients)');
       
       final token = await StorageService().getToken();
       
@@ -127,28 +128,34 @@ class PromotionService {
         },
       );
 
+      print('🔍 promotion_service.getPromotions - Status code: ${response.statusCode}');
       final responseData = jsonDecode(response.body);
+      print('🔍 promotion_service.getPromotions - Response keys: ${responseData.keys.toList()}');
 
       if (response.statusCode == 200) {
         final List<dynamic> promotionsJson = responseData['promotions'] ?? [];
-        List<Promotion> promotions = promotionsJson
-            .map((json) => Promotion.fromJson(json))
-            .toList();
+        List<Promotion> promotions = [];
         
-        print('🔍 promotion_service.getPromotions - Nombre de promotions avant filtrage: ${promotions.length}');
-        
-        // Filtrer par marchand si merchantId est fourni
-        if (merchantId != null) {
-          print('🔍 promotion_service.getPromotions - Filtrage par merchantId: $merchantId');
-          promotions = promotions.where((promo) {
-            final vendeurId = promo.product?.vendeurId;
-            print('🔍 promotion_service.getPromotions - Promotion ${promo.id}: vendeurId=$vendeurId (type: ${vendeurId.runtimeType}), match=${vendeurId == merchantId}');
-            return vendeurId == merchantId;
-          }).toList();
-          print('🔍 promotion_service.getPromotions - Nombre de promotions après filtrage: ${promotions.length}');
-        } else {
-          print('🔍 promotion_service.getPromotions - Pas de filtrage (merchantId est null)');
+        for (var json in promotionsJson) {
+          try {
+            final promoId = json['id']?.toString() ?? 'unknown';
+            print('🔍 promotion_service.getPromotions - Parsing promotion ID: $promoId');
+            print('🔍 promotion_service.getPromotions - nouveauPrix type: ${json['nouveauPrix'].runtimeType}, value: ${json['nouveauPrix']}');
+            print('🔍 promotion_service.getPromotions - ancienPrix type: ${json['ancienPrix'].runtimeType}, value: ${json['ancienPrix']}');
+            print('🔍 promotion_service.getPromotions - product vendeur: ${json['product']?['vendeur']}');
+            print('🔍 promotion_service.getPromotions - product vendeurId: ${json['product']?['vendeurId']}');
+            final promotion = Promotion.fromJson(json);
+            promotions.add(promotion);
+            print('🔍 promotion_service.getPromotions - Promotion $promoId parsée avec succès');
+          } catch (e, stackTrace) {
+            print('🔍 promotion_service.getPromotions - Erreur parsing promotion: $e');
+            print('🔍 promotion_service.getPromotions - Stack trace: $stackTrace');
+            print('🔍 promotion_service.getPromotions - JSON: $json');
+            // Continuer avec les autres promotions même si une échoue
+          }
         }
+        
+        print('🔍 promotion_service.getPromotions - Nombre de promotions récupérées: ${promotions.length}');
         
         return {
           'success': true,
@@ -161,12 +168,53 @@ class PromotionService {
         );
       }
     } on http.ClientException catch (e) {
+      print('🔍 promotion_service.getPromotions - ClientException: $e');
       return {
         'success': false,
         'error': 'Impossible de se connecter au serveur. Vérifiez votre connexion internet.',
         'promotions': <Promotion>[],
       };
     } catch (e) {
+      print('🔍 promotion_service.getPromotions - Exception: $e');
+      return {
+        'success': false,
+        'error': e.toString(),
+        'promotions': <Promotion>[],
+      };
+    }
+  }
+
+  /// Récupère les promotions d'un marchand spécifique (filtrées côté client)
+  /// Note: Cette méthode utilise getPromotions() puis filtre côté client
+  /// Pour une meilleure performance, le backend devrait fournir un endpoint dédié
+  Future<Map<String, dynamic>> getMerchantPromotions(int merchantId) async {
+    try {
+      print('🔍 promotion_service.getMerchantPromotions - merchantId: $merchantId');
+      
+      // Récupérer toutes les promotions
+      final allPromotionsResult = await getPromotions();
+      
+      if (allPromotionsResult['success'] != true) {
+        return allPromotionsResult;
+      }
+      
+      final allPromotions = allPromotionsResult['promotions'] as List<Promotion>;
+      
+      // Filtrer par marchand
+      final merchantPromotions = allPromotions.where((promo) {
+        final vendeurId = promo.product?.vendeurId;
+        print('🔍 promotion_service.getMerchantPromotions - Promotion ${promo.id}: vendeurId=$vendeurId, match=${vendeurId == merchantId}');
+        return vendeurId == merchantId;
+      }).toList();
+      
+      print('🔍 promotion_service.getMerchantPromotions - Nombre de promotions du marchand: ${merchantPromotions.length}');
+      
+      return {
+        'success': true,
+        'promotions': merchantPromotions,
+      };
+    } catch (e) {
+      print('🔍 promotion_service.getMerchantPromotions - Exception: $e');
       return {
         'success': false,
         'error': e.toString(),

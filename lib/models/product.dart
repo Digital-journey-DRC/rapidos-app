@@ -28,16 +28,47 @@ class Product {
   });
 
   factory Product.fromJson(Map<String, dynamic> json) {
+    // Helper functions pour parser les valeurs de manière sécurisée
+    int parseToInt(dynamic value, int fallback) {
+      if (value == null) return fallback;
+      if (value is int) return value;
+      if (value is double) return value.toInt();
+      if (value is String) {
+        return int.tryParse(value) ?? fallback;
+      }
+      if (value is num) return value.toInt();
+      return fallback;
+    }
+
+    double parseToDouble(dynamic value, double fallback) {
+      if (value == null) return fallback;
+      if (value is double) return value;
+      if (value is int) return value.toDouble();
+      if (value is String) {
+        return double.tryParse(value) ?? fallback;
+      }
+      if (value is num) return value.toDouble();
+      return fallback;
+    }
+
+    // Gérer vendeurId : peut être directement dans json ou dans un objet vendeur
+    int vendeurIdValue = 0;
+    if (json['vendeurId'] != null) {
+      vendeurIdValue = parseToInt(json['vendeurId'], 0);
+    } else if (json['vendeur'] != null && json['vendeur'] is Map) {
+      vendeurIdValue = parseToInt(json['vendeur']['id'], 0);
+    }
+
     return Product(
-      id: json['id'],
-      name: json['name'],
-      description: json['description'],
-      price: json['price'].toDouble(),
-      stock: json['stock'],
-      vendeurId: json['vendeurId'],
-      createdAt: json['createdAt'],
-      updatedAt: json['updatedAt'],
-      categorieId: json['categorieId'],
+      id: parseToInt(json['id'], 0),
+      name: json['name']?.toString() ?? '',
+      description: json['description']?.toString() ?? '',
+      price: parseToDouble(json['price'], 0.0),
+      stock: parseToInt(json['stock'], 0),
+      vendeurId: vendeurIdValue,
+      createdAt: json['createdAt']?.toString() ?? '',
+      updatedAt: json['updatedAt']?.toString() ?? '',
+      categorieId: parseToInt(json['categorieId'], 0),
       media: json['media'] != null ? Media.fromJson(json['media']) : null,
       category: json['category'] != null ? Category.fromJson(json['category']) : null,
     );
@@ -62,13 +93,25 @@ class Media {
   });
 
   factory Media.fromJson(Map<String, dynamic> json) {
+    // Helper function pour parser les valeurs de manière sécurisée
+    int parseToInt(dynamic value, int fallback) {
+      if (value == null) return fallback;
+      if (value is int) return value;
+      if (value is double) return value.toInt();
+      if (value is String) {
+        return int.tryParse(value) ?? fallback;
+      }
+      if (value is num) return value.toInt();
+      return fallback;
+    }
+
     return Media(
-      id: json['id'],
-      mediaUrl: json['mediaUrl'],
-      mediaType: json['mediaType'],
-      createdAt: json['createdAt'],
-      updatedAt: json['updatedAt'],
-      productId: json['productId'],
+      id: parseToInt(json['id'], 0),
+      mediaUrl: json['mediaUrl']?.toString() ?? '',
+      mediaType: json['mediaType']?.toString() ?? '',
+      createdAt: json['createdAt']?.toString() ?? '',
+      updatedAt: json['updatedAt']?.toString() ?? '',
+      productId: parseToInt(json['productId'], 0),
     );
   }
 } 

@@ -67,10 +67,15 @@ class Promotion {
       try {
         if (dateValue == null) return fallback;
         if (dateValue is String) {
-          return DateTime.parse(dateValue);
+          // Gérer les formats ISO 8601 avec ou sans timezone
+          return DateTime.parse(dateValue).toLocal();
+        }
+        if (dateValue is DateTime) {
+          return dateValue.toLocal();
         }
         return fallback;
       } catch (e) {
+        print('🔍 Promotion.parseDate - Erreur parsing date: $dateValue, erreur: $e');
         return fallback;
       }
     }

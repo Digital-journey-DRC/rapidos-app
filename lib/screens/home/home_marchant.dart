@@ -691,7 +691,9 @@ void saveCommande() async {
                 print('🔍 home_marchant - merchantId final: $merchantId');
                 
                 return FutureBuilder<Map<String, dynamic>>(
-                  future: PromotionService().getPromotions(merchantId: merchantId),
+                  future: merchantId != null
+                      ? PromotionService().getMerchantPromotions(merchantId)
+                      : PromotionService().getPromotions(),
                   builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const SizedBox(
