@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:immo/constants.dart';
 import 'package:immo/widgets/app_logo.dart';
 import 'package:immo/models/merchant_hours.dart';
+import 'package:immo/services/merchant_hours_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:convert';
 
 class MerchantServiceHoursScreen extends StatefulWidget {
   const MerchantServiceHoursScreen({Key? key}) : super(key: key);
@@ -13,8 +13,13 @@ class MerchantServiceHoursScreen extends StatefulWidget {
 }
 
 class _MerchantServiceHoursScreenState extends State<MerchantServiceHoursScreen> {
-  late MerchantServiceConfig _config;
+  MerchantServiceConfig _config = MerchantServiceConfig.getDefault();
   bool _isLoading = false;
+  final MerchantHoursService _hoursService = MerchantHoursService();
+  // Map pour suivre quels jours ont déjà un horaire enregistré dans l'API
+  final Map<String, bool> _existingHoraires = {};
+  // Sauvegarder l'état précédent des jours avant désactivation
+  List<MerchantHours>? _previousHoursState;
 
   @override
   void initState() {
@@ -25,46 +30,171 @@ class _MerchantServiceHoursScreenState extends State<MerchantServiceHoursScreen>
   Future<void> _loadConfig() async {
     setState(() => _isLoading = true);
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final configJson = prefs.getString('merchant_service_config');
+      // Charger depuis l'API
+      final result = await _hoursService.getAllHoraires();
       
-      if (configJson != null) {
-        _config = MerchantServiceConfig.fromJson(jsonDecode(configJson));
+      if (result['success'] == true && mounted) {
+        final horairesJson = result['horaires'] as List<dynamic>;
+        
+        // Marquer tous les jours qui ont un horaire existant
+        _existingHoraires.clear();
+        for (var horaire in horairesJson) {
+          final jour = horaire['jour']?.toString().toLowerCase() ?? '';
+          if (jour.isNotEmpty) {
+            _existingHoraires[jour] = true;
+          }
+        }
+        
+        if (horairesJson.isNotEmpty) {
+          // Convertir depuis l'API
+          _config = MerchantServiceConfig.fromApiHoraires(horairesJson);
+          // Sauvegarder l'état actuel comme état précédent (pour restauration future)
+          _previousHoursState = List<MerchantHours>.from(_config.hours);
+        } else {
+          // Aucun horaire enregistré, utiliser les valeurs par défaut
+          _config = MerchantServiceConfig.getDefault();
+          _previousHoursState = List<MerchantHours>.from(_config.hours);
+        }
+        
+        // Charger le statut "isManuallyOffline" depuis SharedPreferences (géré localement)
+        // Par défaut, le contrôle manuel est actif (suit les heures) donc isManuallyOffline = false
+        final prefs = await SharedPreferences.getInstance();
+        final isManuallyOffline = prefs.getBool('merchant_manually_offline') ?? false;
+        _config = _config.copyWith(isManuallyOffline: isManuallyOffline);
+        
+        // Si le contrôle manuel est désactivé (hors ligne), s'assurer que tous les jours sont désactivés localement
+        if (isManuallyOffline) {
+          final updatedHours = _config.hours.map((h) => 
+            h.copyWith(isEnabled: false)
+          ).toList();
+          _config = _config.copyWith(hours: updatedHours);
+        }
       } else {
+        // En cas d'erreur, utiliser les valeurs par défaut
         _config = MerchantServiceConfig.getDefault();
+        if (mounted && result['error'] != null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Erreur: ${result['error']}'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
       }
     } catch (e) {
       _config = MerchantServiceConfig.getDefault();
-    }
-    setState(() => _isLoading = false);
-  }
-
-  Future<void> _saveConfig() async {
-    setState(() => _isLoading = true);
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('merchant_service_config', jsonEncode(_config.toJson()));
-      
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Configuration enregistrée avec succès'),
-            backgroundColor: AppColors.success,
-          ),
-        );
-      }
-    } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Erreur lors de l\'enregistrement: $e'),
-            backgroundColor: Colors.red,
+            content: Text('Erreur lors du chargement: $e'),
+            backgroundColor: Colors.orange,
           ),
         );
       }
     }
-    setState(() => _isLoading = false);
+    if (mounted) {
+      setState(() => _isLoading = false);
+    }
   }
+
+  // Méthode commentée car le bouton "Enregistrer les modifications" a été désactivé
+  // Chaque jour a maintenant son propre bouton "Enregistrer"
+  // Future<void> _saveConfig() async {
+  //   // Vérifier que toutes les heures sont valides
+  //   final allValid = _config.hours.every((h) => _validateHours(h));
+  //   if (!allValid) {
+  //     if (mounted) {
+  //       ScaffoldMessenger.of(context).showSnackBar(
+  //         const SnackBar(
+  //           content: Text('Veuillez corriger les heures invalides (heure d\'ouverture doit être avant l\'heure de fermeture)'),
+  //           backgroundColor: Colors.red,
+  //         ),
+  //       );
+  //     }
+  //     return;
+  //   }
+
+  //   if (!mounted) return;
+  //   setState(() => _isLoading = true);
+    
+  //   try {
+  //     int successCount = 0;
+  //     int errorCount = 0;
+  //     String? lastError;
+
+  //     // Sauvegarder chaque jour via l'API
+  //     for (var dayHours in _config.hours) {
+  //       Map<String, dynamic> result;
+        
+  //       // Si l'horaire existe déjà, utiliser PUT (update), sinon POST (create)
+  //       if (_existingHoraires[dayHours.jourApi] == true) {
+  //         result = await _hoursService.updateHoraire(
+  //           jour: dayHours.jourApi,
+  //           heureOuverture: dayHours.isEnabled ? dayHours.openTime : null,
+  //           heureFermeture: dayHours.isEnabled ? dayHours.closeTime : null,
+  //           estOuvert: dayHours.isEnabled,
+  //         );
+  //       } else {
+  //         result = await _hoursService.createOrUpdateHoraire(
+  //           jour: dayHours.jourApi,
+  //           heureOuverture: dayHours.isEnabled ? dayHours.openTime : null,
+  //           heureFermeture: dayHours.isEnabled ? dayHours.closeTime : null,
+  //           estOuvert: dayHours.isEnabled,
+  //         );
+  //       }
+
+  //       if (result['success'] == true) {
+  //         successCount++;
+  //         // Marquer comme existant après création/mise à jour réussie
+  //         _existingHoraires[dayHours.jourApi] = true;
+  //       } else {
+  //         errorCount++;
+  //         lastError = result['error']?.toString();
+  //       }
+  //     }
+
+  //     // Sauvegarder le statut "isManuallyOffline" localement
+  //     final prefs = await SharedPreferences.getInstance();
+  //     await prefs.setBool('merchant_manually_offline', _config.isManuallyOffline);
+
+  //     if (mounted) {
+  //       setState(() => _isLoading = false);
+        
+  //       if (errorCount == 0) {
+  //         ScaffoldMessenger.of(context).showSnackBar(
+  //           const SnackBar(
+  //             content: Text('Configuration enregistrée avec succès'),
+  //             backgroundColor: AppColors.success,
+  //           ),
+  //         );
+  //       } else if (successCount > 0) {
+  //         ScaffoldMessenger.of(context).showSnackBar(
+  //           SnackBar(
+  //             content: Text('$successCount horaire(s) enregistré(s), $errorCount erreur(s): $lastError'),
+  //             backgroundColor: Colors.orange,
+  //           ),
+  //         );
+  //       } else {
+  //         ScaffoldMessenger.of(context).showSnackBar(
+  //           SnackBar(
+  //             content: Text('Erreur lors de l\'enregistrement: $lastError'),
+  //             backgroundColor: Colors.red,
+  //           ),
+  //         );
+  //       }
+  //     }
+  //   } catch (e) {
+  //     if (mounted) {
+  //       setState(() => _isLoading = false);
+  //       ScaffoldMessenger.of(context).showSnackBar(
+  //         SnackBar(
+  //           content: Text('Erreur lors de l\'enregistrement: $e'),
+  //           backgroundColor: Colors.red,
+  //         ),
+  //       );
+  //     }
+  //   }
+  // }
 
   Future<void> _selectTime(BuildContext context, MerchantHours dayHours, bool isOpenTime) async {
     final initialTime = isOpenTime && dayHours.openTime != null
@@ -125,9 +255,441 @@ class _MerchantServiceHoursScreenState extends State<MerchantServiceHoursScreen>
     return openMinutes < closeMinutes;
   }
 
+  /// Sauvegarde un horaire individuel (Create ou Update)
+  Future<void> _saveSingleHoraire(MerchantHours dayHours) async {
+    if (!_validateHours(dayHours)) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('L\'heure d\'ouverture doit être avant l\'heure de fermeture'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
+
+    if (!mounted) return;
+    setState(() => _isLoading = true);
+
+    try {
+      Map<String, dynamic> result;
+      
+      // Si l'horaire existe déjà, utiliser PUT (update), sinon POST (create)
+      if (_existingHoraires[dayHours.jourApi] == true) {
+        result = await _hoursService.updateHoraire(
+          jour: dayHours.jourApi,
+          heureOuverture: dayHours.isEnabled ? dayHours.openTime : null,
+          heureFermeture: dayHours.isEnabled ? dayHours.closeTime : null,
+          estOuvert: dayHours.isEnabled,
+        );
+      } else {
+        result = await _hoursService.createOrUpdateHoraire(
+          jour: dayHours.jourApi,
+          heureOuverture: dayHours.isEnabled ? dayHours.openTime : null,
+          heureFermeture: dayHours.isEnabled ? dayHours.closeTime : null,
+          estOuvert: dayHours.isEnabled,
+        );
+      }
+
+      if (mounted) {
+        setState(() => _isLoading = false);
+        
+        if (result['success'] == true) {
+          // Marquer comme existant après création/mise à jour réussie
+          _existingHoraires[dayHours.jourApi] = true;
+          
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Horaire du ${dayHours.day} enregistré avec succès'),
+              backgroundColor: AppColors.success,
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Erreur: ${result['error']}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  /// Supprime un horaire pour un jour spécifique
+  Future<void> _deleteHoraire(MerchantHours dayHours) async {
+    if (_existingHoraires[dayHours.jourApi] != true) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Aucun horaire enregistré pour ce jour'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+      return;
+    }
+
+    // Demander confirmation
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Supprimer l\'horaire'),
+        content: Text('Êtes-vous sûr de vouloir supprimer l\'horaire du ${dayHours.day} ?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Annuler'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Supprimer'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      final result = await _hoursService.deleteHoraire(dayHours.jourApi);
+
+      if (mounted) {
+        setState(() => _isLoading = false);
+        
+        if (result['success'] == true) {
+          // Retirer de la map des horaires existants
+          _existingHoraires.remove(dayHours.jourApi);
+          
+          // Mettre à jour la config locale : désactiver le jour
+          final index = _config.hours.indexWhere((h) => h.day == dayHours.day);
+          if (index != -1) {
+            final updatedHours = List<MerchantHours>.from(_config.hours);
+            updatedHours[index] = updatedHours[index].copyWith(
+              isEnabled: false,
+              openTime: null,
+              closeTime: null,
+            );
+            _config = _config.copyWith(hours: updatedHours);
+          }
+          
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Horaire du ${dayHours.day} supprimé avec succès'),
+              backgroundColor: AppColors.success,
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Erreur: ${result['error']}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  /// Sauvegarde le statut du contrôle manuel
+  Future<void> _saveManualControl(bool isManuallyOffline) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('merchant_manually_offline', isManuallyOffline);
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              isManuallyOffline
+                  ? 'Boutique mise hors ligne - tous les jours désactivés'
+                  : 'Boutique en ligne - disponibilités restaurées',
+            ),
+            backgroundColor: isManuallyOffline ? Colors.orange : AppColors.success,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur lors de la sauvegarde: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  /// Désactive tous les jours dans l'API (en parallèle pour réduire le temps)
+  Future<void> _deactivateAllDays() async {
+    if (!mounted) return;
+    setState(() => _isLoading = true);
+
+    try {
+      // Faire tous les appels API en parallèle pour réduire le temps de chargement
+      final futures = _config.hours.map((dayHours) async {
+        if (_existingHoraires[dayHours.jourApi] == true) {
+          return await _hoursService.updateHoraire(
+            jour: dayHours.jourApi,
+            estOuvert: false,
+          );
+        } else {
+          return await _hoursService.createOrUpdateHoraire(
+            jour: dayHours.jourApi,
+            estOuvert: false,
+          );
+        }
+      }).toList();
+
+      final results = await Future.wait(futures);
+      
+      int successCount = 0;
+      int errorCount = 0;
+
+      for (int i = 0; i < results.length; i++) {
+        if (results[i]['success'] == true) {
+          successCount++;
+          _existingHoraires[_config.hours[i].jourApi] = true;
+        } else {
+          errorCount++;
+        }
+      }
+
+      if (mounted) {
+        setState(() => _isLoading = false);
+        
+        if (errorCount > 0 && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('$successCount jour(s) désactivé(s), $errorCount erreur(s)'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur lors de la désactivation: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  /// Restaure l'état précédent des heures (en parallèle pour réduire le temps)
+  Future<void> _restorePreviousHours() async {
+    if (_previousHoursState == null || !mounted) return;
+    
+    setState(() => _isLoading = true);
+
+    try {
+      // Faire tous les appels API en parallèle pour réduire le temps de chargement
+      final futures = _previousHoursState!.map((previousDayHours) async {
+        if (_existingHoraires[previousDayHours.jourApi] == true) {
+          return await _hoursService.updateHoraire(
+            jour: previousDayHours.jourApi,
+            heureOuverture: previousDayHours.isEnabled ? previousDayHours.openTime : null,
+            heureFermeture: previousDayHours.isEnabled ? previousDayHours.closeTime : null,
+            estOuvert: previousDayHours.isEnabled,
+          );
+        } else {
+          return await _hoursService.createOrUpdateHoraire(
+            jour: previousDayHours.jourApi,
+            heureOuverture: previousDayHours.isEnabled ? previousDayHours.openTime : null,
+            heureFermeture: previousDayHours.isEnabled ? previousDayHours.closeTime : null,
+            estOuvert: previousDayHours.isEnabled,
+          );
+        }
+      }).toList();
+
+      final results = await Future.wait(futures);
+      
+      int successCount = 0;
+      int errorCount = 0;
+
+      for (int i = 0; i < results.length; i++) {
+        if (results[i]['success'] == true) {
+          successCount++;
+          _existingHoraires[_previousHoursState![i].jourApi] = true;
+        } else {
+          errorCount++;
+        }
+      }
+
+      // Mettre à jour la config avec l'état restauré
+      if (mounted) {
+        setState(() {
+          _config = _config.copyWith(hours: _previousHoursState!);
+          _isLoading = false;
+        });
+        
+        if (errorCount > 0) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('$successCount jour(s) restauré(s), $errorCount erreur(s)'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur lors de la restauration: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  /// Active les heures par défaut (si pas d'état précédent) - en parallèle pour réduire le temps
+  Future<void> _activateDefaultHours() async {
+    if (!mounted) return;
+    
+    setState(() => _isLoading = true);
+
+    try {
+      // Utiliser les heures par défaut
+      final defaultConfig = MerchantServiceConfig.getDefault();
+      
+      // Faire tous les appels API en parallèle pour réduire le temps de chargement
+      final futures = defaultConfig.hours.map((dayHours) async {
+        return await _hoursService.createOrUpdateHoraire(
+          jour: dayHours.jourApi,
+          heureOuverture: dayHours.isEnabled ? dayHours.openTime : null,
+          heureFermeture: dayHours.isEnabled ? dayHours.closeTime : null,
+          estOuvert: dayHours.isEnabled,
+        );
+      }).toList();
+
+      final results = await Future.wait(futures);
+      
+      int successCount = 0;
+      int errorCount = 0;
+
+      for (int i = 0; i < results.length; i++) {
+        if (results[i]['success'] == true) {
+          successCount++;
+          _existingHoraires[defaultConfig.hours[i].jourApi] = true;
+        } else {
+          errorCount++;
+        }
+      }
+
+      // Mettre à jour la config avec les heures par défaut
+      if (mounted) {
+        setState(() {
+          _config = _config.copyWith(hours: defaultConfig.hours);
+          _isLoading = false;
+        });
+        
+        if (errorCount > 0) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('$successCount jour(s) activé(s), $errorCount erreur(s)'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur lors de l\'activation: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  /// Récupère un horaire spécifique pour un jour
+  Future<void> _loadSingleHoraire(String jour) async {
+    if (!mounted) return;
+    
+    try {
+      final result = await _hoursService.getHoraireByDay(jour);
+      
+      if (result['success'] == true && mounted) {
+        final horaireJson = result['horaire'] as Map<String, dynamic>;
+        final horaire = MerchantHours.fromJson(horaireJson);
+        
+        // Mettre à jour la config avec cet horaire
+        final index = _config.hours.indexWhere((h) => h.jourApi == jour);
+        if (index != -1) {
+          final updatedHours = List<MerchantHours>.from(_config.hours);
+          updatedHours[index] = horaire;
+          _config = _config.copyWith(hours: updatedHours);
+          _existingHoraires[jour] = true;
+          
+          setState(() {});
+          
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Horaire du ${horaire.day} rechargé'),
+              backgroundColor: AppColors.success,
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur lors du rechargement: $e'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final isCurrentlyOpen = _config.isCurrentlyOpen();
+    // Calculer le statut actuel : si manuellement offline, toujours fermé
+    // Sinon, vérifier selon les heures programmées
+    // final isCurrentlyOpen = _config.isCurrentlyOpen();
+    // final statusMessage = _config.isManuallyOffline
+    //     ? 'Boutique fermée manuellement'
+    //     : (isCurrentlyOpen
+    //         ? 'Boutique ouverte selon les heures programmées'
+    //         : 'Boutique fermée selon les heures programmées');
     
     return Scaffold(
       appBar: AppBarWithLogo(
@@ -138,60 +700,60 @@ class _MerchantServiceHoursScreenState extends State<MerchantServiceHoursScreen>
       backgroundColor: const Color(0xFFF7F8FA),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          : RefreshIndicator(
+              onRefresh: _loadConfig,
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Statut de la boutique
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: isCurrentlyOpen ? Colors.green.shade50 : Colors.red.shade50,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: isCurrentlyOpen ? Colors.green.shade300 : Colors.red.shade300,
-                        width: 1,
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          isCurrentlyOpen ? Icons.check_circle : Icons.cancel,
-                          color: isCurrentlyOpen ? Colors.green.shade700 : Colors.red.shade700,
-                          size: 24,
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                isCurrentlyOpen ? 'Boutique ouverte' : 'Boutique fermée',
-                                style: TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w600,
-                                  color: isCurrentlyOpen ? Colors.green.shade900 : Colors.red.shade900,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                isCurrentlyOpen
-                                    ? 'Votre boutique est actuellement ouverte'
-                                    : 'Votre boutique est actuellement fermée',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: isCurrentlyOpen ? Colors.green.shade700 : Colors.red.shade700,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                  // Container(
+                  //   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  //   decoration: BoxDecoration(
+                  //     color: isCurrentlyOpen ? Colors.green.shade50 : Colors.red.shade50,
+                  //     borderRadius: BorderRadius.circular(12),
+                  //     border: Border.all(
+                  //       color: isCurrentlyOpen ? Colors.green.shade300 : Colors.red.shade300,
+                  //       width: 1,
+                  //     ),
+                  //   ),
+                  //   child: Row(
+                  //     children: [
+                  //       Icon(
+                  //         isCurrentlyOpen ? Icons.check_circle : Icons.cancel,
+                  //         color: isCurrentlyOpen ? Colors.green.shade700 : Colors.red.shade700,
+                  //         size: 24,
+                  //       ),
+                  //       const SizedBox(width: 10),
+                  //       Expanded(
+                  //         child: Column(
+                  //           crossAxisAlignment: CrossAxisAlignment.start,
+                  //           children: [
+                  //             Text(
+                  //               isCurrentlyOpen ? 'Boutique ouverte' : 'Boutique fermée',
+                  //               style: TextStyle(
+                  //                 fontSize: 15,
+                  //                 fontWeight: FontWeight.w600,
+                  //                 color: isCurrentlyOpen ? Colors.green.shade900 : Colors.red.shade900,
+                  //               ),
+                  //             ),
+                  //             const SizedBox(height: 2),
+                  //             Text(
+                  //               statusMessage,
+                  //               style: TextStyle(
+                  //                 fontSize: 12,
+                  //                 color: isCurrentlyOpen ? Colors.green.shade700 : Colors.red.shade700,
+                  //               ),
+                  //             ),
+                  //           ],
+                  //         ),
+                  //       ),
+                  //     ],
+                  //   ),
+                  // ),
                   
-                  const SizedBox(height: 14),
+                  // const SizedBox(height: 14),
                   
                   // Bouton pour mettre hors ligne/en ligne manuellement
                   Container(
@@ -215,8 +777,8 @@ class _MerchantServiceHoursScreenState extends State<MerchantServiceHoursScreen>
                         const SizedBox(height: 6),
                         Text(
                           _config.isManuallyOffline
-                              ? 'Votre boutique est mise hors ligne manuellement'
-                              : 'Votre boutique suit les heures programmées',
+                              ? 'Votre boutique est fermée manuellement, peu importe les heures configurées'
+                              : 'Votre boutique suit automatiquement les heures d\'ouverture configurées pour chaque jour',
                           style: TextStyle(
                             fontSize: 12,
                             color: Colors.grey.shade600,
@@ -228,20 +790,72 @@ class _MerchantServiceHoursScreenState extends State<MerchantServiceHoursScreen>
                           children: [
                             Switch(
                               value: !_config.isManuallyOffline,
-                              onChanged: (value) {
-                                setState(() {
-                                  _config = _config.copyWith(isManuallyOffline: !value);
-                                });
+                              onChanged: (value) async {
+                                // value = true signifie "En ligne" (suit les heures)
+                                // value = false signifie "Hors ligne" (indisponible)
+                                
+                                if (!value) {
+                                  // On désactive le contrôle manuel (mise hors ligne)
+                                  // Sauvegarder l'état actuel avant de tout désactiver
+                                  _previousHoursState = List<MerchantHours>.from(_config.hours);
+                                  
+                                  // Désactiver tous les jours dans l'API
+                                  await _deactivateAllDays();
+                                  
+                                  // Mettre à jour la config locale
+                                  setState(() {
+                                    final updatedHours = _config.hours.map((h) => 
+                                      h.copyWith(isEnabled: false)
+                                    ).toList();
+                                    _config = _config.copyWith(
+                                      isManuallyOffline: true,
+                                      hours: updatedHours,
+                                    );
+                                  });
+                                } else {
+                                  // On active le contrôle manuel (suit les heures)
+                                  // Restaurer l'état précédent si disponible
+                                  if (_previousHoursState != null) {
+                                    await _restorePreviousHours();
+                                  } else {
+                                    // Si pas d'état précédent, activer les jours par défaut
+                                    await _activateDefaultHours();
+                                  }
+                                  
+                                  setState(() {
+                                    _config = _config.copyWith(isManuallyOffline: false);
+                                  });
+                                }
+                                
+                                // Sauvegarder le statut du contrôle manuel
+                                await _saveManualControl(!value);
                               },
                               activeColor: AppColors.primary,
                             ),
                             const SizedBox(width: 8),
-                            Text(
-                              _config.isManuallyOffline ? 'Hors ligne' : 'En ligne',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey.shade700,
-                                fontWeight: FontWeight.w500,
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    _config.isManuallyOffline ? 'Hors ligne' : 'En ligne',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: _config.isManuallyOffline ? Colors.red.shade700 : Colors.green.shade700,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    _config.isManuallyOffline
+                                        ? 'Boutique fermée manuellement'
+                                        : 'Suit les heures programmées',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: Colors.grey.shade600,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ],
@@ -264,8 +878,10 @@ class _MerchantServiceHoursScreenState extends State<MerchantServiceHoursScreen>
                   
                   ..._config.hours.map((dayHours) {
                     final isValid = _validateHours(dayHours);
+                    final hasExistingHoraire = _existingHoraires[dayHours.jourApi] == true;
                     return _DayHoursCard(
                       dayHours: dayHours,
+                      hasExistingHoraire: hasExistingHoraire,
                       onEnabledChanged: (enabled) {
                         setState(() {
                           final index = _config.hours.indexWhere((h) => h.day == dayHours.day);
@@ -278,53 +894,44 @@ class _MerchantServiceHoursScreenState extends State<MerchantServiceHoursScreen>
                       },
                       onOpenTimeTap: () => _selectTime(context, dayHours, true),
                       onCloseTimeTap: () => _selectTime(context, dayHours, false),
+                      onSave: () => _saveSingleHoraire(dayHours),
+                      onDelete: () => _deleteHoraire(dayHours),
+                      onRefresh: () => _loadSingleHoraire(dayHours.jourApi),
                       isValid: isValid,
                     );
                   }).toList(),
                   
                   const SizedBox(height: 18),
                   
-                  // Bouton de sauvegarde
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        // Vérifier que toutes les heures sont valides
-                        final allValid = _config.hours.every((h) => _validateHours(h));
-                        if (!allValid) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Veuillez corriger les heures invalides (heure d\'ouverture doit être avant l\'heure de fermeture)'),
-                              backgroundColor: Colors.red,
-                            ),
-                          );
-                          return;
-                        }
-                        _saveConfig();
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        elevation: 0,
-                      ),
-                      child: const Text(
-                        'Enregistrer les modifications',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ),
+                  // Bouton de sauvegarde (commenté car chaque jour a son propre bouton)
+                  // SizedBox(
+                  //   width: double.infinity,
+                  //   child: ElevatedButton(
+                  //     onPressed: _isLoading ? null : _saveConfig,
+                  //     style: ElevatedButton.styleFrom(
+                  //       backgroundColor: AppColors.primary,
+                  //       foregroundColor: Colors.white,
+                  //       padding: const EdgeInsets.symmetric(vertical: 14),
+                  //       shape: RoundedRectangleBorder(
+                  //         borderRadius: BorderRadius.circular(12),
+                  //       ),
+                  //       elevation: 0,
+                  //     ),
+                  //     child: const Text(
+                  //       'Enregistrer les modifications',
+                  //       style: TextStyle(
+                  //         fontSize: 14,
+                  //         fontWeight: FontWeight.w600,
+                  //       ),
+                  //     ),
+                  //   ),
+                  // ),
                   
                   const SizedBox(height: 12),
                 ],
               ),
             ),
+          ),
     );
   }
 }
@@ -334,14 +941,22 @@ class _DayHoursCard extends StatelessWidget {
   final Function(bool) onEnabledChanged;
   final VoidCallback onOpenTimeTap;
   final VoidCallback onCloseTimeTap;
+  final VoidCallback? onSave;
+  final VoidCallback? onDelete;
+  final VoidCallback? onRefresh;
   final bool isValid;
+  final bool hasExistingHoraire;
 
   const _DayHoursCard({
     required this.dayHours,
     required this.onEnabledChanged,
     required this.onOpenTimeTap,
     required this.onCloseTimeTap,
+    this.onSave,
+    this.onDelete,
+    this.onRefresh,
     required this.isValid,
+    required this.hasExistingHoraire,
   });
 
   @override
@@ -363,14 +978,45 @@ class _DayHoursCard extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: Text(
-                  dayHours.day,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                  ),
+                child: Row(
+                  children: [
+                    Text(
+                      dayHours.day,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    if (hasExistingHoraire) ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppColors.success.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Text(
+                          'Enregistré',
+                          style: TextStyle(
+                            fontSize: 8,
+                            color: AppColors.success,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
+              if (onRefresh != null)
+                IconButton(
+                  icon: const Icon(Icons.refresh, size: 16),
+                  color: AppColors.primary,
+                  onPressed: onRefresh,
+                  tooltip: 'Recharger',
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
               Transform.scale(
                 scale: 0.85,
                 child: Switch(
@@ -422,15 +1068,72 @@ class _DayHoursCard extends StatelessWidget {
                 ],
               ),
             ],
+            // Boutons d'action (Save/Delete)
+            if (dayHours.isEnabled) ...[
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  if (onSave != null)
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: onSave,
+                        icon: Icon(Icons.save, size: 14, color: AppColors.primary.withOpacity(0.7)),
+                        label: Text(
+                          'Enregistrer',
+                          style: TextStyle(fontSize: 11, color: AppColors.primary.withOpacity(0.8)),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          foregroundColor: AppColors.primary,
+                          padding: const EdgeInsets.symmetric(vertical: 6),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(6),
+                            side: BorderSide(
+                              color: AppColors.primary.withOpacity(0.3),
+                              width: 1,
+                            ),
+                          ),
+                          elevation: 0,
+                        ),
+                      ),
+                    ),
+                  if (onDelete != null && hasExistingHoraire) ...[
+                    const SizedBox(width: 6),
+                    IconButton(
+                      icon: const Icon(Icons.delete_outline, size: 18),
+                      color: Colors.red,
+                      onPressed: onDelete,
+                      tooltip: 'Supprimer',
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                    ),
+                  ],
+                ],
+              ),
+            ],
           ] else ...[
             const SizedBox(height: 4),
-            Text(
-              'Fermé ce jour',
-              style: TextStyle(
-                color: Colors.grey.shade600,
-                fontSize: 11,
-                fontStyle: FontStyle.italic,
-              ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Fermé ce jour',
+                  style: TextStyle(
+                    color: Colors.grey.shade600,
+                    fontSize: 11,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+                if (onDelete != null && hasExistingHoraire)
+                  IconButton(
+                    icon: const Icon(Icons.delete_outline, size: 18),
+                    color: Colors.red,
+                    onPressed: onDelete,
+                    tooltip: 'Supprimer l\'horaire',
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  ),
+              ],
             ),
           ],
         ],

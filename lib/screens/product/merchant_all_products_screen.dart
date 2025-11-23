@@ -3,7 +3,7 @@ import 'package:immo/constants.dart';
 import 'package:immo/widgets/app_logo.dart';
 import 'package:immo/models/product.dart';
 import 'package:immo/screens/product/product_detail_screen.dart';
-import 'package:immo/widgets/merchant_closed_banner.dart';
+// import 'package:immo/widgets/merchant_closed_banner.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:immo/cubit/product_cubit.dart';
 import 'package:immo/screens/product/add_product_screen.dart';
@@ -54,7 +54,7 @@ class _MerchantAllProductsScreenState extends State<MerchantAllProductsScreen> {
       backgroundColor: const Color(0xFFF7F8FA),
       body: Column(
         children: [
-          const MerchantClosedBanner(),
+          // const MerchantClosedBanner(),
           Padding(
             padding: const EdgeInsets.all(12.0),
             child: TextField(

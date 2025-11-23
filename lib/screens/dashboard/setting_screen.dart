@@ -14,7 +14,7 @@ import '../../widgets/app_logo.dart';
 import '../../services/profile_service.dart';
 import '../auth/login_screen.dart';
 import '../../widgets/merchant_section_card.dart';
-import '../../widgets/merchant_closed_banner.dart';
+// import '../../widgets/merchant_closed_banner.dart';
 import '../product/merchant_all_products_screen.dart';
 import '../product/merchant_promo_products_screen.dart';
 import '../product/merchant_recommended_products_screen.dart';
@@ -1323,7 +1323,7 @@ class _SettingScreenState extends State<SettingScreen>
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           // Bannière de fermeture pour les marchands
-          if (isVendeur) const MerchantClosedBanner(),
+          // if (isVendeur) const MerchantClosedBanner(),
           
           // Sections marchand
           if (isVendeur) ...[

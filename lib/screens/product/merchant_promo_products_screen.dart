@@ -129,7 +129,7 @@ class _MerchantPromoProductsScreenState extends State<MerchantPromoProductsScree
       backgroundColor: const Color(0xFFF7F8FA),
       body: Column(
         children: [
-         //s cons MerchantClosedBanner(),
+         // cons MerchantClosedBanner(),
           Padding(
             padding: const EdgeInsets.all(12.0),
             child: TextField(

@@ -3,7 +3,7 @@ import 'package:immo/constants.dart';
 import 'package:immo/widgets/app_logo.dart';
 import 'package:immo/models/merchant_product.dart';
 import 'package:immo/screens/product/product_detail_screen.dart';
-import 'package:immo/widgets/merchant_closed_banner.dart';
+// import 'package:immo/widgets/merchant_closed_banner.dart';
 
 class MerchantRecommendedProductsScreen extends StatefulWidget {
   const MerchantRecommendedProductsScreen({Key? key}) : super(key: key);
@@ -48,7 +48,7 @@ class _MerchantRecommendedProductsScreenState extends State<MerchantRecommendedP
       backgroundColor: const Color(0xFFF7F8FA),
       body: Column(
         children: [
-          const MerchantClosedBanner(),
+          // const MerchantClosedBanner(),
           Padding(
             padding: const EdgeInsets.all(12.0),
             child: TextField(
