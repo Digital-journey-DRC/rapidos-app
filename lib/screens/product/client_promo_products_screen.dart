@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:immo/constants.dart';
-import 'package:immo/widgets/app_logo.dart';
 import 'package:immo/services/promotion_service.dart';
 import 'package:immo/models/promotion.dart';
 import 'package:immo/screens/product/product_detail_screen.dart';
@@ -71,36 +69,76 @@ class _ClientPromoProductsScreenState extends State<ClientPromoProductsScreen> {
     }).toList();
 
     return Scaffold(
-      appBar: AppBarWithLogo(
-        title: 'Tous les produits en promo',
-        backgroundColor: Colors.white,
-        elevation: 0,
-      ),
       backgroundColor: const Color(0xFFF7F8FA),
-      body: Column(
-        children: [
-          // Barre de recherche
-          Padding(
-            padding: const EdgeInsets.all(12.0),
-            child: TextField(
-              decoration: InputDecoration(
-                hintText: 'Rechercher une promotion...',
-                prefixIcon: const Icon(Icons.search),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                filled: true,
-                fillColor: Colors.white,
+      body: RefreshIndicator(
+        onRefresh: _loadPromotions,
+        child: CustomScrollView(
+          slivers: [
+          // Header compact et professionnel
+          SliverAppBar(
+            floating: true,
+            pinned: true,
+            snap: false,
+            elevation: 0,
+            backgroundColor: Colors.white,
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back_ios, size: 18, color: Color(0xFF1A1A1A)),
+              onPressed: () => Navigator.pop(context),
+            ),
+            title: const Text(
+              'Promotions',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF1A1A1A),
+                letterSpacing: -0.5,
               ),
-              onChanged: (val) => setState(() => _search = val),
+            ),
+            centerTitle: false,
+            bottom: PreferredSize(
+              preferredSize: const Size.fromHeight(0),
+              child: Container(
+                height: 1,
+                color: Colors.grey.shade200,
+              ),
+            ),
+          ),
+          // Barre de recherche intégrée
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              child: Container(
+                height: 44,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey.shade200, width: 1),
+                ),
+                child: TextField(
+                  style: const TextStyle(fontSize: 15),
+                  decoration: InputDecoration(
+                    hintText: 'Rechercher une promotion...',
+                    hintStyle: TextStyle(
+                      color: Colors.grey.shade400,
+                      fontSize: 15,
+                    ),
+                    prefixIcon: Icon(Icons.search, size: 20, color: Colors.grey.shade400),
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  ),
+                  onChanged: (val) => setState(() => _search = val),
+                ),
+              ),
             ),
           ),
           // Liste des promotions
-          Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : filtered.isEmpty
-                    ? Center(
+          _isLoading
+              ? const SliverFillRemaining(
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              : filtered.isEmpty
+                  ? SliverFillRemaining(
+                      child: Center(
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
@@ -125,20 +163,22 @@ class _ClientPromoProductsScreenState extends State<ClientPromoProductsScreen> {
                             ),
                           ],
                         ),
-                      )
-                    : RefreshIndicator(
-                        onRefresh: _loadPromotions,
-                        child: ListView.builder(
-                          padding: const EdgeInsets.all(12.0),
-                          itemCount: filtered.length,
-                          itemBuilder: (context, index) {
+                      ),
+                    )
+                  : SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                      sliver: SliverList(
+                        delegate: SliverChildBuilderDelegate(
+                          (context, index) {
                             final promotion = filtered[index];
                             return _PromoProductCard(promotion: promotion);
                           },
+                          childCount: filtered.length,
                         ),
                       ),
-          ),
-        ],
+                    ),
+          ],
+        ),
       ),
     );
   }
@@ -148,14 +188,6 @@ class _PromoProductCard extends StatelessWidget {
   final Promotion promotion;
 
   const _PromoProductCard({required this.promotion});
-
-  double _calculateRating() {
-    double rating = 4.0;
-    if (promotion.likes > 10) rating += 0.5;
-    if (promotion.discountPercentage > 20) rating += 0.3;
-    if ((promotion.product?.stock ?? 0) > 30) rating += 0.2;
-    return rating.clamp(3.5, 5.0);
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -196,50 +228,65 @@ class _PromoProductCard extends StatelessWidget {
           ),
         );
       },
-      child: Card(
+      child: Container(
         margin: const EdgeInsets.only(bottom: 12),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
-        elevation: 1,
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Image
+            // Image - Plus grande et mise en avant
             ClipRRect(
               borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(12),
-                bottomLeft: Radius.circular(12),
+                topLeft: Radius.circular(16),
+                bottomLeft: Radius.circular(16),
               ),
               child: Stack(
                 children: [
                   Image.network(
                     imageUrl,
-                    width: 100,
-                    height: 100,
+                    width: 120,
+                    height: 120,
                     fit: BoxFit.cover,
                     errorBuilder: (context, error, stackTrace) => Container(
-                      width: 100,
-                      height: 100,
-                      color: Colors.grey.shade200,
+                      width: 120,
+                      height: 120,
+                      color: Colors.grey.shade100,
                       child: const Icon(Icons.image_not_supported, color: Colors.grey, size: 30),
                     ),
                   ),
                   Positioned(
-                    top: 6,
-                    right: 6,
+                    top: 8,
+                    right: 8,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: AppColors.primary,
-                        borderRadius: BorderRadius.circular(6),
+                        color: const Color(0xFFEF4444),
+                        borderRadius: BorderRadius.circular(8),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.red.withOpacity(0.3),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
                       ),
                       child: Text(
                         '-${promotion.discountPercentage.toStringAsFixed(0)}%',
                         style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 10,
+                          fontSize: 11,
                           fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5,
                         ),
                       ),
                     ),
@@ -247,103 +294,110 @@ class _PromoProductCard extends StatelessWidget {
                 ],
               ),
             ),
-            // Détails
+            // Détails - Design moderne et épuré
             Expanded(
               child: Padding(
-                padding: const EdgeInsets.all(12.0),
+                padding: const EdgeInsets.all(14.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    // Catégorie et rating
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Flexible(
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        // Catégorie discrète
+                        if (productCategory.isNotEmpty)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                             decoration: BoxDecoration(
-                              color: AppColors.primary,
+                              color: Colors.grey.shade100,
                               borderRadius: BorderRadius.circular(6),
                             ),
                             child: Text(
-                              productCategory.isNotEmpty ? productCategory : 'Promotion',
-                              style: const TextStyle(color: Colors.white, fontSize: 9),
+                              productCategory,
+                              style: TextStyle(
+                                color: Colors.grey.shade700,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w500,
+                              ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
+                        if (productCategory.isNotEmpty) const SizedBox(height: 8),
+                        // Nom du produit - Plus visible
+                        Text(
+                          productName,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 15,
+                            color: Color(0xFF1A1A1A),
+                            height: 1.3,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                         ),
+                        // Libellé de la promotion
+                        if (promotion.libelle.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            promotion.libelle,
+                            style: TextStyle(
+                              color: Colors.grey.shade600,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w400,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    // Prix et infos en bas
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Prix - Mise en avant
                         Row(
+                          crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
-                            Icon(Icons.star, color: AppColors.primary, size: 14),
                             Text(
-                              _calculateRating().toStringAsFixed(1),
-                              style: const TextStyle(fontSize: 11),
+                              '${promotion.nouveauPrix.toStringAsFixed(0)} FC',
+                              style: const TextStyle(
+                                color: Color(0xFF1A1A1A),
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                                letterSpacing: -0.5,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              '${promotion.ancienPrix.toStringAsFixed(0)} FC',
+                              style: TextStyle(
+                                color: Colors.grey.shade400,
+                                fontSize: 12,
+                                decoration: TextDecoration.lineThrough,
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
                           ],
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    // Nom du produit
-                    Text(
-                      productName,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    // Libellé de la promotion
-                    if (promotion.libelle.isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        promotion.libelle,
-                        style: TextStyle(
-                          color: Colors.grey.shade700,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w500,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                    const SizedBox(height: 6),
-                    // Prix
-                    Row(
-                      children: [
-                        Text(
-                          '${promotion.nouveauPrix.toStringAsFixed(0)} FC',
-                          style: const TextStyle(
-                            color: AppColors.primary,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          '${promotion.ancienPrix.toStringAsFixed(0)} FC',
-                          style: TextStyle(
-                            color: Colors.grey.shade600,
-                            fontSize: 11,
-                            decoration: TextDecoration.lineThrough,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    // Stock
-                    Row(
-                      children: [
-                        Icon(Icons.inventory_2_outlined, size: 12, color: Colors.grey.shade600),
-                        const SizedBox(width: 4),
-                        Text(
-                          'Stock: $productStock',
-                          style: TextStyle(
-                            color: Colors.grey.shade600,
-                            fontSize: 11,
-                          ),
+                        const SizedBox(height: 6),
+                        // Stock discret
+                        Row(
+                          children: [
+                            Icon(Icons.check_circle_outline, size: 14, color: Colors.grey.shade500),
+                            const SizedBox(width: 4),
+                            Text(
+                              '$productStock disponibles',
+                              style: TextStyle(
+                                color: Colors.grey.shade600,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w400,
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -357,4 +411,7 @@ class _PromoProductCard extends StatelessWidget {
     );
   }
 }
+
+
+
 

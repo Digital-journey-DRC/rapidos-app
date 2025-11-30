@@ -13,6 +13,7 @@ import '../../cubits/profile/profile_cubit.dart';
 import '../../widgets/app_logo.dart';
 import '../../services/profile_service.dart';
 import '../auth/login_screen.dart';
+import '../home/new_home.dart';
 import '../../widgets/merchant_section_card.dart';
 // import '../../widgets/merchant_closed_banner.dart';
 import '../product/merchant_all_products_screen.dart';
@@ -2997,7 +2998,10 @@ class _SettingScreenState extends State<SettingScreen>
               onPressed: () {
                 Navigator.of(context).pop();
                 context.read<AuthCubit>().logout();
-                Navigator.of(context).pushReplacementNamed('/login');
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (_) => const NewHomeScreen()),
+                  (route) => false,
+                );
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.error,

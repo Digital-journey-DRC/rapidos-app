@@ -37,6 +37,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
   Position? _currentPosition;
   bool _isLoading = false;
   List<dynamic> _commandes = [];
+  http.Client? _httpClient;
 
   /// Retourne le widget icône approprié pour une catégorie, ou Icons.category par défaut
   Widget _getCategoryIconWidget(String categoryName, Color color, double size) {
@@ -269,8 +270,17 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
   @override
   void initState() {
     super.initState();
+    // Créer un client HTTP pour pouvoir l'annuler si nécessaire
+    _httpClient = http.Client();
     // Attendre que l'AuthCubit soit initialisé avant de charger les données
     _initializeData();
+  }
+
+  @override
+  void dispose() {
+    // Fermer le client HTTP pour éviter les fuites mémoire
+    _httpClient?.close();
+    super.dispose();
   }
 
   Future<void> _initializeData() async {
@@ -311,6 +321,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
     try {
       print('🔄 NewHomeScreen: Récupération des médias utilisateur...');
 
+      if (!mounted) return;
       // Récupérer l'utilisateur connecté
       final authState = context.read<AuthCubit>().state;
       print('🔍 NewHomeScreen: État AuthCubit: ${authState.runtimeType}');
@@ -322,9 +333,12 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
         print(
             '🔄 NewHomeScreen: Récupération des médias pour l\'utilisateur: $userId');
 
-        if (userId.isNotEmpty && token != null) {
+        if (userId.isNotEmpty && token != null && _httpClient != null) {
+          // Vérifier que le widget est toujours monté avant de faire la requête
+          if (!mounted) return;
+          
           // Requête pour récupérer les médias de l'utilisateur
-          final response = await http.get(
+          final response = await _httpClient!.get(
             Uri.parse('http://24.144.87.127:3333/users/me'),
             headers: {
               'Authorization': 'Bearer $token',
@@ -332,6 +346,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
             },
           );
 
+          if (!mounted) return;
           if (response.statusCode == 200) {
             final data = jsonDecode(response.body);
             print(
@@ -343,8 +358,10 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
               updatedUser['media'] = data['data']['media'];
 
               // Mettre à jour l'état de l'authentification
-              context.read<AuthCubit>().updateUser(updatedUser, token);
-              print('✅ NewHomeScreen: Données utilisateur mises à jour');
+              if (mounted) {
+                context.read<AuthCubit>().updateUser(updatedUser, token);
+                print('✅ NewHomeScreen: Données utilisateur mises à jour');
+              }
             }
           } else {
             print(
@@ -370,6 +387,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
   Future<void> _fetchOrdersAndLocation() async {
     try {
       print('🔄 NewHomeScreen: Récupération des commandes et localisation...');
+      if (!mounted) return;
       setState(() {
         _isLoading = true;
       });
@@ -378,6 +396,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
       final orderCubit = context.read<OrderCubit>();
       await orderCubit.fetchOrders();
       final commandes = orderCubit.orderListState.commandes;
+      if (!mounted) return;
       setState(() {
         _commandes = commandes;
       });
@@ -390,6 +409,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
         bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
         if (!serviceEnabled) {
           print('❌ NewHomeScreen: Service de localisation désactivé');
+          if (!mounted) return;
           setState(() {
             _isLoading = false;
           });
@@ -400,6 +420,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
           permission = await Geolocator.requestPermission();
           if (permission == LocationPermission.denied) {
             print('❌ NewHomeScreen: Permission de localisation refusée');
+            if (!mounted) return;
             setState(() {
               _isLoading = false;
             });
@@ -409,6 +430,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
         if (permission == LocationPermission.deniedForever) {
           print(
               '❌ NewHomeScreen: Permission de localisation refusée définitivement');
+          if (!mounted) return;
           setState(() {
             _isLoading = false;
           });
@@ -417,6 +439,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
         Position position = await Geolocator.getCurrentPosition(
           desiredAccuracy: LocationAccuracy.high,
         );
+        if (!mounted) return;
         setState(() {
           _currentPosition = position;
           _isLoading = false;
@@ -424,6 +447,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
         print(
             '✅ NewHomeScreen: Position récupérée: ${position.latitude}, ${position.longitude}');
       } else {
+        if (!mounted) return;
         setState(() {
           _isLoading = false;
         });
@@ -432,6 +456,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
     } catch (e) {
       print(
           '❌ NewHomeScreen: Erreur lors de la récupération des commandes: $e');
+      if (!mounted) return;
       setState(() {
         _isLoading = false;
       });
@@ -501,7 +526,27 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
     }
   }
 
-  /// Effectue la déconnexion et redirige vers l'écran de login
+  /// Vérifie si l'utilisateur est connecté (pas seulement autorisé)
+  bool _isUserLoggedIn() {
+    try {
+      final authState = context.read<AuthCubit>().state;
+      return authState is AuthSuccess && authState.user != null;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /// Redirige vers login si l'utilisateur n'est pas connecté (pour ajout au panier)
+  void _checkLoginAndRedirect() {
+    if (!_isUserLoggedIn()) {
+      print('🚫 Utilisateur non connecté, redirection vers login...');
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+      );
+    }
+  }
+
+  /// Effectue la déconnexion et redirige vers l'écran home non connecté
   Future<void> _logout() async {
     try {
       print('🔄 Déconnexion en cours...');
@@ -517,19 +562,19 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
 
       print('✅ Session effacée avec succès');
 
-      // Rediriger vers l'écran de login
+      // Rediriger vers l'écran home non connecté
       if (mounted) {
         Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const LoginScreen()),
+          MaterialPageRoute(builder: (_) => const NewHomeScreen()),
           (route) => false,
         );
       }
     } catch (e) {
       print('❌ Erreur lors de la déconnexion: $e');
-      // Rediriger quand même vers l'écran de login
+      // Rediriger quand même vers l'écran home non connecté
       if (mounted) {
         Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const LoginScreen()),
+          MaterialPageRoute(builder: (_) => const NewHomeScreen()),
           (route) => false,
         );
       }
@@ -538,190 +583,164 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Responsive logo sizing
-    final screenWidth = MediaQuery.of(context).size.width;
-    final logoSize = screenWidth < 600 ? 80.0 : 100.0; // Plus petit sur mobile
-    
     return Scaffold(
       backgroundColor: Colors.white,
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            // Orange Header Section (Talabat style) - Now scrollable
-            Stack(
-              children: [
-                Container(
-                  color: AppColors.primary,
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-                  child: Column(
-                    children: [
-                      // Top row with profile and logo
-                      const SizedBox(height: 50),
-                      
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Image.asset(
-                            AppAssets.logoWhite, 
-                            width: logoSize, 
-                            height: logoSize,
-                            fit: BoxFit.contain,
+      body: CustomScrollView(
+        slivers: [
+          // Header compact avec personnalité
+          SliverAppBar(
+            floating: true,
+            pinned: true,
+            snap: false,
+            elevation: 0,
+            backgroundColor: Colors.white,
+            expandedHeight: 0,
+            title: BlocBuilder<FeaturedProductCubit, FeaturedProductState>(
+              builder: (context, state) {
+                return GestureDetector(
+                  onTap: () {
+                    _checkAuthorizationAndRedirect();
+                    if (_isAuthorizedUser()) {
+                      if (state is FeaturedProductLoaded && state.products.isNotEmpty) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => AllProductsScreen(
+                              products: state.products.reversed.toList(),
+                            ),
                           ),
-                                                  Row(
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            children: [
-                              BlocBuilder<AuthCubit, AuthState>(
-                                builder: (context, state) {
-                                  if (state is AuthSuccess &&
-                                      state.user != null &&
-                                      state.user!['media'] != null) {
-                                    return GestureDetector(
-                                      onTap: () {
-                                        _checkAuthorizationAndRedirect();
-                                        if (_isAuthorizedUser()) {
-                                          Navigator.push(
-                                            context,
-                                            MaterialPageRoute(
-                                                builder: (context) =>
-                                                    const SettingScreen()),
-                                          );
-                                        }
-                                      },
-                                      child: CircleAvatar(
-                                        radius: 18,
-                                        backgroundColor: Colors.white,
-                                        backgroundImage:
-                                            NetworkImage(state.user!['media']),
-                                      ),
-                                    );
-                                  } else {
-                                    return GestureDetector(
-                                      onTap: () {
-                                        _checkAuthorizationAndRedirect();
-                                        if (_isAuthorizedUser()) {
-                                          Navigator.push(
-                                            context,
-                                            MaterialPageRoute(
-                                                builder: (context) =>
-                                                    const SettingScreen()),
-                                          );
-                                        }
-                                      },
-                                      child: const CircleAvatar(
-                                        radius: 18,
-                                        backgroundColor: Colors.white,
-                                        child: Icon(Icons.person,
-                                            color: AppColors.primary, size: 20),
-                                      ),
-                                    );
-                                  }
-                                },
-                              ),
-                            ],
-                          ),
-                          // Icon(Icons.keyboard_arrow_down, color: Colors.white, size: 20),
+                        );
+                      }
+                    }
+                  },
+                  child: Container(
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: Colors.grey.shade200, width: 1.5),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.03),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
                       ],
                     ),
-                    // Location selector
-                    GestureDetector(
-                      onTap: () {
-                        // Option to change location
-                      },
-                      child:const  Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            'Trouvez ce dont vous avez besoin',
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(
+                            Icons.search,
+                            size: 18,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            'Rechercher des produits...',
                             style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
+                              color: Colors.grey.shade700,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w400,
                             ),
                           ),
-                          // const SizedBox(width: 4),
-                        
-                        ],
-                      ),
+                        ),
+                        Icon(
+                          Icons.tune,
+                          size: 18,
+                          color: Colors.grey.shade400,
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 20),
-                    // Search bar
-
-                    BlocBuilder<FeaturedProductCubit, FeaturedProductState>(
-                      builder: (context, state) {
-                        if (state is FeaturedProductLoaded &&
-                            state.products.isNotEmpty) {
-                          return Container(
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(12),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.05),
-                                  blurRadius: 4,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            child: GestureDetector(
-                              onTap: () {
-                                _checkAuthorizationAndRedirect();
-                                if (_isAuthorizedUser()) {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      // builder: (context) => const AllMerchantsScreen(),
-                                      builder: (context) =>
-                                          AllProductsScreen(
-                                              products: state.products.reversed
-                                                  .toList()),
-                                    ),
-                                  );
-                                }
-                              },
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 16, vertical: 12),
-                                child: Row(
-                                  children: [
-                                    Icon(Icons.search,
-                                        color: Colors.grey.shade600, size: 20),
-                                    const SizedBox(width: 12),
-                                    Text(
-                                      'Recherche...',
-                                      style: TextStyle(
-                                        color: Colors.grey.shade600,
-                                        fontSize: 15,
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                  ),
+                );
+              },
+            ),
+            actions: [
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: BlocBuilder<AuthCubit, AuthState>(
+                  builder: (context, state) {
+                    if (state is AuthSuccess &&
+                        state.user != null &&
+                        state.user!['media'] != null) {
+                      return GestureDetector(
+                        onTap: () {
+                          _checkAuthorizationAndRedirect();
+                          if (_isAuthorizedUser()) {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const SettingScreen(),
                               ),
+                            );
+                          }
+                        },
+                        child: Container(
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: AppColors.primary.withOpacity(0.2),
+                              width: 2,
                             ),
-                          );
-                        }
-                        return const SizedBox.shrink();
-                      },
-                    ),
-
-                    const SizedBox(height: 30),
-                  ],
-                ),
-              ),
-              // Wave decoration at the bottom
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: 0,
-                child: CustomPaint(
-                  size: Size(MediaQuery.of(context).size.width, 30),
-                  painter: WavePainter(),
+                          ),
+                          child: CircleAvatar(
+                            radius: 18,
+                            backgroundColor: Colors.white,
+                            backgroundImage: NetworkImage(state.user!['media']),
+                          ),
+                        ),
+                      );
+                    } else {
+                      return GestureDetector(
+                        onTap: () {
+                          _checkAuthorizationAndRedirect();
+                          if (_isAuthorizedUser()) {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const SettingScreen(),
+                              ),
+                            );
+                          }
+                        },
+                        child: Container(
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: AppColors.primary.withOpacity(0.2),
+                              width: 2,
+                            ),
+                          ),
+                          child: CircleAvatar(
+                            radius: 18,
+                            backgroundColor: Colors.white,
+                            child: Icon(
+                              Icons.person,
+                              color: AppColors.primary,
+                              size: 20,
+                            ),
+                          ),
+                        ),
+                      );
+                    }
+                  },
                 ),
               ),
             ],
           ),
 
-            // Categories Section (Horizontal Scroll) - Now scrollable with the page
-            Container(
+          // Categories Section (Horizontal Scroll)
+          SliverToBoxAdapter(
+            child: Container(
               color: Colors.white,
               padding: const EdgeInsets.symmetric(vertical: 16),
               child: SizedBox(
@@ -843,9 +862,11 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                 ),
               ),
             ),
+          ),
 
-            // Content Section - Now part of the same scroll view
-            Column(
+          // Content Section
+          SliverToBoxAdapter(
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                   // "Hey there!" Section (if not logged in or for promotions)
@@ -949,9 +970,6 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                     },
                   ),
 
-                  // Produits recommandés section
-                  const RecommendedProductsSection(),
-
                   // Featured products section
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 16.0),
@@ -964,7 +982,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                             const Padding(
                               padding: EdgeInsets.only(left: 16),
                               child: Text(
-                                'Produits populaires',
+                                'Produits',
                                 style: TextStyle(
                                     fontSize: 18,
                                     fontWeight: FontWeight.bold,
@@ -1056,6 +1074,9 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
 
                   // Produits en promo section
                   const PromoProductsSection(),
+
+                  // Produits recommandés section
+                  const RecommendedProductsSection(),
 
                   // Top Marchands section
                   Padding(
@@ -1409,11 +1430,11 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                       ),
                     ),
 
-                const SizedBox(height: 20), // Bottom padding
-              ],
-            ),
-          ],
-        ),
+              const SizedBox(height: 9), // Bottom padding
+            ],
+          ),
+          ),
+        ],
       ),
     );
   }
@@ -1433,25 +1454,23 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
       builder: (context) {
         return GestureDetector(
           onTap: () {
-            _checkAuthorizationAndRedirect();
-            if (_isAuthorizedUser()) {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => ProductDetailScreen(
-                    description: description,
-                    idVendeur: idVendeur,
-                    id: id,
-                    tag: tag,
-                    category: category,
-                    stock: stock,
-                    name: name,
-                    price: price,
-                    imagePath: imagePath,
-                  ),
+            // Permettre de voir les détails du produit sans être connecté
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => ProductDetailScreen(
+                  description: description,
+                  idVendeur: idVendeur,
+                  id: id,
+                  tag: tag,
+                  category: category,
+                  stock: stock,
+                  name: name,
+                  price: price,
+                  imagePath: imagePath,
                 ),
-              );
-            }
+              ),
+            );
           },
           child: Container(
             width: 150,
@@ -1525,8 +1544,11 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                       right: 8,
                       child: GestureDetector(
                         onTap: () async {
-                          _checkAuthorizationAndRedirect();
-                          if (!_isAuthorizedUser()) return;
+                          // Vérifier la connexion uniquement pour l'ajout au panier
+                          if (!_isUserLoggedIn()) {
+                            _checkLoginAndRedirect();
+                            return;
+                          }
 
                           final newItem = {
                             'id': id,

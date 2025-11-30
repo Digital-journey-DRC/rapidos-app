@@ -180,7 +180,7 @@ class _AuthGateState extends State<AuthGate> {
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(20),
                 child: Image.asset(
-                  'assets/images/rapidons-3.png',
+                  'assets/images/logo-rapidons.png',
                   width: 120,
                   height: 120,
                   fit: BoxFit.contain,

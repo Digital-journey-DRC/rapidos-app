@@ -8,6 +8,7 @@ import '../cubits/message/message_cubit.dart';
 import '../cubits/message/message_state.dart';
 import '../cubit/auth_cubit.dart';
 import '../widgets/custom_skeletons.dart';
+import '../screens/home/new_home.dart';
 
 class MessagesScreen extends StatefulWidget {
   const MessagesScreen({super.key});
@@ -270,8 +271,10 @@ class _MessagesScreenState extends State<MessagesScreen> {
                                 TextButton(
                                   onPressed: () {
                                     context.read<AuthCubit>().logout();
-                                    Navigator.pushReplacementNamed(
-                                        context, AppRoutes.login);
+                                    Navigator.of(context).pushAndRemoveUntil(
+                                      MaterialPageRoute(builder: (_) => const NewHomeScreen()),
+                                      (route) => false,
+                                    );
                                   },
                                   child: Text(
                                     'Déconnexion',
@@ -316,8 +319,10 @@ class _MessagesScreenState extends State<MessagesScreen> {
                                 TextButton(
                                   onPressed: () {
                                     context.read<AuthCubit>().logout();
-                                    Navigator.pushReplacementNamed(
-                                        context, AppRoutes.login);
+                                    Navigator.of(context).pushAndRemoveUntil(
+                                      MaterialPageRoute(builder: (_) => const NewHomeScreen()),
+                                      (route) => false,
+                                    );
                                   },
                                   child: Text(
                                     'Déconnexion',

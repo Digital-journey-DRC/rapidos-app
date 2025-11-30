@@ -199,7 +199,7 @@ class PromoProductsSection extends StatelessWidget {
                     separatorBuilder: (_, __) => const SizedBox(width: 10),
                     itemBuilder: (context, index) {
                       return Container(
-                        width: 140,
+                        width: 180,
                         decoration: BoxDecoration(
                           color: Colors.grey.shade200,
                           borderRadius: BorderRadius.circular(10),
@@ -401,7 +401,7 @@ class PromoProductsSection extends StatelessWidget {
         );
       },
       child: Container(
-        width: 140,
+        width: 180,
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(10),
@@ -428,13 +428,13 @@ class PromoProductsSection extends StatelessWidget {
                     ),
                     child: Image.network(
                       imagePath,
-                      height: 90,
-                      width: 140,
+                      height: 120,
+                      width: 180,
                       fit: BoxFit.cover,
                       errorBuilder: (context, error, stackTrace) {
                         return Container(
-                          height: 90,
-                          width: 140,
+                          height: 120,
+                          width: 180,
                           color: Colors.grey.shade300,
                           child: const Icon(Icons.image, color: Colors.grey, size: 20),
                         );
@@ -493,9 +493,10 @@ class PromoProductsSection extends StatelessWidget {
             ),
             // Informations du produit
             Padding(
-              padding: const EdgeInsets.all(8),
+              padding: const EdgeInsets.fromLTRB(8, 6, 8, 4),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   // Nom du produit
                   Text(
@@ -504,11 +505,12 @@ class PromoProductsSection extends StatelessWidget {
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
                       color: Colors.black87,
+                      height: 1.2,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 2),
                   // Période de validité
                   Row(
                     children: [
@@ -524,6 +526,7 @@ class PromoProductsSection extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 8,
                             color: Colors.grey.shade600,
+                            height: 1.2,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -531,7 +534,7 @@ class PromoProductsSection extends StatelessWidget {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 3),
                   // Prix
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.end,
@@ -616,7 +619,7 @@ class PromoProductsSection extends StatelessWidget {
         );
       },
       child: Container(
-        width: 140,
+        width: 180,
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(10),
@@ -643,13 +646,13 @@ class PromoProductsSection extends StatelessWidget {
                     ),
                     child: Image.network(
                       imageUrl,
-                      height: 90,
-                      width: 140,
+                      height: 120,
+                      width: 180,
                       fit: BoxFit.cover,
                       errorBuilder: (context, error, stackTrace) {
                         return Container(
-                          height: 90,
-                          width: 140,
+                          height: 120,
+                          width: 180,
                           color: Colors.grey.shade300,
                           child: const Icon(Icons.image, color: Colors.grey, size: 20),
                         );
@@ -710,9 +713,10 @@ class PromoProductsSection extends StatelessWidget {
             ),
             // Informations du produit
             Padding(
-              padding: const EdgeInsets.all(8),
+              padding: const EdgeInsets.fromLTRB(8, 6, 8, 4),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   // Nom du produit
                   Text(
@@ -721,11 +725,12 @@ class PromoProductsSection extends StatelessWidget {
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
                       color: Colors.black87,
+                      height: 1.2,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 2),
                   // Période de validité
                   Row(
                     children: [
@@ -741,6 +746,7 @@ class PromoProductsSection extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 8,
                             color: Colors.grey.shade600,
+                            height: 1.2,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -748,7 +754,7 @@ class PromoProductsSection extends StatelessWidget {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 3),
                   // Prix
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.end,

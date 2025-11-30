@@ -6,6 +6,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:immo/cubit/cart_cubit.dart';
 import 'package:immo/cubit/merchant_cubit.dart';
 import 'package:immo/cubit/favorites_cubit.dart';
+import 'package:immo/cubit/auth_cubit.dart';
+import '../auth/login_screen.dart';
 import '../../models/product.dart';
 import '../../models/vendeur.dart';
 
@@ -52,7 +54,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   int quantity = 1;
   bool isInCart = false;
   bool isFavorite = false;
-  late PageController _secondaryImagesPageController;
+  String _currentMainImage = ''; // Image principale actuellement affichée
   int _currentSecondaryImageIndex = 0;
 
   @override
@@ -61,13 +63,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     _checkIfInCart();
     context.read<MerchantCubit>().fetchMerchants(context);
     _checkIfFavorite();
-    _secondaryImagesPageController = PageController();
-  }
-
-  @override
-  void dispose() {
-    _secondaryImagesPageController.dispose();
-    super.dispose();
+    // Initialiser l'image principale avec l'image par défaut
+    _currentMainImage = widget.imagePath;
   }
 
   void _checkIfInCart() {
@@ -86,20 +83,39 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     }
   }
 
-  /// Retourne les 4 images secondaires qui défilent horizontalement
-  List<String> _getSecondaryImages() {
-    // Si productImages est fourni, utiliser ces images
+  /// Retourne toutes les images disponibles (principale + secondaires)
+  List<String> _getAllImages() {
+    final List<String> images = [];
+    
+    // Ajouter l'image principale en premier
+    images.add(widget.imagePath);
+    
+    // Si productImages est fourni, ajouter les images secondaires
     if (widget.productImages != null && widget.productImages!.isNotEmpty) {
-      final images = widget.productImages!.take(4).toList();
-      // Si on a moins de 4 images, compléter avec l'image principale
-      while (images.length < 4) {
-        images.add(widget.imagePath);
+      for (var image in widget.productImages!) {
+        if (image != widget.imagePath && !images.contains(image)) {
+          images.add(image);
+        }
       }
-      return images;
     }
     
-    // Si aucune image secondaire n'est fournie, utiliser l'image principale 4 fois
-    return List.filled(4, widget.imagePath);
+    // Si on a moins de 4 images au total, compléter avec l'image principale
+    while (images.length < 4) {
+      images.add(widget.imagePath);
+    }
+    
+    return images;
+  }
+
+  /// Change l'image principale lorsqu'on clique ou scroll sur une image secondaire
+  void _changeMainImage(int index) {
+    final allImages = _getAllImages();
+    if (index >= 0 && index < allImages.length) {
+      setState(() {
+        _currentMainImage = allImages[index];
+        _currentSecondaryImageIndex = index;
+      });
+    }
   }
 
   /// Récupère les informations du marchand (version statique)
@@ -216,6 +232,18 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   void _addToCart() async {
+    // Vérifier si l'utilisateur est connecté avant d'ajouter au panier
+    final authState = context.read<AuthCubit>().state;
+    if (authState is! AuthSuccess || authState.user == null) {
+      // Rediriger vers login si non connecté
+      if (mounted) {
+        Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const LoginScreen()),
+        );
+      }
+      return;
+    }
+
     final newItem = {
       'id': widget.id,
       'name': widget.name,
@@ -307,7 +335,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           children: [
             // Image principale - Design élégant et moderne
             Hero(
-              tag: 'product_${widget.id}_${widget.imagePath}',
+              tag: 'product_${widget.id}_$_currentMainImage',
               child: Container(
                 height: MediaQuery.of(context).size.width < 600 ? 220 : 260,
                 width: double.infinity,
@@ -330,9 +358,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
-                    // Image principale avec effet de zoom
+                    // Image principale avec effet de zoom (dynamique)
                     Image.network(
-                      widget.imagePath,
+                      _currentMainImage,
                       fit: BoxFit.cover,
                       width: double.infinity,
                       errorBuilder: (context, error, stackTrace) {
@@ -437,101 +465,42 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               ),
             ),
             
-            // Section des images secondaires en carrousel - Design professionnel et épuré
+            // Section des miniatures cliquables - Design professionnel et épuré
             Container(
               padding: const EdgeInsets.symmetric(vertical: 16),
               color: Colors.white,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Carrousel principal avec PageView
-                  SizedBox(
-                    height: 100,
-                    child: PageView.builder(
-                      controller: _secondaryImagesPageController,
-                      onPageChanged: (index) {
-                        setState(() {
-                          _currentSecondaryImageIndex = index;
-                        });
-                      },
-                      itemCount: _getSecondaryImages().length,
-                      itemBuilder: (context, index) {
-                        final imageUrl = _getSecondaryImages()[index];
-                        return Container(
-                          margin: const EdgeInsets.symmetric(horizontal: 20),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(12),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.06),
-                                blurRadius: 10,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(12),
-                            child: Image.network(
-                              imageUrl,
-                              fit: BoxFit.cover,
-                              width: double.infinity,
-                              errorBuilder: (context, error, stackTrace) {
-                                return Container(
-                                  color: Colors.grey.shade100,
-                                  child: Center(
-                                    child: Icon(
-                                      Icons.image_not_supported,
-                                      size: 28,
-                                      color: Colors.grey.shade400,
-                                    ),
-                                  ),
-                                );
-                              },
-                              loadingBuilder: (context, child, loadingProgress) {
-                                if (loadingProgress == null) return child;
-                                return Container(
-                                  color: Colors.grey.shade50,
-                                  child: Center(
-                                    child: SizedBox(
-                                      width: 20,
-                                      height: 20,
-                                      child: CircularProgressIndicator(
-                                        value: loadingProgress.expectedTotalBytes != null
-                                            ? loadingProgress.cumulativeBytesLoaded /
-                                                loadingProgress.expectedTotalBytes!
-                                            : null,
-                                        strokeWidth: 2,
-                                        color: AppColors.primary,
-                                      ),
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  // Miniatures cliquables en bas
+                  // Miniatures cliquables avec scroll
                   SizedBox(
                     height: 70,
-                    child: ListView.builder(
-                      scrollDirection: Axis.horizontal,
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      itemCount: _getSecondaryImages().length,
-                      itemBuilder: (context, index) {
-                        final imageUrl = _getSecondaryImages()[index];
-                        final isActive = index == _currentSecondaryImageIndex;
-                        return GestureDetector(
-                          onTap: () {
-                            _secondaryImagesPageController.animateToPage(
-                              index,
-                              duration: const Duration(milliseconds: 300),
-                              curve: Curves.easeInOut,
-                            );
-                          },
+                    child: NotificationListener<ScrollNotification>(
+                      onNotification: (ScrollNotification notification) {
+                        if (notification is ScrollUpdateNotification) {
+                          // Détecter l'image visible lors du scroll
+                          final scrollPosition = notification.metrics.pixels;
+                          final itemWidth = 70.0 + 10.0; // width + margin
+                          final currentIndex = (scrollPosition / itemWidth).round();
+                          if (currentIndex >= 0 && 
+                              currentIndex < _getAllImages().length && 
+                              currentIndex != _currentSecondaryImageIndex) {
+                            _changeMainImage(currentIndex);
+                          }
+                        }
+                        return false;
+                      },
+                      child: ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        itemCount: _getAllImages().length,
+                        itemBuilder: (context, index) {
+                          final imageUrl = _getAllImages()[index];
+                          final isActive = index == _currentSecondaryImageIndex;
+                          return GestureDetector(
+                            onTap: () {
+                              _changeMainImage(index);
+                            },
                           child: AnimatedContainer(
                             duration: const Duration(milliseconds: 200),
                             margin: const EdgeInsets.only(right: 10),
@@ -613,16 +582,17 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           ),
                         );
                       },
+                      ),
                     ),
                   ),
                   // Indicateurs (dots) minimalistes
-                  if (_getSecondaryImages().length > 1)
+                  if (_getAllImages().length > 1)
                     Padding(
                       padding: const EdgeInsets.only(top: 8),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: List.generate(
-                          _getSecondaryImages().length,
+                          _getAllImages().length,
                           (index) => _buildCarouselIndicator(index == _currentSecondaryImageIndex),
                         ),
                       ),
