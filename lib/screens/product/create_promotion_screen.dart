@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'package:image/image.dart' as img;
+import 'package:http/http.dart' as http;
 import '../../constants.dart';
 import '../../widgets/app_logo.dart';
 import '../../services/promotion_service.dart';
@@ -31,6 +32,7 @@ class _CreatePromotionScreenState extends State<CreatePromotionScreen> {
   
   DateTime? _delaiPromotion;
   List<File> _selectedImages = []; // Images secondaires (optionnelles)
+  List<String> _selectedImageUrls = []; // URLs des images secondaires pour affichage
   String? _mainImageUrl; // Image principale du produit (pré-remplie) - pour affichage uniquement
   File? _mainImageFile; // Fichier de l'image principale à envoyer
   final ImagePicker _picker = ImagePicker();
@@ -48,7 +50,39 @@ class _CreatePromotionScreenState extends State<CreatePromotionScreen> {
       _ancienPrixController.text = widget.product!.price.toStringAsFixed(2);
       // Pré-remplir l'image principale du produit
       _mainImageUrl = widget.product!.media?.mediaUrl;
+      // Pré-remplir les 4 images supplémentaires avec l'image principale
+      _prefillSecondaryImages();
     }
+  }
+
+  /// Pré-remplit les 4 images supplémentaires avec l'image principale si elles sont vides
+  void _prefillSecondaryImages() {
+    final mainImageUrl = _mainImageUrl ?? _selectedProduct?.media?.mediaUrl;
+    if (mainImageUrl != null && mainImageUrl.isNotEmpty) {
+      setState(() {
+        // Pré-remplir avec l'image principale jusqu'à 4 images seulement si aucune image n'est sélectionnée
+        if (_selectedImages.isEmpty) {
+          _selectedImageUrls = List.filled(4, mainImageUrl);
+        }
+      });
+    }
+  }
+
+  /// Télécharge une image depuis une URL et la convertit en File
+  Future<File?> _downloadImageFromUrl(String url) async {
+    try {
+      final response = await http.get(Uri.parse(url));
+      if (response.statusCode == 200) {
+        final bytes = response.bodyBytes;
+        final tempDir = Directory.systemTemp;
+        final file = File('${tempDir.path}/downloaded_${DateTime.now().millisecondsSinceEpoch}.jpg');
+        await file.writeAsBytes(bytes);
+        return file;
+      }
+    } catch (e) {
+      print('Erreur lors du téléchargement de l\'image: $e');
+    }
+    return null;
   }
 
   Future<void> _loadProducts() async {
@@ -105,6 +139,10 @@ class _CreatePromotionScreenState extends State<CreatePromotionScreen> {
               }
             } else {
               _selectedImages.addAll(newImages);
+            }
+            // Effacer les URLs pré-remplies quand on sélectionne de nouvelles images
+            if (_selectedImages.isNotEmpty) {
+              _selectedImageUrls = [];
             }
           });
         }
@@ -261,12 +299,26 @@ class _CreatePromotionScreenState extends State<CreatePromotionScreen> {
         mainImageFile = compressed ?? mainImageFile;
       }
 
-      // Compresser les images secondaires
+      // Gérer les images secondaires : utiliser les fichiers sélectionnés ou télécharger depuis les URLs pré-remplies
       final List<File> compressedSecondaryImages = [];
-      for (var image in _selectedImages) {
-        if (!mounted) break;
-        final compressed = await _compressImage(image);
-        compressedSecondaryImages.add(compressed ?? image);
+      
+      // Si des fichiers ont été sélectionnés, les utiliser
+      if (_selectedImages.isNotEmpty) {
+        for (var image in _selectedImages) {
+          if (!mounted) break;
+          final compressed = await _compressImage(image);
+          compressedSecondaryImages.add(compressed ?? image);
+        }
+      } else if (_selectedImageUrls.isNotEmpty) {
+        // Sinon, télécharger les images depuis les URLs pré-remplies
+        for (var url in _selectedImageUrls.take(4)) {
+          if (!mounted) break;
+          final downloadedFile = await _downloadImageFromUrl(url);
+          if (downloadedFile != null) {
+            final compressed = await _compressImage(downloadedFile);
+            compressedSecondaryImages.add(compressed ?? downloadedFile);
+          }
+        }
       }
 
       // Créer la promotion avec les fichiers directement
@@ -454,6 +506,8 @@ class _CreatePromotionScreenState extends State<CreatePromotionScreen> {
                       _mainImageUrl = product?.media?.mediaUrl;
                       // Réinitialiser les images secondaires
                       _selectedImages = [];
+                      // Pré-remplir les 4 images supplémentaires avec l'image principale
+                      _prefillSecondaryImages();
                     });
                   },
                   validator: (value) {
@@ -787,7 +841,7 @@ class _CreatePromotionScreenState extends State<CreatePromotionScreen> {
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(color: Colors.grey.shade300),
                   ),
-                  child: _selectedImages.isEmpty
+                  child: (_selectedImages.isEmpty && _selectedImageUrls.isEmpty)
                       ? Center(
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
@@ -808,18 +862,51 @@ class _CreatePromotionScreenState extends State<CreatePromotionScreen> {
                             crossAxisSpacing: 4,
                             mainAxisSpacing: 4,
                           ),
-                          itemCount: _selectedImages.length,
+                          itemCount: _selectedImages.isNotEmpty 
+                              ? _selectedImages.length 
+                              : _selectedImageUrls.length,
                           itemBuilder: (context, index) {
+                            final isFile = _selectedImages.isNotEmpty;
                             return Stack(
                               children: [
                                 ClipRRect(
                                   borderRadius: BorderRadius.circular(6),
-                                  child: Image.file(
-                                    _selectedImages[index],
-                                    fit: BoxFit.cover,
-                                    width: double.infinity,
-                                    height: double.infinity,
-                                  ),
+                                  child: isFile
+                                      ? Image.file(
+                                          _selectedImages[index],
+                                          fit: BoxFit.cover,
+                                          width: double.infinity,
+                                          height: double.infinity,
+                                        )
+                                      : Image.network(
+                                          _selectedImageUrls[index],
+                                          fit: BoxFit.cover,
+                                          width: double.infinity,
+                                          height: double.infinity,
+                                          errorBuilder: (context, error, stackTrace) {
+                                            return Container(
+                                              color: Colors.grey.shade200,
+                                              child: Icon(Icons.image_not_supported, 
+                                                size: 20, 
+                                                color: Colors.grey.shade400),
+                                            );
+                                          },
+                                          loadingBuilder: (context, child, loadingProgress) {
+                                            if (loadingProgress == null) return child;
+                                            return Container(
+                                              color: Colors.grey.shade100,
+                                              child: Center(
+                                                child: CircularProgressIndicator(
+                                                  value: loadingProgress.expectedTotalBytes != null
+                                                      ? loadingProgress.cumulativeBytesLoaded /
+                                                          loadingProgress.expectedTotalBytes!
+                                                      : null,
+                                                  strokeWidth: 2,
+                                                ),
+                                              ),
+                                            );
+                                          },
+                                        ),
                                 ),
                                 Positioned(
                                   top: 2,
@@ -827,7 +914,15 @@ class _CreatePromotionScreenState extends State<CreatePromotionScreen> {
                                   child: GestureDetector(
                                     onTap: () {
                                       setState(() {
-                                        _selectedImages.removeAt(index);
+                                        if (isFile) {
+                                          _selectedImages.removeAt(index);
+                                          // Si toutes les images sont supprimées, réinitialiser avec les URLs
+                                          if (_selectedImages.isEmpty) {
+                                            _prefillSecondaryImages();
+                                          }
+                                        } else {
+                                          _selectedImageUrls.removeAt(index);
+                                        }
                                       });
                                     },
                                     child: Container(

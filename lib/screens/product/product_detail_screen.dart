@@ -68,6 +68,20 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   void _checkIfInCart() {
+    // Vérifier si l'utilisateur est connecté avant de vérifier le panier
+    final authState = context.read<AuthCubit>().state;
+    if (authState is! AuthSuccess || 
+        authState.user == null || 
+        authState.token == null ||
+        authState.user!.isEmpty) {
+      // Si l'utilisateur n'est pas connecté, le produit n'est pas dans le panier
+      setState(() {
+        isInCart = false;
+      });
+      return;
+    }
+    
+    // Vérifier si le produit est dans le panier
     final cartItems = context.read<CartCubit>().state.items;
     setState(() {
       isInCart = cartItems.any((item) => item['name'] == widget.name);
@@ -232,11 +246,23 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   void _addToCart() async {
-    // Vérifier si l'utilisateur est connecté avant d'ajouter au panier
+    // Vérifier si l'utilisateur est connecté et a des données valides
     final authState = context.read<AuthCubit>().state;
-    if (authState is! AuthSuccess || authState.user == null) {
-      // Rediriger vers login si non connecté
+    
+    // Vérifier si l'utilisateur n'est pas connecté ou si les données utilisateur sont nulles
+    if (authState is! AuthSuccess || 
+        authState.user == null || 
+        authState.token == null ||
+        authState.user!.isEmpty) {
+      // Rediriger vers login si non connecté ou données utilisateur invalides
       if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Veuillez vous connecter pour ajouter un produit au panier'),
+            backgroundColor: Colors.orange,
+            duration: Duration(seconds: 2),
+          ),
+        );
         Navigator.of(context).push(
           MaterialPageRoute(builder: (_) => const LoginScreen()),
         );

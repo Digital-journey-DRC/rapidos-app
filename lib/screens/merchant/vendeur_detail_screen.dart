@@ -18,9 +18,7 @@ class VendeurDetailScreen extends StatefulWidget {
   State<VendeurDetailScreen> createState() => _VendeurDetailScreenState();
 }
 
-class _VendeurDetailScreenState extends State<VendeurDetailScreen>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+class _VendeurDetailScreenState extends State<VendeurDetailScreen> {
   Vendeur? _vendeur;
   bool _isLoading = true;
   String? _errorMessage;
@@ -29,14 +27,7 @@ class _VendeurDetailScreenState extends State<VendeurDetailScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
     _loadVendeurData();
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
   }
 
   Future<void> _loadVendeurData() async {
@@ -141,13 +132,84 @@ class _VendeurDetailScreenState extends State<VendeurDetailScreen>
                   ? const Center(child: Text('Aucune donnée disponible'))
                   : CustomScrollView(
                       slivers: [
-                        // App Bar avec image de couverture
+                        // App Bar avec design moderne et élégant
                         SliverAppBar(
-                          expandedHeight: 180.0,
+                          expandedHeight: 100.0,
                           pinned: true,
                           systemOverlayStyle: SystemUiOverlayStyle.light,
                           backgroundColor: AppColors.primary,
+                          elevation: 0,
+                          leading: IconButton(
+                            icon: Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(Icons.arrow_back, color: Colors.white, size: 18),
+                            ),
+                            onPressed: () => Navigator.pop(context),
+                          ),
+                          actions: [
+                            IconButton(
+                              icon: Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.2),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Icon(Icons.info_outline, color: Colors.white, size: 18),
+                              ),
+                              onPressed: () => _showInfoBottomSheet(context),
+                              tooltip: 'Informations',
+                            ),
+                          ],
                           flexibleSpace: FlexibleSpaceBar(
+                            titlePadding: const EdgeInsets.only(bottom: 12),
+                            centerTitle: true,
+                            title: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.95),
+                                borderRadius: BorderRadius.circular(10),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.1),
+                                    blurRadius: 6,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.store,
+                                    size: 12,
+                                    color: AppColors.primary,
+                                  ),
+                                  const SizedBox(width: 5),
+                                  Flexible(
+                                    child: Text(
+                                      _vendeur!.fullName,
+                                      style: TextStyle(
+                                        color: Colors.grey.shade900,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        letterSpacing: -0.2,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Icon(
+                                    Icons.verified,
+                                    size: 12,
+                                    color: Colors.blue.shade600,
+                                  ),
+                                ],
+                              ),
+                            ),
                             background: Container(
                               decoration: BoxDecoration(
                                 gradient: LinearGradient(
@@ -155,220 +217,174 @@ class _VendeurDetailScreenState extends State<VendeurDetailScreen>
                                   end: Alignment.bottomRight,
                                   colors: [
                                     AppColors.primary,
-                                    AppColors.primary.withOpacity(0.7),
+                                    AppColors.primary.withOpacity(0.8),
+                                    AppColors.primary.withOpacity(0.9),
                                   ],
                                 ),
                               ),
-                              child: _vendeur!.profileImageUrl != null
-                                  ? Image.network(
-                                      _vendeur!.profileImageUrl!,
-                                      fit: BoxFit.cover,
-                                      errorBuilder: (context, error, stackTrace) {
-                                        return Container(
-                                          color: AppColors.primary,
-                                        );
-                                      },
-                                    )
-                                  : Container(
-                                      color: AppColors.primary,
+                              child: Stack(
+                                children: [
+                                  // Pattern décoratif subtil
+                                  Positioned.fill(
+                                    child: Opacity(
+                                      opacity: 0.1,
+                                      child: CustomPaint(
+                                        painter: _PatternPainter(),
+                                      ),
                                     ),
+                                  ),
+                                  // Overlay gradient en bas
+                                  Positioned(
+                                    bottom: 0,
+                                    left: 0,
+                                    right: 0,
+                                    height: 60,
+                                    child: Container(
+                                      decoration: BoxDecoration(
+                                        gradient: LinearGradient(
+                                          begin: Alignment.topCenter,
+                                          end: Alignment.bottomCenter,
+                                          colors: [
+                                            Colors.transparent,
+                                            Colors.black.withOpacity(0.1),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
-                          leading: IconButton(
-                            icon: const Icon(Icons.arrow_back, color: Colors.white),
-                            onPressed: () => Navigator.pop(context),
                           ),
                         ),
 
-                        // Informations du vendeur
+                        // Header compact avec design moderne et coloré
                         SliverToBoxAdapter(
                           child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 12),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                            margin: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [
+                                  AppColors.primary.withOpacity(0.08),
+                                  AppColors.primary.withOpacity(0.03),
+                                  Colors.white,
+                                ],
+                              ),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: AppColors.primary.withOpacity(0.12),
+                                width: 1,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: AppColors.primary.withOpacity(0.08),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Row(
                               children: [
-                                // Image de profil et nom
-                                Row(
-                                  children: [
-                                    Container(
-                                      decoration: BoxDecoration(
-                                        shape: BoxShape.circle,
-                                        border: Border.all(
-                                          color: AppColors.primary.withOpacity(0.2),
-                                          width: 2,
+                                // Avatar compact avec bordure colorée
+                                Container(
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    gradient: LinearGradient(
+                                      colors: [
+                                        AppColors.primary,
+                                        AppColors.primary.withOpacity(0.7),
+                                      ],
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: AppColors.primary.withOpacity(0.25),
+                                        blurRadius: 6,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
+                                  ),
+                                  padding: const EdgeInsets.all(2.5),
+                                  child: CircleAvatar(
+                                    radius: 22,
+                                    backgroundColor: Colors.white,
+                                    backgroundImage: _vendeur!.profileImageUrl != null
+                                        ? NetworkImage(_vendeur!.profileImageUrl!)
+                                        : null,
+                                    child: _vendeur!.profileImageUrl == null
+                                        ? Icon(
+                                            Icons.person,
+                                            size: 22,
+                                            color: AppColors.primary,
+                                          )
+                                        : null,
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                // Statistiques compactes
+                                Expanded(
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                                    children: [
+                                      _buildStatColumn(
+                                        '${_vendeur!.totalProducts ?? 0}',
+                                        'Produits',
+                                      ),
+                                      Container(
+                                        width: 1,
+                                        height: 28,
+                                        decoration: BoxDecoration(
+                                          gradient: LinearGradient(
+                                            begin: Alignment.topCenter,
+                                            end: Alignment.bottomCenter,
+                                            colors: [
+                                              Colors.transparent,
+                                              Colors.grey.shade300,
+                                              Colors.transparent,
+                                            ],
+                                          ),
                                         ),
                                       ),
-                                      child: CircleAvatar(
-                                        radius: 40,
-                                        backgroundColor: Colors.grey.shade200,
-                                        backgroundImage: _vendeur!.profileImageUrl != null
-                                            ? NetworkImage(_vendeur!.profileImageUrl!)
-                                            : null,
-                                        child: _vendeur!.profileImageUrl == null
-                                            ? Icon(
-                                                Icons.person,
-                                                size: 40,
-                                                color: Colors.grey.shade400,
-                                              )
-                                            : null,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 16),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                      Column(
+                                        mainAxisSize: MainAxisSize.min,
                                         children: [
-                                          Text(
-                                            _vendeur!.fullName,
-                                            style: const TextStyle(
-                                              fontSize: 20,
-                                              fontWeight: FontWeight.bold,
-                                              color: AppColors.primary,
+                                          Container(
+                                            padding: const EdgeInsets.all(5),
+                                            decoration: BoxDecoration(
+                                              color: Colors.blue.shade50,
+                                              borderRadius: BorderRadius.circular(6),
+                                            ),
+                                            child: Icon(
+                                              Icons.verified,
+                                              size: 14,
+                                              color: Colors.blue.shade700,
                                             ),
                                           ),
-                                          const SizedBox(height: 4),
-                                          Row(
-                                            children: [
-                                              Icon(
-                                                Icons.verified,
-                                                size: 16,
-                                                color: Colors.blue.shade600,
-                                              ),
-                                              const SizedBox(width: 4),
-                                              Text(
-                                                'Vendeur vérifié',
-                                                style: TextStyle(
-                                                  fontSize: 12,
-                                                  color: Colors.grey.shade600,
-                                                ),
-                                              ),
-                                            ],
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            'Vérifié',
+                                            style: TextStyle(
+                                              fontSize: 9,
+                                              color: Colors.grey.shade700,
+                                              fontWeight: FontWeight.w600,
+                                            ),
                                           ),
                                         ],
                                       ),
-                                    ),
-                                  ],
-                                ),
-
-                                const SizedBox(height: 16),
-
-                                // Statistiques
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                                  children: [
-                                    _buildStatColumn(
-                                      '${_vendeur!.totalProducts ?? 0}',
-                                      'Produits',
-                                    ),
-                                    _buildStatColumn(
-                                      '${_vendeur!.horairesOuverture?.where((h) => h.estOuvert).length ?? 0}',
-                                      'Jours ouverts',
-                                    ),
-                                  ],
-                                ),
-
-                                const SizedBox(height: 16),
-
-                                // Horaires d'ouverture
-                                if (_vendeur!.horairesOuverture != null &&
-                                    _vendeur!.horairesOuverture!.isNotEmpty)
-                                  Container(
-                                    padding: const EdgeInsets.all(12),
-                                    decoration: BoxDecoration(
-                                      color: Colors.grey.shade50,
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          'Horaires d\'ouverture',
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.grey.shade800,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 8),
-                                        ..._vendeur!.horairesOuverture!.map((horaire) {
-                                          return Padding(
-                                            padding: const EdgeInsets.only(bottom: 6),
-                                            child: Row(
-                                              mainAxisAlignment:
-                                                  MainAxisAlignment.spaceBetween,
-                                              children: [
-                                                Text(
-                                                  _getDayName(horaire.jour),
-                                                  style: TextStyle(
-                                                    fontSize: 13,
-                                                    color: Colors.grey.shade700,
-                                                  ),
-                                                ),
-                                                if (horaire.estOuvert &&
-                                                    horaire.heureOuverture != null &&
-                                                    horaire.heureFermeture != null)
-                                                  Text(
-                                                    '${_formatTime(horaire.heureOuverture)} - ${_formatTime(horaire.heureFermeture)}',
-                                                    style: TextStyle(
-                                                      fontSize: 13,
-                                                      fontWeight: FontWeight.w600,
-                                                      color: Colors.green.shade700,
-                                                    ),
-                                                  )
-                                                else
-                                                  Text(
-                                                    'Fermé',
-                                                    style: TextStyle(
-                                                      fontSize: 13,
-                                                      color: Colors.red.shade600,
-                                                    ),
-                                                  ),
-                                              ],
-                                            ),
-                                          );
-                                        }).toList(),
-                                      ],
-                                    ),
+                                    ],
                                   ),
+                                ),
                               ],
                             ),
                           ),
                         ),
 
-                        // Tab Bar
-                        SliverPersistentHeader(
-                          delegate: _SliverAppBarDelegate(
-                            TabBar(
-                              controller: _tabController,
-                              labelColor: AppColors.primary,
-                              unselectedLabelColor: Colors.grey.shade600,
-                              indicatorColor: AppColors.primary,
-                              indicatorWeight: 3,
-                              tabs: const [
-                                Tab(
-                                  icon: Icon(Icons.grid_on, size: 20),
-                                  text: 'Produits',
-                                ),
-                                Tab(
-                                  icon: Icon(Icons.info_outline, size: 20),
-                                  text: 'Informations',
-                                ),
-                              ],
-                            ),
-                          ),
-                          pinned: true,
-                        ),
-
-                        // Tab Bar View
-                        SliverFillRemaining(
-                          child: TabBarView(
-                            controller: _tabController,
-                            children: [
-                              _buildProductsGrid(),
-                              _buildInfoTab(),
-                            ],
-                          ),
+                        // Grille de produits
+                        SliverPadding(
+                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                          sliver: _buildProductsSliverGrid(),
                         ),
                       ],
                     ),
@@ -382,16 +398,16 @@ class _VendeurDetailScreenState extends State<VendeurDetailScreen>
         Text(
           count,
           style: const TextStyle(
-            fontSize: 20,
+            fontSize: 16,
             fontWeight: FontWeight.bold,
             color: AppColors.primary,
           ),
         ),
-        const SizedBox(height: 2),
+        const SizedBox(height: 1),
         Text(
           label,
           style: TextStyle(
-            fontSize: 12,
+            fontSize: 10,
             color: Colors.grey.shade600,
             fontWeight: FontWeight.w500,
           ),
@@ -400,52 +416,61 @@ class _VendeurDetailScreenState extends State<VendeurDetailScreen>
     );
   }
 
-  Widget _buildProductsGrid() {
-    if (_vendeur == null) return const SizedBox.shrink();
+  Widget _buildProductsSliverGrid() {
+    if (_vendeur == null) {
+      return SliverToBoxAdapter(
+        child: const SizedBox.shrink(),
+      );
+    }
 
     final products = _vendeur!.products;
     if (products == null || products.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.inventory_2_outlined,
-              size: 64,
-              color: Colors.grey.shade300,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Aucun produit disponible',
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey.shade600,
+      return SliverFillRemaining(
+        hasScrollBody: false,
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.inventory_2_outlined,
+                size: 64,
+                color: Colors.grey.shade300,
               ),
-            ),
-          ],
+              const SizedBox(height: 16),
+              Text(
+                'Aucun produit disponible',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Colors.grey.shade600,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
         ),
       );
     }
 
-    return GridView.builder(
-      padding: const EdgeInsets.all(16),
+    return SliverGrid(
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
-        childAspectRatio: 0.68,
+        childAspectRatio: 0.85, // Plus compact (augmenté pour réduire la hauteur)
         crossAxisSpacing: 12,
         mainAxisSpacing: 12,
       ),
-      itemCount: products.length,
-      itemBuilder: (context, index) {
-        final productJson = products[index] as Map<String, dynamic>;
-        try {
-          final product = Product.fromJson(productJson);
-          return _buildProductCard(product);
-        } catch (e) {
-          print('Erreur parsing product: $e');
-          return const SizedBox.shrink();
-        }
-      },
+      delegate: SliverChildBuilderDelegate(
+        (context, index) {
+          final productJson = products[index] as Map<String, dynamic>;
+          try {
+            final product = Product.fromJson(productJson);
+            return _buildProductCard(product);
+          } catch (e) {
+            print('Erreur parsing product: $e');
+            return const SizedBox.shrink();
+          }
+        },
+        childCount: products.length,
+      ),
     );
   }
 
@@ -474,6 +499,7 @@ class _VendeurDetailScreenState extends State<VendeurDetailScreen>
               price: product.price,
               imagePath: imageUrl,
               productImages: productImages.isNotEmpty ? productImages : null,
+              product: product,
             ),
           ),
         );
@@ -481,73 +507,397 @@ class _VendeurDetailScreenState extends State<VendeurDetailScreen>
       child: Container(
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.06),
-              blurRadius: 10,
+              color: AppColors.primary.withOpacity(0.15),
+              blurRadius: 12,
               offset: const Offset(0, 4),
+              spreadRadius: 0,
+            ),
+            BoxShadow(
+              color: Colors.black.withOpacity(0.08),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+              spreadRadius: 0,
             ),
           ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Image
+            // Image avec overlay gradient coloré
             Expanded(
-              flex: 3,
+              flex: 2,
               child: ClipRRect(
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-                child: Image.network(
-                  imageUrl,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) {
-                    return Container(
-                      color: Colors.grey.shade200,
-                      child: Icon(
-                        Icons.image_not_supported,
-                        color: Colors.grey.shade400,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    Image.network(
+                      imageUrl,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return Container(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [
+                                Colors.grey.shade200,
+                                Colors.grey.shade300,
+                              ],
+                            ),
+                          ),
+                          child: Center(
+                            child: Icon(
+                              Icons.image_not_supported,
+                              size: 32,
+                              color: Colors.grey.shade400,
+                            ),
+                          ),
+                        );
+                      },
+                      loadingBuilder: (context, child, loadingProgress) {
+                        if (loadingProgress == null) return child;
+                        return Container(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [
+                                Colors.grey.shade50,
+                                Colors.grey.shade100,
+                              ],
+                            ),
+                          ),
+                          child: Center(
+                            child: SizedBox(
+                              width: 28,
+                              height: 28,
+                              child: CircularProgressIndicator(
+                                value: loadingProgress.expectedTotalBytes != null
+                                    ? loadingProgress.cumulativeBytesLoaded /
+                                        loadingProgress.expectedTotalBytes!
+                                    : null,
+                                strokeWidth: 2.5,
+                                color: AppColors.primary,
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                    // Gradient overlay coloré en bas
+                    Positioned(
+                      bottom: 0,
+                      left: 0,
+                      right: 0,
+                      child: Container(
+                        height: 50,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.transparent,
+                              AppColors.primary.withOpacity(0.3),
+                            ],
+                          ),
+                        ),
                       ),
-                    );
-                  },
+                    ),
+                  ],
                 ),
               ),
             ),
-            // Détails
+            // Détails avec fond coloré subtil
             Expanded(
-              flex: 2,
-              child: Padding(
-                padding: const EdgeInsets.all(8),
+              flex: 1,
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.white,
+                      AppColors.primary.withOpacity(0.02),
+                    ],
+                  ),
+                  borderRadius: const BorderRadius.vertical(bottom: Radius.circular(16)),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      // Nom du produit avec style amélioré
+                      Text(
+                        product.name,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.grey.shade900,
+                          height: 1.3,
+                          letterSpacing: -0.2,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      // Prix et Stock avec design moderne
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          // Prix avec badge coloré
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [
+                                  AppColors.primary,
+                                  AppColors.primary.withOpacity(0.8),
+                                ],
+                              ),
+                              borderRadius: BorderRadius.circular(8),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: AppColors.primary.withOpacity(0.3),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Text(
+                                  '${product.price.toStringAsFixed(0)}',
+                                  style: const TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                    height: 1,
+                                    letterSpacing: -0.3,
+                                  ),
+                                ),
+                                const SizedBox(width: 3),
+                                Padding(
+                                  padding: const EdgeInsets.only(bottom: 1),
+                                  child: Text(
+                                    'FC',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.white.withOpacity(0.9),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          // Stock - Badge moderne
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.green.shade50,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: Colors.green.shade200,
+                                width: 1,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.inventory_2,
+                                  size: 11,
+                                  color: Colors.green.shade700,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  '${product.stock}',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: Colors.green.shade700,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Affiche une bottom sheet avec les informations du vendeur
+  void _showInfoBottomSheet(BuildContext context) {
+    if (_vendeur == null) return;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        height: MediaQuery.of(context).size.height * 0.75,
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          children: [
+            // Handle bar
+            Container(
+              margin: const EdgeInsets.only(top: 12),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            // Header
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.info_outline,
+                    color: AppColors.primary,
+                    size: 24,
+                  ),
+                  const SizedBox(width: 12),
+                  const Text(
+                    'Informations',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(context),
+                    color: Colors.grey.shade600,
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            // Contenu scrollable
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(20),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      product.name,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.primary,
+                    // Identité
+                    _buildSectionTitle('Identité'),
+                    const SizedBox(height: 12),
+                    _buildInfoItem('Nom complet', _vendeur!.fullName, Icons.person),
+                    if (_vendeur!.email.isNotEmpty)
+                      _buildInfoItem('Email', _vendeur!.email, Icons.email),
+                    if (_vendeur!.phone.isNotEmpty)
+                      _buildInfoItem('Téléphone', _vendeur!.phone, Icons.phone),
+                    if (_vendeur!.userStatus != null)
+                      _buildInfoItem('Statut', _vendeur!.userStatus!, Icons.info),
+                    
+                    const SizedBox(height: 24),
+                    
+                    // Horaires d'ouverture
+                    if (_vendeur!.horairesOuverture != null &&
+                        _vendeur!.horairesOuverture!.isNotEmpty) ...[
+                      _buildSectionTitle('Horaires d\'ouverture'),
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade50,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: Colors.grey.shade200,
+                            width: 1,
+                          ),
+                        ),
+                        child: Column(
+                          children: _vendeur!.horairesOuverture!.map((horaire) {
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    _getDayName(horaire.jour),
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.grey.shade800,
+                                    ),
+                                  ),
+                                  if (horaire.estOuvert &&
+                                      horaire.heureOuverture != null &&
+                                      horaire.heureFermeture != null)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 12, vertical: 6),
+                                      decoration: BoxDecoration(
+                                        color: Colors.green.shade50,
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(
+                                          color: Colors.green.shade200,
+                                          width: 1,
+                                        ),
+                                      ),
+                                      child: Text(
+                                        '${_formatTime(horaire.heureOuverture)} - ${_formatTime(horaire.heureFermeture)}',
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.green.shade700,
+                                        ),
+                                      ),
+                                    )
+                                  else
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 12, vertical: 6),
+                                      decoration: BoxDecoration(
+                                        color: Colors.red.shade50,
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(
+                                          color: Colors.red.shade200,
+                                          width: 1,
+                                        ),
+                                      ),
+                                      child: Text(
+                                        'Fermé',
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.red.shade700,
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                        ),
                       ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const Spacer(),
-                    Text(
-                      '${product.price.toStringAsFixed(0)} FCFA',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey.shade800,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '${product.stock} en stock',
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: Colors.grey.shade600,
-                      ),
-                    ),
+                    ],
                   ],
                 ),
               ),
@@ -558,19 +908,13 @@ class _VendeurDetailScreenState extends State<VendeurDetailScreen>
     );
   }
 
-  Widget _buildInfoTab() {
-    if (_vendeur == null) return const SizedBox.shrink();
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildInfoItem('Email', _vendeur!.email, Icons.email),
-          _buildInfoItem('Téléphone', _vendeur!.phone, Icons.phone),
-          if (_vendeur!.userStatus != null)
-            _buildInfoItem('Statut', _vendeur!.userStatus!, Icons.info),
-        ],
+  Widget _buildSectionTitle(String title) {
+    return Text(
+      title,
+      style: TextStyle(
+        fontSize: 16,
+        fontWeight: FontWeight.bold,
+        color: Colors.grey.shade800,
       ),
     );
   }
@@ -578,14 +922,25 @@ class _VendeurDetailScreenState extends State<VendeurDetailScreen>
   Widget _buildInfoItem(String label, String value, IconData icon) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: Colors.grey.shade200,
+          width: 1,
+        ),
       ),
       child: Row(
         children: [
-          Icon(icon, color: AppColors.primary, size: 20),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, color: AppColors.primary, size: 20),
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -596,13 +951,14 @@ class _VendeurDetailScreenState extends State<VendeurDetailScreen>
                   style: TextStyle(
                     fontSize: 12,
                     color: Colors.grey.shade600,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   value,
                   style: TextStyle(
-                    fontSize: 14,
+                    fontSize: 15,
                     fontWeight: FontWeight.w600,
                     color: Colors.grey.shade800,
                   ),
@@ -616,29 +972,26 @@ class _VendeurDetailScreenState extends State<VendeurDetailScreen>
   }
 }
 
-class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
-  final TabBar tabBar;
-
-  _SliverAppBarDelegate(this.tabBar);
-
+// Custom painter pour créer un pattern décoratif
+class _PatternPainter extends CustomPainter {
   @override
-  double get minExtent => tabBar.preferredSize.height;
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.0;
 
-  @override
-  double get maxExtent => tabBar.preferredSize.height;
-
-  @override
-  Widget build(
-      BuildContext context, double shrinkOffset, bool overlapsContent) {
-    return Container(
-      color: Colors.white,
-      child: tabBar,
-    );
+    // Dessiner des lignes diagonales subtiles
+    const spacing = 30.0;
+    for (double i = -size.height; i < size.width + size.height; i += spacing) {
+      canvas.drawLine(
+        Offset(i, 0),
+        Offset(i + size.height, size.height),
+        paint,
+      );
+    }
   }
 
   @override
-  bool shouldRebuild(_SliverAppBarDelegate oldDelegate) {
-    return false;
-  }
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
-
