@@ -5,6 +5,7 @@ import 'package:immo/screens/auth/otp_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/auth_service.dart';
 import '../services/storage_service.dart';
+import '../services/auth_gate_service.dart';
 
 // States
 abstract class AuthState {}
@@ -97,9 +98,7 @@ class AuthCubit extends Cubit<AuthState> {
   }) async {
     try {
       emit(AuthLoading());
-      final response = await _authService.sendOTP(
-        phone: phone,
-      );
+      await _authService.sendOTP(phone: phone);
 
       // Revenir à l'état initial après l'envoi de l'OTP
       emit(AuthInitial());
@@ -196,7 +195,10 @@ class AuthCubit extends Cubit<AuthState> {
   }
 
   Future<void> logout() async {
+    // Reset complet : effacer via StorageService ET AuthGateService
     await _storageService.clearAll();
+    final authGateService = AuthGateService();
+    await authGateService.clearSession();
     emit(AuthInitial());
   }
 
@@ -207,11 +209,11 @@ class AuthCubit extends Cubit<AuthState> {
       final lastLogin = await _storageService.getLastLoginTime();
 
       if (token != null && userData != null && lastLogin != null) {
-        // Check if 23 hours have passed since last login
+        // Session valable 24h depuis la dernière connexion
         final now = DateTime.now();
         final difference = now.difference(lastLogin);
-        if (difference.inHours >= 23) {
-          // Session expired after 23 hours
+        if (difference.inHours >= 24) {
+          // Session expirée après 24h
           await _storageService.clearAll();
           emit(AuthInitial());
           return;

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -16,9 +17,8 @@ import '../auth/login_screen.dart';
 import '../home/new_home.dart';
 import '../../widgets/merchant_section_card.dart';
 // import '../../widgets/merchant_closed_banner.dart';
-import '../product/merchant_all_products_screen.dart';
 import '../product/merchant_promo_products_screen.dart';
-import '../product/merchant_recommended_products_screen.dart';
+import '../home/voir_plus_produits.dart';
 import '../merchant/merchant_service_hours_screen.dart';
 import '../../cubit/product_cubit.dart';
 import '../../services/promotion_service.dart';
@@ -55,8 +55,10 @@ class _SettingScreenState extends State<SettingScreen>
   // Données dynamiques pour les marchands
   int _allProductsCount = 0;
   int _promoProductsCount = 0;
-  int _recommendedProductsCount = 0;
   bool _isLoadingCounts = false;
+
+  // StreamSubscription pour écouter les changements d'AuthCubit
+  StreamSubscription? _authSubscription;
 
   @override
   void initState() {
@@ -68,14 +70,34 @@ class _SettingScreenState extends State<SettingScreen>
     _profileCubit = ProfileCubit(ProfileService());
 
     // Get current user data from AuthCubit
+    // Utiliser un délai pour s'assurer que le widget est complètement monté dans l'arbre
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadUserData();
+      if (!mounted) return;
       
-      // Écouter les changements de l'AuthCubit
-      context.read<AuthCubit>().stream.listen((authState) {
-        if (authState is AuthSuccess && authState.user != null) {
-          print('🔄 AuthCubit a changé, rechargement des données utilisateur');
-          _loadUserData();
+      // Utiliser un microtask pour s'assurer que le contexte est valide
+      Future.microtask(() {
+        if (!mounted) return;
+        _loadUserData();
+        
+        // Écouter les changements de l'AuthCubit
+        // S'assurer que le contexte est valide avant de créer la subscription
+        try {
+          final authCubit = context.read<AuthCubit>();
+          _authSubscription = authCubit.stream.listen((authState) {
+            // Ne pas recharger si le widget est démonté ou si l'utilisateur s'est déconnecté
+            if (!mounted) return;
+            
+            // Si l'état est AuthInitial (déconnexion), ne pas recharger les données
+            if (authState is AuthInitial) {
+              return;
+            }
+            
+            if (authState is AuthSuccess && authState.user != null) {
+              _loadUserData();
+            }
+          });
+        } catch (e) {
+          // Erreur silencieuse pour la production
         }
       });
     });
@@ -98,22 +120,15 @@ class _SettingScreenState extends State<SettingScreen>
       final promotionService = PromotionService();
       int? merchantId;
       final userId = authState.user!['id'];
-      print('🔍 setting_screen._loadMerchantCounts - userId brut: $userId (type: ${userId.runtimeType})');
       if (userId != null) {
         if (userId is int) {
           merchantId = userId;
-          print('🔍 setting_screen._loadMerchantCounts - userId est int: $merchantId');
         } else if (userId is String) {
           merchantId = int.tryParse(userId);
-          print('🔍 setting_screen._loadMerchantCounts - userId est String, parsé: $merchantId');
         } else if (userId is num) {
           merchantId = userId.toInt();
-          print('🔍 setting_screen._loadMerchantCounts - userId est num, converti: $merchantId');
         }
-      } else {
-        print('🔍 setting_screen._loadMerchantCounts - userId est null');
       }
-      print('🔍 setting_screen._loadMerchantCounts - merchantId final: $merchantId');
       final promoResult = merchantId != null
           ? await promotionService.getMerchantPromotions(merchantId)
           : await promotionService.getPromotions();
@@ -124,11 +139,6 @@ class _SettingScreenState extends State<SettingScreen>
           final productState = context.read<ProductCubit>().state;
           if (productState is ProductLoaded) {
             _allProductsCount = productState.products.length;
-            // Pour les produits recommandés, on peut utiliser une logique similaire
-            // Pour l'instant, on utilise les produits avec un rating élevé
-            _recommendedProductsCount = productState.products
-                .where((p) => p.stock > 20 && p.price > 0 && p.price < 50000)
-                .length;
           }
           
           // Compter les promotions actives
@@ -150,17 +160,28 @@ class _SettingScreenState extends State<SettingScreen>
 
   // Méthode pour charger les données utilisateur
   void _loadUserData() {
+    // Vérifier que le widget est toujours monté avant d'accéder au contexte
+    if (!mounted) return;
+    
+    try {
     final authState = context.read<AuthCubit>().state;
     if (authState is AuthSuccess && authState.user != null) {
-      print('🔄 Chargement des données utilisateur: ${authState.user}');
-      
       // Mettre à jour les contrôleurs avec les données actuelles
-      _firstNameController.text = authState.user!['firstName'] ?? '';
-      _lastNameController.text = authState.user!['lastName'] ?? '';
-      _phoneController.text = authState.user!['phone'] ?? '';
+        _firstNameController.text = authState.user!['firstName'] ?? '';
+        _lastNameController.text = authState.user!['lastName'] ?? '';
+        _phoneController.text = authState.user!['phone'] ?? '';
 
-      // Injecter l'AuthCubit dans le ProfileCubit
-      _profileCubit.setAuthCubit(context.read<AuthCubit>());
+        // Injecter l'AuthCubit dans le ProfileCubit
+        // Vérifier à nouveau que le widget est monté avant d'accéder au contexte
+        if (mounted) {
+          try {
+            _profileCubit.setAuthCubit(context.read<AuthCubit>());
+          } catch (e) {
+            return;
+          }
+        } else {
+          return;
+        }
 
       // Set the correct number of tabs based on user role
       final isProprietaire = authState.user!['role'] == 'proprietaire';
@@ -183,7 +204,15 @@ class _SettingScreenState extends State<SettingScreen>
       }
       
       // Forcer la mise à jour de l'interface utilisateur
-      setState(() {});
+      if (mounted) {
+        setState(() {});
+      }
+      }
+    } catch (e) {
+      // Ne pas appeler setState si le widget n'est plus monté
+      if (mounted) {
+        setState(() {});
+      }
     }
   }
 
@@ -231,6 +260,8 @@ class _SettingScreenState extends State<SettingScreen>
 
   @override
   void dispose() {
+    // Annuler la subscription pour éviter les memory leaks
+    _authSubscription?.cancel();
     _tabController?.dispose();
     _firstNameController.dispose();
     _lastNameController.dispose();
@@ -464,69 +495,26 @@ class _SettingScreenState extends State<SettingScreen>
         return;
       }
 
-      // Afficher un indicateur de chargement
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Upload de l\'image en cours...'),
-          backgroundColor: Colors.green,
-        ),
-      );
-
-      // Préparer la requête multipart
-      var headers = {
-        'Authorization': 'Bearer ${authState.token}',
-      };
-      
-      var request = http.MultipartRequest(
-        'POST', 
-        Uri.parse('http://24.144.87.127:3333/users/update-profil')
+      // Utiliser ProfileCubit pour uploader l'image (utilise le bon endpoint)
+      await _profileCubit.uploadProfileImage(
+        token: authState.token!,
+        imageFile: imageFile,
       );
       
-      // Ajouter le fichier image
-      request.files.add(
-        await http.MultipartFile.fromPath('avatar', imageFile.path)
-      );
+      // Recharger les données utilisateur après l'upload
+      _loadUserData();
+      _fetchUserMedia();
       
-      // Ajouter les headers
-      request.headers.addAll(headers);
-
-      // Envoyer la requête
-      http.StreamedResponse response = await request.send();
-
-      if (response.statusCode == 200) {
-        final responseBody = await response.stream.bytesToString();
-        print('Upload réussi: $responseBody');
-        _fetchUserMedia();
-        
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Image uploadée avec succès !'),
-            backgroundColor: Colors.green,
-          ),
-        );
-        
-        // Mettre à jour l'interface si nécessaire
-        setState(() {
-          // L'image sera mise à jour via le ProfileCubit
-        });
-        
-      } else {
-        print('Erreur upload: ${response.reasonPhrase}');
+    } catch (e) {
+      print('Erreur lors de l\'upload: $e');
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Erreur lors de l\'upload: ${response.reasonPhrase}'),
+            content: Text('Erreur lors de l\'upload: $e'),
             backgroundColor: Colors.red,
           ),
         );
       }
-    } catch (e) {
-      print('Erreur lors de l\'upload: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erreur lors de l\'upload: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
     }
   }
 
@@ -1355,7 +1343,7 @@ class _SettingScreenState extends State<SettingScreen>
                   Padding(
                     padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
                     child: const Text(
-                      'Gestion des produits',
+                      'Gestion boutique',
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
@@ -1372,9 +1360,6 @@ class _SettingScreenState extends State<SettingScreen>
                             if (mounted) {
                               setState(() {
                                 _allProductsCount = productState.products.length;
-                                _recommendedProductsCount = productState.products
-                                    .where((p) => p.stock > 20 && p.price > 0 && p.price < 50000)
-                                    .length;
                               });
                             }
                           }
@@ -1393,7 +1378,7 @@ class _SettingScreenState extends State<SettingScreen>
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (context) => const MerchantAllProductsScreen(),
+                                builder: (context) => const VoirPlusProduitsScreen(),
                               ),
                             ).then((_) {
                               // Rafraîchir les compteurs après retour
@@ -1434,31 +1419,6 @@ class _SettingScreenState extends State<SettingScreen>
                               context,
                               MaterialPageRoute(
                                 builder: (context) => const MerchantPromoProductsScreen(),
-                              ),
-                            ).then((_) {
-                              // Rafraîchir les compteurs après retour
-                              _loadMerchantCounts();
-                            });
-                          },
-                        ),
-                      );
-                    },
-                  ),
-                  BlocBuilder<ProductCubit, ProductState>(
-                    builder: (context, productState) {
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        child: MerchantSectionCard(
-                          title: 'Produits recommandés',
-                          subtitle: 'Mettre en avant vos meilleurs produits',
-                          icon: Icons.star_outline,
-                          iconColor: Colors.amber,
-                          count: _isLoadingCounts ? null : _recommendedProductsCount,
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const MerchantRecommendedProductsScreen(),
                               ),
                             ).then((_) {
                               // Rafraîchir les compteurs après retour
@@ -1513,132 +1473,59 @@ class _SettingScreenState extends State<SettingScreen>
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 // Modifier informations personnelles
-          _buildMenuItem(
-            icon: Icons.edit_outlined,
-            iconColor: AppColors.buttonColor,
-            title: 'Modifier informations personnelles',
-            onTap: () {
-              // Ouvrir le formulaire de mise à jour du profil
-              _showUpdateProfileDialog();
-            },
-            showDivider: true,
-          ),
-          // Modifier mot de passe
-          _buildMenuItem(
-            icon: Icons.lock_outline,
-            iconColor: AppColors.buttonColor,
-            title: 'Modifier mot de passe',
-            onTap: () {
-              _showChangePasswordDialog();
-            },
-            showDivider: true,
-          ),
-          // Modifier vos adresses
-          _buildMenuItem(
-            icon: Icons.location_on_outlined,
-            iconColor: AppColors.buttonColor,
-            title: 'Modifier vos adresses',
-            onTap: () {
-              _showAddressesDialog();
-            },
-            showDivider: true,
-          ),
-          // Se déconnecter
-          _buildMenuItem(
-            icon: Icons.logout,
-            iconColor: AppColors.error,
-            title: 'Se déconnecter',
-            onTap: () {
-              _showLogoutConfirmation();
-            },
-            showDivider: true,
-          ),
-          // Supprimer compte
-          _buildMenuItem(
-            icon: Icons.delete_outline,
-            iconColor: Colors.red,
-            title: 'Supprimer compte',
-            onTap: () {
-              _showDeleteAccountConfirmation();
-            },
-            showDivider: false,
-          ),
-        ],
-      ),
-    ),
-        ],
-      ),
-    );
-  }
-
-  /// Construit un item de menu avec icône et texte
-  Widget _buildMenuItem({
-    required IconData icon,
-    required Color iconColor,
-    required String title,
-    required VoidCallback onTap,
-    required bool showDivider,
-  }) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
-        child: Column(
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(11),
-                    decoration: BoxDecoration(
-                      color: iconColor.withOpacity(0.12),
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: iconColor.withOpacity(0.1),
-                          blurRadius: 4,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Icon(
-                      icon,
-                      color: iconColor,
-                      size: 22,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Text(
-                      title,
-                      style: TextStyle(
-                        fontSize: 15.5,
-                        fontWeight: FontWeight.w600,
-                        color: iconColor == Colors.red ? Colors.red.shade700 : Colors.grey.shade800,
-                        letterSpacing: 0.2,
-                      ),
-                    ),
-                  ),
-                  Icon(
-                    Icons.chevron_right,
-                    color: Colors.grey.shade400,
-                    size: 22,
-                  ),
-                ],
-              ),
+                MerchantSectionCard(
+                  title: 'Modifier informations personnelles',
+                  subtitle: 'Mettre à jour vos données personnelles',
+                  icon: Icons.edit_outlined,
+                  iconColor: AppColors.primary,
+                  onTap: () {
+                    _showUpdateProfileDialog();
+                  },
+                ),
+                // Modifier mot de passe
+                MerchantSectionCard(
+                  title: 'Modifier mot de passe',
+                  subtitle: 'Changer votre mot de passe de sécurité',
+                  icon: Icons.lock_outline,
+                  iconColor: AppColors.primary,
+                  onTap: () {
+                    _showChangePasswordDialog();
+                  },
+                ),
+                // Modifier vos adresses
+                MerchantSectionCard(
+                  title: 'Modifier vos adresses',
+                  subtitle: 'Gérer vos adresses de livraison',
+                  icon: Icons.location_on_outlined,
+                  iconColor: AppColors.primary,
+                  onTap: () {
+                    _showAddressesDialog();
+                  },
+                ),
+                // Se déconnecter
+                MerchantSectionCard(
+                  title: 'Se déconnecter',
+                  subtitle: 'Déconnexion de votre compte',
+                  icon: Icons.logout,
+                  iconColor: AppColors.error,
+                  onTap: () {
+                    _showLogoutConfirmation();
+                  },
+                ),
+                // Supprimer compte
+                MerchantSectionCard(
+                  title: 'Supprimer compte',
+                  subtitle: 'Supprimer définitivement votre compte',
+                  icon: Icons.delete_outline,
+                  iconColor: Colors.red,
+                  onTap: () {
+                    _showDeleteAccountConfirmation();
+                  },
+                ),
+              ],
             ),
-            if (showDivider)
-              Divider(
-                height: 1,
-                thickness: 0.5,
-                indent: 60,
-                endIndent: 20,
-                color: Colors.grey.shade200,
-              ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -1771,13 +1658,125 @@ class _SettingScreenState extends State<SettingScreen>
                         return null;
                       },
                     ),
+                    const SizedBox(height: 24),
+                    // Section Photo de profil
+                    const Text(
+                      'Photo de profil',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    GestureDetector(
+                      onTap: () {
+                        _showImageSourceDialog();
+                      },
+                      child: Container(
+                        height: 120,
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.grey.shade300),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: _selectedImage != null
+                            ? Stack(
+                                children: [
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(12),
+                                    child: Image.file(
+                                      _selectedImage!,
+                                      fit: BoxFit.cover,
+                                      width: double.infinity,
+                                      height: double.infinity,
+                                    ),
+                                  ),
+                                  Positioned(
+                                    top: 4,
+                                    right: 4,
+                                    child: Container(
+                                      padding: const EdgeInsets.all(6),
+                                      decoration: BoxDecoration(
+                                        color: Colors.black.withOpacity(0.5),
+                                        borderRadius: BorderRadius.circular(20),
+                                      ),
+                                      child: const Icon(
+                                        Icons.edit,
+                                        color: Colors.white,
+                                        size: 18,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              )
+                            : Builder(
+                                builder: (context) {
+                                  final currentAuthState = context.read<AuthCubit>().state;
+                                  return Stack(
+                                    children: [
+                                      // Afficher l'image actuelle si disponible
+                                      if (currentAuthState is AuthSuccess && 
+                                          currentAuthState.user != null && 
+                                          currentAuthState.user!['media'] != null)
+                                        ClipRRect(
+                                          borderRadius: BorderRadius.circular(12),
+                                          child: Image.network(
+                                            currentAuthState.user!['media'].toString().startsWith('http')
+                                                ? currentAuthState.user!['media']
+                                                : 'http://24.144.87.127:3333/${currentAuthState.user!['media']}',
+                                            fit: BoxFit.cover,
+                                            width: double.infinity,
+                                            height: double.infinity,
+                                            errorBuilder: (context, error, stackTrace) {
+                                              return Container(
+                                                color: Colors.grey.shade200,
+                                                child: const Icon(Icons.person, size: 40, color: Colors.grey),
+                                              );
+                                            },
+                                          ),
+                                        )
+                                      else
+                                        Container(
+                                          color: Colors.grey.shade200,
+                                          child: const Icon(Icons.person, size: 40, color: Colors.grey),
+                                        ),
+                                      Container(
+                                        decoration: BoxDecoration(
+                                          color: Colors.black.withOpacity(0.3),
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                        child: const Center(
+                                          child: Column(
+                                            mainAxisAlignment: MainAxisAlignment.center,
+                                            children: [
+                                              Icon(Icons.camera_alt, color: Colors.white, size: 24),
+                                              SizedBox(height: 4),
+                                              Text(
+                                                'Cliquer pour changer',
+                                                style: TextStyle(color: Colors.white, fontSize: 12),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  );
+                                },
+                              ),
+                      ),
+                    ),
                     const SizedBox(height: 28),
                     // Bouton Mettre à jour le profil
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
-                        onPressed: () {
+                        onPressed: () async {
                           if (_formKey.currentState!.validate()) {
+                            // Si une nouvelle image a été sélectionnée, l'uploader d'abord
+                            if (_selectedImage != null) {
+                              await _uploadImageToServer(_selectedImage!);
+                            }
                             Navigator.pop(context);
                             _updateProfile();
                           }
@@ -2973,6 +2972,12 @@ class _SettingScreenState extends State<SettingScreen>
 
   /// Affiche la confirmation de déconnexion
   void _showLogoutConfirmation() {
+    // Récupérer le rôle de l'utilisateur avant la déconnexion
+    final authState = context.read<AuthCubit>().state;
+    final isMerchant = authState is AuthSuccess && 
+                      authState.user != null && 
+                      authState.user!['role'] == 'vendeur';
+    
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -2995,13 +3000,26 @@ class _SettingScreenState extends State<SettingScreen>
               ),
             ),
             ElevatedButton(
-              onPressed: () {
+              onPressed: () async {
                 Navigator.of(context).pop();
-                context.read<AuthCubit>().logout();
-                Navigator.of(context).pushAndRemoveUntil(
-                  MaterialPageRoute(builder: (_) => const NewHomeScreen()),
-                  (route) => false,
-                );
+                // Attendre que logout() termine complètement (reset de toutes les données)
+                await context.read<AuthCubit>().logout();
+                // Rediriger selon le rôle : marchand vers login, autres vers home
+                if (context.mounted) {
+                  if (isMerchant) {
+                    // Pour les marchands uniquement, rediriger vers l'écran de login
+                    Navigator.of(context).pushAndRemoveUntil(
+                      MaterialPageRoute(builder: (_) => const LoginScreen()),
+                      (route) => false,
+                    );
+                  } else {
+                    // Pour les autres utilisateurs, rediriger vers l'écran home non connecté
+                    Navigator.of(context).pushAndRemoveUntil(
+                      MaterialPageRoute(builder: (_) => const NewHomeScreen()),
+                      (route) => false,
+                    );
+                  }
+                }
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.error,

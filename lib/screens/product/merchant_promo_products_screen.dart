@@ -2,9 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:immo/constants.dart';
 import 'package:immo/widgets/app_logo.dart';
 import 'package:immo/models/promotion.dart';
-import 'package:immo/screens/product/product_detail_screen.dart';
 import 'package:immo/screens/product/create_promotion_screen.dart';
-import 'package:immo/screens/product/edit_promotion_screen.dart';
+import 'package:immo/screens/product/promotion_detail_screen.dart';
 import 'package:immo/services/promotion_service.dart';
 import 'package:immo/cubit/auth_cubit.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -218,82 +217,6 @@ class _PromoProductCard extends StatelessWidget {
     required this.onDelete,
   });
 
-  void _showDeleteConfirmation(BuildContext context, Promotion promotion) {
-    showDialog(
-      context: context,
-      builder: (BuildContext dialogContext) {
-        return AlertDialog(
-          title: const Text('Supprimer la promotion'),
-          content: Text(
-            'Êtes-vous sûr de vouloir supprimer la promotion "${promotion.libelle.isNotEmpty ? promotion.libelle : 'cette promotion'}" ?\n\nCette action est irréversible.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('Annuler'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                Navigator.pop(dialogContext);
-                await _deletePromotion(context, promotion);
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('Supprimer'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  Future<void> _deletePromotion(BuildContext context, Promotion promotion) async {
-    try {
-      // Afficher un loader
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => const Center(child: CircularProgressIndicator()),
-      );
-
-      final result = await PromotionService().deletePromotion(promotion.id);
-
-      if (context.mounted) {
-        Navigator.pop(context); // Fermer le loader
-
-        if (result['success'] == true) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Promotion supprimée avec succès'),
-              backgroundColor: AppColors.success,
-            ),
-          );
-          // Recharger la liste via le callback
-          onDelete();
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Erreur: ${result['error']}'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      if (context.mounted) {
-        Navigator.pop(context); // Fermer le loader
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erreur: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
-
   /// Calcule un rating dynamique basé sur les likes et le produit
   double _calculateRating() {
     double rating = 4.0;
@@ -337,38 +260,24 @@ class _PromoProductCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final product = promotion.product;
     final productName = product?.name ?? 'Produit';
-    final productDescription = product?.description ?? '';
     final productCategory = product?.category?.name ?? '';
     final productStock = product?.stock ?? 0;
-    final productId = product?.id ?? promotion.productId;
-    final vendeurId = product?.vendeurId.toString() ?? '';
 
     return GestureDetector(
       onTap: () {
-        if (product != null) {
-          // Préparer la liste des images (image principale + images secondaires)
-          final List<String> productImages = [promotion.image];
-          // Utiliser le nouveau tableau images
-          productImages.addAll(promotion.images.where((img) => img.isNotEmpty));
-
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => ProductDetailScreen(
-                description: productDescription,
-                idVendeur: vendeurId,
-                id: productId,
-                tag: productCategory,
-                stock: productStock,
-                category: productCategory,
-                name: productName,
-                price: promotion.nouveauPrix,
-                imagePath: promotion.image,
-                productImages: productImages,
-              ),
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => PromotionDetailScreen(
+              promotion: promotion,
             ),
-          );
-        }
+          ),
+        ).then((success) {
+          if (success == true) {
+            // Rafraîchir la liste si une modification/suppression a été effectuée
+            onEdit();
+          }
+        });
       },
       child: Card(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -523,63 +432,6 @@ class _PromoProductCard extends StatelessWidget {
                       ),
                     ),
                   ],
-                  const SizedBox(height: 4),
-                  // Boutons d'action (icônes uniquement)
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      Expanded(
-                        child: InkWell(
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => EditPromotionScreen(promotion: promotion),
-                              ),
-                            ).then((success) {
-                              if (success == true) {
-                                onEdit();
-                              }
-                            });
-                          },
-                          borderRadius: BorderRadius.circular(6),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 6),
-                            decoration: BoxDecoration(
-                              color: AppColors.primary,
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: const Icon(
-                              Icons.edit,
-                              size: 16,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      Expanded(
-                        child: InkWell(
-                          onTap: () {
-                            _showDeleteConfirmation(context, promotion);
-                          },
-                          borderRadius: BorderRadius.circular(6),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 6),
-                            decoration: BoxDecoration(
-                              color: Colors.grey.shade700,
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: const Icon(
-                              Icons.delete,
-                              size: 16,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
                 ],
               ),
             ),

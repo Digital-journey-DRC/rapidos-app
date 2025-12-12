@@ -76,10 +76,8 @@ class _TwitterStyleProductCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: () {
-        // Version statique : données hardcodées pour la démonstration
-        // Le nom du marchand sera généré statiquement
-        final merchantName = 'Rapidos Store ${product.vendeurId}';
-        
+        // Les données du vendeur sont incluses dans product.vendeur (firstName/lastName)
+        // On passe le produit complet pour harmoniser la structure.
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -95,9 +93,8 @@ class _TwitterStyleProductCard extends StatelessWidget {
               imagePath: product.media?.mediaUrl != null
                                     ? product.media!.mediaUrl
                                     : 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&h=400&fit=crop',
-              // Données statiques pour la démonstration
-              merchantName: merchantName,
-              productImages: [], // Liste vide, les images statiques seront utilisées dans ProductDetailScreen
+              product: product, // Passage du produit complet avec vendeur
+              productImages: [], // Liste vide, images principales déjà fournies
               goToCartTab: () {
                 Navigator.of(context).popUntil((route) => route.isFirst);
               },

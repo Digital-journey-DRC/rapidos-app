@@ -5,6 +5,7 @@ import 'package:immo/widgets/app_logo.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:immo/cubit/product_cubit.dart';
+import 'package:immo/screens/product/add_product_screen.dart';
 
 class VoirPlusProduitsScreen extends StatefulWidget {
   const VoirPlusProduitsScreen({Key? key}) : super(key: key);
@@ -178,8 +179,27 @@ class _VoirPlusProduitsScreenState extends State<VoirPlusProduitsScreen> {
           ),
         ],
       ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const AddProductScreen(),
+            ),
+          ).then((result) {
+            if (result == true) {
+              // Rafraîchir la liste des produits si un produit a été ajouté
+              context.read<ProductCubit>().fetchProducts();
+            }
+          });
+        },
+        backgroundColor: AppColors.primary,
+        child: const Icon(Icons.add, color: Colors.white),
+        tooltip: 'Ajouter un produit',
+      ),
     );
   }
+
 }
 
 class _ProductCard extends StatefulWidget {
@@ -206,7 +226,6 @@ class _ProductCard extends StatefulWidget {
 class _ProductCardState extends State<_ProductCard> with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
   late Animation<double> _scaleAnimation;
-  bool _isHovered = false;
 
   @override
   void initState() {

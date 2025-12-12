@@ -5,6 +5,9 @@ import 'package:flutter/services.dart';
 import 'package:immo/services/product_service.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:immo/cubit/product_cubit.dart';
+import 'package:immo/models/product.dart';
+import 'package:immo/models/category.dart';
+import 'package:immo/screens/product/edit_product_screen.dart';
 
 class DetailProduitMarchantScreen extends StatefulWidget {
   final int productId;
@@ -31,201 +34,143 @@ class DetailProduitMarchantScreen extends StatefulWidget {
 }
 
 class _DetailProduitMarchantScreenState extends State<DetailProduitMarchantScreen> {
-  final TextEditingController _nameController = TextEditingController();
-  final TextEditingController _priceController = TextEditingController();
-  final TextEditingController _stockController = TextEditingController();
-  final TextEditingController _badgeController = TextEditingController();
-  final TextEditingController _descriptionController = TextEditingController();
   final ProductService _productService = ProductService();
   bool _isLoading = false;
+  String _currentMainImage = '';
+  int _currentImageIndex = 0;
+  Product? _product;
 
   @override
   void initState() {
     super.initState();
-    // Initialiser les contrôleurs avec les valeurs actuelles
-    _nameController.text = widget.productName;
-    _priceController.text = widget.productPrice;
-    _stockController.text = widget.productStock;
-    _badgeController.text = widget.productBadge;
-    _descriptionController.text = widget.productBadge; // Utiliser le badge comme description par défaut
+    // Initialiser l'image principale
+    _currentMainImage = _getImageUrl(widget.productImageUrl);
+    
+    // Récupérer le produit complet depuis ProductCubit
+    _loadProduct();
+  }
+
+  void _loadProduct() {
+    final productState = context.read<ProductCubit>().state;
+    if (productState is ProductLoaded) {
+      final product = productState.products.firstWhere(
+        (p) => p.id == widget.productId,
+        orElse: () {
+          // Créer un produit de fallback avec les données disponibles
+          final priceValue = double.tryParse(widget.productPrice.replaceAll(' FC', '').replaceAll(' ', '')) ?? 0.0;
+          final stockValue = int.tryParse(widget.productStock) ?? 0;
+          return Product(
+            id: widget.productId,
+            name: widget.productName,
+            description: widget.productBadge,
+            price: priceValue,
+            stock: stockValue,
+            vendeurId: 0,
+            createdAt: '',
+            updatedAt: '',
+            categorieId: 0,
+            category: widget.productBadge.isNotEmpty ? Category(
+              id: 0,
+              name: widget.productBadge,
+              description: '',
+            ) : null,
+            media: widget.productImageUrl.isNotEmpty ? Media(
+              id: 0,
+              mediaUrl: widget.productImageUrl,
+              mediaType: 'image',
+              createdAt: '',
+              updatedAt: '',
+              productId: widget.productId,
+            ) : null,
+          );
+        },
+      );
+      if (mounted) {
+        setState(() {
+          _product = product;
+        });
+      }
+    } else {
+      // Si les produits ne sont pas encore chargés, créer un produit de fallback
+      final priceValue = double.tryParse(widget.productPrice.replaceAll(' FC', '').replaceAll(' ', '')) ?? 0.0;
+      final stockValue = int.tryParse(widget.productStock) ?? 0;
+      final fallbackProduct = Product(
+        id: widget.productId,
+        name: widget.productName,
+        description: widget.productBadge,
+        price: priceValue,
+        stock: stockValue,
+        vendeurId: 0,
+        createdAt: '',
+        updatedAt: '',
+        categorieId: 0,
+        category: widget.productBadge.isNotEmpty ? Category(
+          id: 0,
+          name: widget.productBadge,
+          description: '',
+        ) : null,
+        media: widget.productImageUrl.isNotEmpty ? Media(
+          id: 0,
+          mediaUrl: widget.productImageUrl,
+          mediaType: 'image',
+          createdAt: '',
+          updatedAt: '',
+          productId: widget.productId,
+        ) : null,
+      );
+      if (mounted) {
+        setState(() {
+          _product = fallbackProduct;
+        });
+      }
+    }
+  }
+
+  String _getImageUrl(String imagePath) {
+    if (imagePath.isEmpty || imagePath == 'null') {
+      return 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=600&h=400&fit=crop';
+    }
+    if (imagePath.startsWith('http')) {
+      return imagePath;
+    }
+    return 'http://24.144.87.127:3333/$imagePath';
+  }
+
+  /// Retourne toutes les images disponibles (principale + secondaires)
+  /// Si les images supplémentaires n'existent pas, utilise l'image principale
+  List<String> _getAllImages() {
+    final List<String> images = [];
+    final mainImage = _getImageUrl(widget.productImageUrl);
+    
+    // Ajouter l'image principale en premier
+    images.add(mainImage);
+    
+    // Pour l'instant, on n'a qu'une seule image, donc on complète avec l'image principale
+    // Si des images supplémentaires existent dans le futur, elles seront ajoutées ici
+    // Pour l'instant, on crée 3 miniatures supplémentaires avec l'image principale
+    while (images.length < 4) {
+      images.add(mainImage);
+    }
+    
+    return images;
+  }
+
+  void _changeMainImage(int index) {
+    final allImages = _getAllImages();
+    if (index >= 0 && index < allImages.length) {
+      setState(() {
+        _currentImageIndex = index;
+        _currentMainImage = allImages[index];
+      });
+    }
   }
 
   @override
   void dispose() {
-    _nameController.dispose();
-    _priceController.dispose();
-    _stockController.dispose();
-    _badgeController.dispose();
-    _descriptionController.dispose();
     super.dispose();
   }
 
-  Future<void> _saveChanges() async {
-    if (_stockController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Veuillez saisir le nouveau stock'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
 
-    setState(() {
-      _isLoading = true;
-    });
-
-    try {
-      final result = await _productService.updateProductStock(
-        productId: widget.productId,
-        newStock: int.parse(_stockController.text),
-      );
-
-      setState(() {
-        _isLoading = false;
-      });
-
-      if (result['success']) {
-        Navigator.of(context).pop(); // Fermer le modal
-        Navigator.of(context).pop(); // Retour à la page précédente
-        
-        // Rafraîchir la liste des produits
-        context.read<ProductCubit>().fetchProducts();
-        
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(result['message']),
-            backgroundColor: AppColors.success,
-          ),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(result['message']),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erreur: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
-
-  void _showEditDialog() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
-      ),
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return Padding(
-              padding: EdgeInsets.only(
-                left: 24,
-                right: 24,
-                top: 32,
-                bottom: MediaQuery.of(context).viewInsets.bottom + 24,
-              ),
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Center(
-                      child: Container(
-                        width: 40,
-                        height: 4,
-                        margin: const EdgeInsets.only(bottom: 16),
-                        decoration: BoxDecoration(
-                          color: Colors.grey[300],
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                    ),
-                    const Text('Modifier le stock',
-                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 20),
-                    TextFormField(
-                      controller: _stockController,
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [
-                        FilteringTextInputFormatter.digitsOnly,
-                      ],
-                      decoration: InputDecoration(
-                        labelText: 'Nouveau stock',
-                        prefixIcon: const Icon(Icons.inventory_2_outlined),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        filled: true,
-                        fillColor: Colors.white,
-                        hintText: 'Ex: 50',
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: _isLoading ? null : _saveChanges,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        child: _isLoading
-                            ? const Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                    ),
-                                  ),
-                                  SizedBox(width: 12),
-                                  Text(
-                                    'Mise à jour du stock...',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
-                              )
-                            : const Text(
-                                'Mettre à jour le stock',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
 
   void _showDeleteConfirmation() {
     showDialog(
@@ -311,11 +256,7 @@ class _DetailProduitMarchantScreenState extends State<DetailProduitMarchantScree
 
   @override
   Widget build(BuildContext context) {
-    final String displayImageUrl = (widget.productImageUrl.isEmpty || widget.productImageUrl == 'null')
-        ? 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=600&h=400&fit=crop'
-        : widget.productImageUrl.startsWith('http')
-            ? widget.productImageUrl
-            : 'http://24.144.87.127:3333/${widget.productImageUrl}';
+    final allImages = _getAllImages();
 
     return Scaffold(
       appBar: AppBarWithLogo(
@@ -325,8 +266,32 @@ class _DetailProduitMarchantScreenState extends State<DetailProduitMarchantScree
         actions: [
           IconButton(
             icon: const Icon(Icons.edit),
-            onPressed: _showEditDialog,
-            tooltip: 'Modifier le stock',
+            onPressed: () {
+              if (_product != null) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => EditProductScreen(product: _product!),
+                  ),
+                ).then((result) {
+                  if (result == true) {
+                    // Rafraîchir les données et retourner à la page précédente
+                    context.read<ProductCubit>().fetchProducts();
+                    Navigator.pop(context);
+                  }
+                });
+              } else {
+                // Si le produit n'est pas encore chargé, essayer de le récupérer
+                _loadProduct();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Chargement du produit...'),
+                    backgroundColor: Colors.orange,
+                  ),
+                );
+              }
+            },
+            tooltip: 'Modifier le produit',
           ),
           IconButton(
             icon: const Icon(Icons.delete, color: Colors.red),
@@ -335,140 +300,294 @@ class _DetailProduitMarchantScreenState extends State<DetailProduitMarchantScree
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Image du produit
-            Container(
-              width: double.infinity,
-              height: 250,
-              decoration: BoxDecoration(
-                color: Colors.grey[100],
-              ),
-              child: ClipRRect(
-                child: Image.network(
-                  displayImageUrl,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) => Container(
-                    color: Colors.grey[200],
-                    child: const Icon(Icons.image, color: Colors.grey, size: 80),
-                  ),
-
-                ),
-              ),
-            ),
-            
-            Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Badge/Catégorie
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Image principale
+                Expanded(
+                  flex: 4,
+                  child: Container(
+                    width: double.infinity,
                     decoration: BoxDecoration(
-                      color: widget.isPromo ? Colors.redAccent : AppColors.primary,
-                      borderRadius: BorderRadius.circular(20),
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.grey.withOpacity(0.2),
+                          blurRadius: 8,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
                     ),
-                    child: Text(
-                      widget.productBadge,
-                      style: const TextStyle(color: Colors.white, fontSize: 12),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(16),
+                      child: Image.network(
+                        _currentMainImage,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => Container(
+                          color: Colors.grey[200],
+                          child: const Icon(Icons.image, size: 80, color: Colors.grey),
+                        ),
+                        loadingBuilder: (context, child, loadingProgress) {
+                          if (loadingProgress == null) return child;
+                          return Container(
+                            color: Colors.grey[50],
+                            child: Center(
+                              child: CircularProgressIndicator(
+                                value: loadingProgress.expectedTotalBytes != null
+                                    ? loadingProgress.cumulativeBytesLoaded /
+                                        loadingProgress.expectedTotalBytes!
+                                    : null,
+                                color: AppColors.primary,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
                     ),
                   ),
-                  
-                  const SizedBox(height: 16),
-                  
-                  // Nom du produit
-                  Text(
-                    widget.productName,
-                    style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
+                ),
+
+                const SizedBox(height: 8),
+
+                // Section des miniatures cliquables
+                SizedBox(
+                  height: 50,
+                  child: ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    itemCount: allImages.length,
+                    itemBuilder: (context, index) {
+                      final imageUrl = allImages[index];
+                      final isActive = index == _currentImageIndex;
+                      return GestureDetector(
+                        onTap: () {
+                          _changeMainImage(index);
+                        },
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          margin: const EdgeInsets.symmetric(horizontal: 4),
+                          width: 50,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: isActive
+                                  ? AppColors.primary
+                                  : Colors.grey.shade300,
+                              width: isActive ? 2.5 : 1.5,
+                            ),
+                            boxShadow: isActive
+                                ? [
+                                    BoxShadow(
+                                      color: AppColors.primary.withOpacity(0.2),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ]
+                                : [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.05),
+                                      blurRadius: 4,
+                                      offset: const Offset(0, 1),
+                                    ),
+                                  ],
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.network(
+                              imageUrl,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) {
+                                return Container(
+                                  color: Colors.grey.shade100,
+                                  child: Icon(
+                                    Icons.image_not_supported,
+                                    size: 20,
+                                    color: Colors.grey.shade400,
+                                  ),
+                                );
+                              },
+                              loadingBuilder: (context, child, loadingProgress) {
+                                if (loadingProgress == null) return child;
+                                return Container(
+                                  color: Colors.grey.shade50,
+                                  child: Center(
+                                    child: SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        value: loadingProgress.expectedTotalBytes != null
+                                            ? loadingProgress.cumulativeBytesLoaded /
+                                                loadingProgress.expectedTotalBytes!
+                                            : null,
+                                        color: AppColors.primary,
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+
+                const SizedBox(height: 8),
+
+                // Badge/Catégorie et nom
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: widget.isPromo ? Colors.redAccent : AppColors.primary,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        widget.productBadge,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 10,
+                        ),
+                      ),
                     ),
-                  ),
-                  
-                  const SizedBox(height: 8),
-                  
-                  // Prix
-                  Text(
-                    '${widget.productPrice} FC',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: widget.isPromo ? Colors.red : Colors.green,
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        widget.productName,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
-                  ),
-                  
-                  const SizedBox(height: 20),
-                  
-                  // Informations détaillées
-                  _buildInfoCard(
-                    icon: Icons.inventory_2,
-                    title: 'Stock disponible',
-                    value: '${widget.productStock} unités',
-                    color: Colors.blue,
-                  ),
-                  
-                  const SizedBox(height: 12),
-                  
-                  _buildInfoCard(
-                    icon: Icons.category,
-                    title: 'Catégorie',
-                    value: widget.productBadge,
-                    color: Colors.orange,
-                  ),
-                  
-                  const SizedBox(height: 12),
-                  
-                  _buildInfoCard(
-                    icon: Icons.local_offer,
-                    title: 'Statut',
-                    value: widget.isPromo ? 'En promotion' : 'Prix normal',
+                  ],
+                ),
+
+                const SizedBox(height: 8),
+
+                // Prix
+                Text(
+                  '${widget.productPrice} FC',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
                     color: widget.isPromo ? Colors.red : Colors.green,
                   ),
-                  
-                  const SizedBox(height: 30),
-                  
-                  // Boutons d'action
-                  Row(
+                ),
+
+                const SizedBox(height: 8),
+
+                // Informations détaillées en grille
+                Expanded(
+                  flex: 3,
+                  child: GridView.count(
+                    crossAxisCount: 2,
+                    mainAxisSpacing: 8,
+                    crossAxisSpacing: 8,
+                    childAspectRatio: 3.0,
                     children: [
+                      _buildInfoCard(
+                        icon: Icons.inventory_2,
+                        title: 'Stock',
+                        value: '${widget.productStock}',
+                        color: Colors.blue,
+                      ),
+                      _buildInfoCard(
+                        icon: Icons.category,
+                        title: 'Catégorie',
+                        value: widget.productBadge,
+                        color: Colors.orange,
+                      ),
+                      _buildInfoCard(
+                        icon: Icons.local_offer,
+                        title: 'Statut',
+                        value: widget.isPromo ? 'Promotion' : 'Normal',
+                        color: widget.isPromo ? Colors.red : Colors.green,
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 8),
+
+                // Boutons d'action
+                Row(
+                  children: [
                       Expanded(
                         child: ElevatedButton.icon(
-                          onPressed: _showEditDialog,
-                          icon: const Icon(Icons.edit, color: Colors.white),
+                          onPressed: () {
+                            if (_product != null) {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => EditProductScreen(product: _product!),
+                                ),
+                              ).then((result) {
+                                if (result == true) {
+                                  // Rafraîchir les données et retourner à la page précédente
+                                  context.read<ProductCubit>().fetchProducts();
+                                  Navigator.pop(context);
+                                }
+                              });
+                            } else {
+                              // Si le produit n'est pas encore chargé, essayer de le récupérer
+                              _loadProduct();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Chargement du produit...'),
+                                  backgroundColor: Colors.orange,
+                                ),
+                              );
+                            }
+                          },
+                          icon: const Icon(Icons.edit, color: Colors.white, size: 18),
                           label: const Text(
-                            'Modifier le stock',
-                            style: TextStyle(color: Colors.white),
+                            'Modifier',
+                            style: TextStyle(color: Colors.white, fontSize: 13),
                           ),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.primary,
                             padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
                           ),
                         ),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: _showDeleteConfirmation,
-                          icon: const Icon(Icons.delete, color: Colors.white),
-                          label: const Text(
-                            'Supprimer',
-                            style: TextStyle(color: Colors.white),
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.red,
-                            padding: const EdgeInsets.symmetric(vertical: 12),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: _showDeleteConfirmation,
+                        icon: const Icon(Icons.delete, color: Colors.white, size: 18),
+                        label: const Text(
+                          'Supprimer',
+                          style: TextStyle(color: Colors.white, fontSize: 13),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
                           ),
                         ),
                       ),
-                    ],
-                  ),
-                ],
-              ),
+                    ),
+                  ],
+                ),
+              ],
             ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
@@ -480,30 +599,30 @@ class _DetailProduitMarchantScreenState extends State<DetailProduitMarchantScree
     required Color color,
   }) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(10),
         border: Border.all(color: Colors.grey.shade200),
         boxShadow: [
           BoxShadow(
             color: Colors.grey.withOpacity(0.1),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
+            blurRadius: 2,
+            offset: const Offset(0, 1),
           ),
         ],
       ),
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
               color: color.withOpacity(0.1),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Icon(icon, color: color, size: 20),
+            child: Icon(icon, color: color, size: 16),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -511,17 +630,20 @@ class _DetailProduitMarchantScreenState extends State<DetailProduitMarchantScree
                 Text(
                   title,
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: 10,
                     color: Colors.grey[600],
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   value,
                   style: const TextStyle(
-                    fontSize: 14,
+                    fontSize: 13,
                     fontWeight: FontWeight.bold,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),

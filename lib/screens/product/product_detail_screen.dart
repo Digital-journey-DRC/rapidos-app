@@ -67,20 +67,41 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     _currentMainImage = widget.imagePath;
   }
 
-  void _checkIfInCart() {
-    // Vérifier si l'utilisateur est connecté avant de vérifier le panier
-    final authState = context.read<AuthCubit>().state;
-    if (authState is! AuthSuccess || 
-        authState.user == null || 
-        authState.token == null ||
-        authState.user!.isEmpty) {
-      // Si l'utilisateur n'est pas connecté, le produit n'est pas dans le panier
+  /// Vérifie si l'utilisateur est autorisé à effectuer des actions
+  bool _isAuthorizedUser() {
+    try {
+      final authState = context.read<AuthCubit>().state;
+      if (authState is AuthSuccess && authState.user != null) {
+        final userPhone = authState.user!['phone']?.toString() ?? '';
+        // Si le numéro est +243842613999, l'utilisateur n'est PAS autorisé
+        return userPhone != '+243842613999';
+      }
+      return false;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /// Redirige vers le login si l'utilisateur n'est pas autorisé
+  void _checkAuthorizationAndRedirect() {
+    if (!_isAuthorizedUser() || !mounted) {
+      return;
+    }
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
+      (route) => false,
+    );
+  }
+
+  void _checkIfInCart() async {
+    // Vérifier si l'utilisateur est autorisé
+    if (!_isAuthorizedUser()) {
       setState(() {
         isInCart = false;
       });
       return;
     }
-    
+
     // Vérifier si le produit est dans le panier
     final cartItems = context.read<CartCubit>().state.items;
     setState(() {
@@ -132,15 +153,27 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     }
   }
 
-  /// Récupère les informations du marchand (version statique)
-  /// Pour l'instant, on utilise des données statiques de démonstration
+  /// Récupère les informations du marchand/vendeur
+  /// Le marchand et le vendeur sont la même chose, donc on utilise toujours firstName et lastName de la clé vendeur
   Map<String, dynamic>? _getMerchantInfo() {
-    // Données statiques du marchand pour la démonstration
+    // Construire le nom du vendeur directement à partir de firstName et lastName de la clé vendeur
+    String fallbackVendeurName = 'Inconnu';
+    final firstName = widget.product?.vendeur?.firstName ?? widget.vendeur?.firstName ?? '';
+    final lastName = widget.product?.vendeur?.lastName ?? widget.vendeur?.lastName ?? '';
+    final name = '$firstName $lastName'.trim();
+    if (name.isNotEmpty) {
+      fallbackVendeurName = name;
+    }
+    final fallbackVendeurId = widget.product?.vendeurId ??
+        (int.tryParse(widget.idVendeur)) ??
+        widget.product?.vendeur?.id ??
+        widget.vendeur?.id;
+
     final staticMerchantData = {
-      'name': widget.merchantName ?? 'Rapidos Store',
+      'name': fallbackVendeurName,
       'products': widget.merchantProducts ?? _getStaticMerchantProducts(),
       'imagePath': widget.imagePath,
-      'merchantId': widget.idVendeur,
+      'merchantId': fallbackVendeurId?.toString() ?? widget.idVendeur,
       'rating': 4.5,
       'isVerified': true,
     };
@@ -246,27 +279,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   void _addToCart() async {
-    // Vérifier si l'utilisateur est connecté et a des données valides
-    final authState = context.read<AuthCubit>().state;
-    
-    // Vérifier si l'utilisateur n'est pas connecté ou si les données utilisateur sont nulles
-    if (authState is! AuthSuccess || 
-        authState.user == null || 
-        authState.token == null ||
-        authState.user!.isEmpty) {
-      // Rediriger vers login si non connecté ou données utilisateur invalides
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Veuillez vous connecter pour ajouter un produit au panier'),
-            backgroundColor: Colors.orange,
-            duration: Duration(seconds: 2),
-          ),
-        );
-        Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const LoginScreen()),
-        );
-      }
+    // Vérifier l'autorisation et rediriger si nécessaire (même logique que new_home.dart)
+    _checkAuthorizationAndRedirect();
+    if (!_isAuthorizedUser() || !mounted) {
       return;
     }
 
@@ -961,7 +976,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   //             const Row(
                   //               children: [
                   //                 Text(
-                  //                   'Rapidos Store',
+                  //                   'Inconnu',
                   //                   style: TextStyle(
                   //                     fontWeight: FontWeight.bold,
                   //                     fontSize: 16,
@@ -1124,7 +1139,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
   /// Widget pour afficher la carte du vendeur cliquable (version dynamique)
   Widget _buildVendeurCard(Vendeur vendeur, int vendeurId) {
-    final vendeurName = vendeur.fullName;
+    // Afficher toujours firstName + lastName du vendeur
+    final vendeurName = '${vendeur.firstName} ${vendeur.lastName}'.trim();
+    // Utiliser l'id du vendeur provenant de l'objet, sinon le paramètre fourni
+    final targetVendeurId = vendeur.id != 0 ? vendeur.id : vendeurId;
     // Utiliser l'image de la boutique (media) au lieu de l'image du profil
     final boutiqueImageUrl = vendeur.media?.mediaUrl ?? vendeur.profileImageUrl;
     
@@ -1134,7 +1152,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           context,
           MaterialPageRoute(
             builder: (context) => VendeurDetailScreen(
-              vendeurId: vendeurId, // Utiliser l'ID du vendeur depuis le produit
+              vendeurId: targetVendeurId, // ID du vendeur depuis l'objet
             ),
           ),
         );

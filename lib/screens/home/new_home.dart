@@ -21,7 +21,6 @@ import 'package:immo/cubit/order_cubit.dart';
 import 'package:immo/cubit/cart_cubit.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'package:immo/services/auth_gate_service.dart';
 import 'package:immo/screens/auth/login_screen.dart';
 import 'dart:math' as math;
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
@@ -285,21 +284,13 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
 
   Future<void> _initializeData() async {
     try {
-      print('🔄 NewHomeScreen: Initialisation des données...');
-
       // Attendre que l'AuthCubit soit initialisé
       int attempts = 0;
       while (attempts < 10) {
         final authState = context.read<AuthCubit>().state;
-        print(
-            '🔍 NewHomeScreen: État AuthCubit (tentative ${attempts + 1}): ${authState.runtimeType}');
-
         if (authState is AuthSuccess && authState.token != null) {
-          print(
-              '✅ NewHomeScreen: AuthCubit initialisé, chargement des données...');
           break;
         }
-
         await Future.delayed(const Duration(milliseconds: 500));
         attempts++;
       }
@@ -310,31 +301,22 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
       context.read<MerchantCubit>().fetchMerchants(context);
       _fetchOrdersAndLocation();
       _fetchUserMedia();
-
-      print('✅ NewHomeScreen: Données initialisées');
     } catch (e) {
-      print('❌ NewHomeScreen: Erreur lors de l\'initialisation: $e');
+      // Erreur silencieuse pour la production
     }
   }
 
   Future<void> _fetchUserMedia() async {
     try {
-      print('🔄 NewHomeScreen: Récupération des médias utilisateur...');
-
       if (!mounted) return;
       // Récupérer l'utilisateur connecté
       final authState = context.read<AuthCubit>().state;
-      print('🔍 NewHomeScreen: État AuthCubit: ${authState.runtimeType}');
 
       if (authState is AuthSuccess && authState.user != null) {
         final userId = authState.user!['id']?.toString() ?? '';
         final token = authState.token;
 
-        print(
-            '🔄 NewHomeScreen: Récupération des médias pour l\'utilisateur: $userId');
-
         if (userId.isNotEmpty && token != null && _httpClient != null) {
-          // Vérifier que le widget est toujours monté avant de faire la requête
           if (!mounted) return;
           
           // Requête pour récupérer les médias de l'utilisateur
@@ -349,8 +331,6 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
           if (!mounted) return;
           if (response.statusCode == 200) {
             final data = jsonDecode(response.body);
-            print(
-                '✅ NewHomeScreen: Médias récupérés: ${data['data']['media']}');
 
             // Mettre à jour les données utilisateur avec les médias
             if (data['data']['media'] != null) {
@@ -360,33 +340,18 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
               // Mettre à jour l'état de l'authentification
               if (mounted) {
                 context.read<AuthCubit>().updateUser(updatedUser, token);
-                print('✅ NewHomeScreen: Données utilisateur mises à jour');
               }
             }
-          } else {
-            print(
-                '❌ NewHomeScreen: Erreur lors de la récupération des médias: ${response.statusCode}');
-            print('❌ NewHomeScreen: Réponse: ${response.body}');
           }
-        } else {
-          print(
-              '❌ NewHomeScreen: Token ou userId manquant pour la récupération des médias');
-          print(
-              '❌ NewHomeScreen: userId: $userId, token: ${token != null ? "présent" : "absent"}');
         }
-      } else {
-        print(
-            '❌ NewHomeScreen: Utilisateur non connecté ou AuthCubit non initialisé');
-        print('❌ NewHomeScreen: authState: $authState');
       }
     } catch (e) {
-      print('❌ NewHomeScreen: Erreur lors de la récupération des médias: $e');
+      // Erreur silencieuse pour la production
     }
   }
 
   Future<void> _fetchOrdersAndLocation() async {
     try {
-      print('🔄 NewHomeScreen: Récupération des commandes et localisation...');
       if (!mounted) return;
       setState(() {
         _isLoading = true;
@@ -401,14 +366,10 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
         _commandes = commandes;
       });
 
-      print('📦 NewHomeScreen: Commandes récupérées: ${commandes.length}');
-
       if (commandes.isNotEmpty) {
         // Si au moins une commande, récupérer la position
-        print('📍 NewHomeScreen: Récupération de la position...');
         bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
         if (!serviceEnabled) {
-          print('❌ NewHomeScreen: Service de localisation désactivé');
           if (!mounted) return;
           setState(() {
             _isLoading = false;
@@ -419,7 +380,6 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
         if (permission == LocationPermission.denied) {
           permission = await Geolocator.requestPermission();
           if (permission == LocationPermission.denied) {
-            print('❌ NewHomeScreen: Permission de localisation refusée');
             if (!mounted) return;
             setState(() {
               _isLoading = false;
@@ -428,15 +388,13 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
           }
         }
         if (permission == LocationPermission.deniedForever) {
-          print(
-              '❌ NewHomeScreen: Permission de localisation refusée définitivement');
           if (!mounted) return;
           setState(() {
             _isLoading = false;
           });
           return;
         }
-        Position position = await Geolocator.getCurrentPosition(
+        final position = await Geolocator.getCurrentPosition(
           desiredAccuracy: LocationAccuracy.high,
         );
         if (!mounted) return;
@@ -444,52 +402,18 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
           _currentPosition = position;
           _isLoading = false;
         });
-        print(
-            '✅ NewHomeScreen: Position récupérée: ${position.latitude}, ${position.longitude}');
       } else {
         if (!mounted) return;
         setState(() {
           _isLoading = false;
         });
-        print('ℹ️ NewHomeScreen: Aucune commande trouvée');
       }
     } catch (e) {
-      print(
-          '❌ NewHomeScreen: Erreur lors de la récupération des commandes: $e');
       if (!mounted) return;
       setState(() {
         _isLoading = false;
       });
     }
-  }
-
-  /// Affiche une boîte de dialogue de confirmation pour la déconnexion
-  void _showLogoutDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Déconnexion'),
-          content: const Text('Êtes-vous sûr de vouloir vous déconnecter ?'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Annuler'),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                _logout();
-              },
-              child: const Text(
-                'Déconnexion',
-                style: TextStyle(color: Colors.red),
-              ),
-            ),
-          ],
-        );
-      },
-    );
   }
 
   /// Vérifie si l'utilisateur est autorisé à effectuer des actions
@@ -498,19 +422,11 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
       final authState = context.read<AuthCubit>().state;
       if (authState is AuthSuccess && authState.user != null) {
         final userPhone = authState.user!['phone']?.toString() ?? '';
-        print(
-            '🔍 Vérification autorisation - Téléphone utilisateur: $userPhone');
-
         // Si le numéro est +243842613999, l'utilisateur n'est PAS autorisé
-        final isAuthorized = userPhone != '+243842613999';
-        print('🔍 Utilisateur autorisé: $isAuthorized');
-
-        return isAuthorized;
+        return userPhone != '+243842613999';
       }
-      print('❌ Utilisateur non connecté');
       return false;
     } catch (e) {
-      print('❌ Erreur lors de la vérification d\'autorisation: $e');
       return false;
     }
   }
@@ -518,7 +434,6 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
   /// Redirige vers le login si l'utilisateur n'est pas autorisé
   void _checkAuthorizationAndRedirect() {
     if (!_isAuthorizedUser()) {
-      print('🚫 Utilisateur non autorisé, redirection vers login...');
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(builder: (_) => const LoginScreen()),
         (route) => false,
@@ -539,7 +454,6 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
   /// Redirige vers login si l'utilisateur n'est pas connecté (pour ajout au panier)
   void _checkLoginAndRedirect() {
     if (!_isUserLoggedIn()) {
-      print('🚫 Utilisateur non connecté, redirection vers login...');
       Navigator.of(context).push(
         MaterialPageRoute(builder: (_) => const LoginScreen()),
       );
@@ -549,20 +463,13 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
   /// Effectue la déconnexion et redirige vers l'écran home non connecté
   Future<void> _logout() async {
     try {
-      print('🔄 Déconnexion en cours...');
 
-      // Effacer la session via AuthGateService
-      final authGateService = AuthGateService();
-      await authGateService.clearSession();
-
-      // Effacer la session via AuthCubit
+      // Effacer la session via AuthCubit (qui fait déjà clearAll + clearSession)
       if (mounted) {
-        context.read<AuthCubit>().logout();
+        await context.read<AuthCubit>().logout();
       }
 
-      print('✅ Session effacée avec succès');
-
-      // Rediriger vers l'écran home non connecté
+      // Rediriger vers l'écran home non connecté (comme au premier chargement)
       if (mounted) {
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(builder: (_) => const NewHomeScreen()),
@@ -570,7 +477,6 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
         );
       }
     } catch (e) {
-      print('❌ Erreur lors de la déconnexion: $e');
       // Rediriger quand même vers l'écran home non connecté
       if (mounted) {
         Navigator.of(context).pushAndRemoveUntil(
@@ -869,106 +775,8 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                  // "Hey there!" Section (if not logged in or for promotions)
-                  BlocBuilder<AuthCubit, AuthState>(
-                    builder: (context, state) {
-                      if (state is! AuthSuccess) {
-                        return Container(
-                          margin: const EdgeInsets.all(16),
-                          padding: const EdgeInsets.all(20),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: Colors.grey.shade200),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.03),
-                                blurRadius: 8,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        const Text(
-                                          'Bonjour !',
-                                          style: TextStyle(
-                                            fontSize: 20,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 8),
-                                        Text(
-                                          'Connectez-vous pour une expérience personnalisée',
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            color: Colors.grey.shade600,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  Container(
-                                    width: 60,
-                                    height: 60,
-                                    decoration: BoxDecoration(
-                                      color: AppColors.primary.withOpacity(0.1),
-                                      borderRadius: BorderRadius.circular(30),
-                                    ),
-                                    child: const Icon(
-                                      Icons.phone_android,
-                                      color: AppColors.primary,
-                                      size: 30,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 16),
-                              SizedBox(
-                                width: double.infinity,
-                                child: ElevatedButton(
-                                  onPressed: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) =>
-                                            const LoginScreen(),
-                                      ),
-                                    );
-                                  },
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: AppColors.primary,
-                                    padding: const EdgeInsets.symmetric(
-                                        vertical: 14),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                  ),
-                                  child: const Text(
-                                    'Se connecter',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      }
-                      return const SizedBox.shrink();
-                    },
-                  ),
+                  // Container "Bonjour connectez-vous" retiré pour afficher directement le contenu
+                  // comme au premier chargement (sans connexion)
 
                   // Featured products section
                   Padding(
@@ -996,19 +804,17 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                                     state.products.isNotEmpty) {
                                   return TextButton(
                                     onPressed: () {
-                                      _checkAuthorizationAndRedirect();
-                                      if (_isAuthorizedUser()) {
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (context) =>
-                                                AllProductsScreen(
-                                                    products: state
-                                                        .products.reversed
-                                                        .toList()),
-                                          ),
-                                        );
-                                      }
+                                      // Permettre l'accès à tous les produits sans connexion
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) =>
+                                              AllProductsScreen(
+                                                  products: state
+                                                      .products.reversed
+                                                      .toList()),
+                                        ),
+                                      );
                                     },
                                     child: const Text('Voir tout',
                                         style: TextStyle(
@@ -1099,16 +905,14 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                             ),
                             TextButton(
                               onPressed: () {
-                                _checkAuthorizationAndRedirect();
-                                if (_isAuthorizedUser()) {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) =>
-                                          const AllMerchantsScreen(),
-                                    ),
-                                  );
-                                }
+                                // Permettre l'accès à tous les marchands sans connexion
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) =>
+                                        const AllMerchantsScreen(),
+                                  ),
+                                );
                               },
                               child: const Text('Voir tout',
                                   style: TextStyle(color: AppColors.primary)),
@@ -1152,33 +956,31 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                                         '${vendeur['firstName']} ${vendeur['lastName']}';
                                     return GestureDetector(
                                       onTap: () {
-                                        _checkAuthorizationAndRedirect();
-                                        if (_isAuthorizedUser()) {
-                                          Navigator.push(
-                                            context,
-                                            MaterialPageRoute(
-                                              builder: (context) =>
-                                                  MerchantProfileScreen(
-                                                description: products.isNotEmpty
-                                                    ? products[0]
-                                                            ['description'] ??
-                                                        ''
-                                                    : '',
-                                                merchantId: vendeur['id'],
-                                                name: name,
-                                                rating: 4.5,
-                                                category: products.isNotEmpty
-                                                    ? products[0]
-                                                            ['description'] ??
-                                                        ''
-                                                    : '',
-                                                imagePath: image,
-                                                isVerified: true,
-                                                products: products,
-                                              ),
+                                        // Permettre l'accès aux profils de marchands sans connexion
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) =>
+                                                MerchantProfileScreen(
+                                              description: products.isNotEmpty
+                                                  ? products[0]
+                                                          ['description'] ??
+                                                      ''
+                                                  : '',
+                                              merchantId: vendeur['id'],
+                                              name: name,
+                                              rating: 4.5,
+                                              category: products.isNotEmpty
+                                                  ? products[0]
+                                                          ['description'] ??
+                                                      ''
+                                                  : '',
+                                              imagePath: image,
+                                              isVerified: true,
+                                              products: products,
                                             ),
-                                          );
-                                        }
+                                          ),
+                                        );
                                       },
                                       child: _buildMerchantCard(
                                         id: vendeur['id'].toString(),
@@ -1658,26 +1460,24 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
     return Builder(
       builder: (context) => GestureDetector(
         onTap: () {
-          _checkAuthorizationAndRedirect();
-          if (_isAuthorizedUser()) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => MerchantProfileScreen(
-                  description: products.isNotEmpty
-                      ? products[0]['description'] ?? ''
-                      : '',
-                  merchantId: id,
-                  name: name,
-                  rating: rating,
-                  category: category,
+          // Permettre l'accès aux profils de marchands sans connexion
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => MerchantProfileScreen(
+                description: products.isNotEmpty
+                    ? products[0]['description'] ?? ''
+                    : '',
+                merchantId: id,
+                name: name,
+                rating: rating,
+                category: category,
                   imagePath: imagePath,
                   isVerified: isVerified,
                   products: products,
                 ),
               ),
             );
-          }
         },
         child: Container(
           width: 180,

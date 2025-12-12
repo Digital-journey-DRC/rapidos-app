@@ -10,6 +10,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:immo/screens/navigation_example.dart';
 import 'package:immo/screens/tracking_map_box.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:immo/screens/home/new_home.dart';
 
 class HomeLivreurScreen extends StatefulWidget {
   const HomeLivreurScreen({Key? key}) : super(key: key);
@@ -31,38 +32,50 @@ class _HomeLivreurScreenState extends State<HomeLivreurScreen> {
   }
 
   Future<void> _getCurrentLocation() async {
+    if (!mounted) return;
     setState(() { _isLoading = true; });
     try {
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
-        setState(() { _isLoading = false; });
+        if (mounted) {
+          setState(() { _isLoading = false; });
+        }
         return;
       }
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
         if (permission == LocationPermission.denied) {
-          setState(() { _isLoading = false; });
+          if (mounted) {
+            setState(() { _isLoading = false; });
+          }
           return;
         }
       }
       if (permission == LocationPermission.deniedForever) {
-        setState(() { _isLoading = false; });
+        if (mounted) {
+          setState(() { _isLoading = false; });
+        }
         return;
       }
       Position position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
       );
-      setState(() {
-        _currentPosition = position;
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _currentPosition = position;
+          _isLoading = false;
+        });
+      }
     } catch (e) {
-      setState(() { _isLoading = false; });
+      if (mounted) {
+        setState(() { _isLoading = false; });
+      }
     }
   }
 
   Future<void> _checkLivreurStatus() async {
+    if (!mounted) return;
     try {
       // Récupérer l'utilisateur connecté
       final authState = context.read<AuthCubit>().state;
@@ -94,7 +107,7 @@ class _HomeLivreurScreenState extends State<HomeLivreurScreen> {
             print('🆔 Document ID: ${statusDoc.id}');
             
             // Vérifier si le statut est false et afficher le popup
-            if (status == false) {
+            if (status == false && mounted) {
               print('⚠️ Statut false détecté, affichage du popup');
               _showStatusPopup();
             }
@@ -136,7 +149,9 @@ class _HomeLivreurScreenState extends State<HomeLivreurScreen> {
             print('📋 Données créées: $newStatusData');
             
             // Afficher le popup car le statut par défaut est false
-            _showStatusPopup();
+            if (mounted) {
+              _showStatusPopup();
+            }
           }
         } else {
           print('❌ ID utilisateur non trouvé');
@@ -304,11 +319,14 @@ class _HomeLivreurScreenState extends State<HomeLivreurScreen> {
                   child: ElevatedButton(
                     onPressed: () async {
                       Navigator.of(context).pop();
-                      // Déconnecter l'utilisateur
+                      // Déconnecter l'utilisateur (reset complet via AuthCubit qui fait clearAll + clearSession)
                       context.read<AuthCubit>().logout();
-                      // Rediriger vers l'écran de connexion
-                      Navigator.of(context).pushReplacementNamed('/login');
-                      print('🚪 Utilisateur déconnecté et redirigé vers l\'écran de connexion');
+                      // Rediriger vers l'écran home non connecté (comme au premier chargement)
+                      Navigator.of(context).pushAndRemoveUntil(
+                        MaterialPageRoute(builder: (_) => const NewHomeScreen()),
+                        (route) => false,
+                      );
+                      print('🚪 Utilisateur déconnecté et redirigé vers l\'écran home non connecté');
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,
