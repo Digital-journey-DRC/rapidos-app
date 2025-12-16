@@ -18,6 +18,7 @@ import 'package:immo/screens/product/promotion_detail_screen.dart';
 import 'package:immo/services/promotion_service.dart';
 import 'package:immo/models/promotion.dart';
 import 'package:immo/screens/product/add_product_screen.dart';
+import 'package:immo/models/product.dart';
 
 class HomeMarchantScreen extends StatefulWidget {
   const HomeMarchantScreen({Key? key}) : super(key: key);
@@ -276,9 +277,13 @@ void saveCommande() async {
                           stock: product.stock.toString(),
                           isPromo: false,
                           price: product.price.toString(),
-                          imageUrl: product.media?.mediaUrl ??
-                              'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&h=400&fit=crop',
+                          imageUrl: product.getMainImage(),
                           productId: product.id,
+                          description: product.description,
+                          category: product.category?.name ?? '',
+                          idVendeur: product.vendeurId.toString(),
+                          priceValue: product.price,
+                          product: product, // Passer le produit complet avec toutes les images
                         );
                       },
                     ),
@@ -396,6 +401,10 @@ void saveCommande() async {
                           imageUrl: promotion.image,
                           productId: product.id,
                           promotion: promotion, // Passer l'objet Promotion complet
+                          description: product.description,
+                          category: product.category?.name ?? '',
+                          idVendeur: product.vendeurId.toString(),
+                          priceValue: promotion.nouveauPrix,
                         );
                       },
                     ),
@@ -595,6 +604,11 @@ class _ProductCard extends StatefulWidget {
   final String price;
   final int productId;
   final Promotion? promotion; // Ajout de l'objet Promotion optionnel
+  final String? description; // Description du produit
+  final String? category; // Catégorie du produit
+  final String? idVendeur; // ID du vendeur
+  final double? priceValue; // Prix en double pour le panier
+  final Product? product; // Produit complet avec toutes les infos (images, etc.)
   const _ProductCard(
       {required this.badge,
       required this.name,
@@ -603,7 +617,12 @@ class _ProductCard extends StatefulWidget {
       required this.isPromo,
       required this.imageUrl,
       required this.productId,
-      this.promotion}); // Promotion optionnel
+      this.promotion,
+      this.description,
+      this.category,
+      this.idVendeur,
+      this.priceValue,
+      this.product}); // Promotion optionnel
 
   @override
   State<_ProductCard> createState() => _ProductCardState();
@@ -668,7 +687,8 @@ class _ProductCardState extends State<_ProductCard> with SingleTickerProviderSta
             ),
           );
         } else if (!widget.isPromo) {
-          // Sinon, navigation vers la page de détail du produit
+          // Utiliser DetailProduitMarchantScreen avec toutes les images
+          final productImages = widget.product?.getAllImages();
           Navigator.push(
             context,
             MaterialPageRoute(
@@ -680,6 +700,8 @@ class _ProductCardState extends State<_ProductCard> with SingleTickerProviderSta
                 productImageUrl: widget.imageUrl,
                 isPromo: widget.isPromo,
                 productId: widget.productId,
+                product: widget.product, // Passer le produit complet avec toutes les infos
+                productImages: productImages, // Passer toutes les images
               ),
             ),
           );

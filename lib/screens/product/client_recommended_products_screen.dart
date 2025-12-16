@@ -148,15 +148,11 @@ class _RecommendedProductCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final imageUrl = product.media?.mediaUrl ?? 
-        'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&h=400&fit=crop';
+    final imageUrl = product.getMainImage();
 
     return GestureDetector(
       onTap: () {
-        final List<String> productImages = [];
-        if (product.media != null && product.media!.mediaUrl.isNotEmpty) {
-          productImages.add(product.media!.mediaUrl);
-        }
+        final List<String> productImages = product.getAllImages();
 
         Navigator.push(
           context,

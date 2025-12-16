@@ -529,16 +529,11 @@ class _VendeurDetailScreenState extends State<VendeurDetailScreen> {
   }
 
   Widget _buildProductCard(Product product) {
-    final imageUrl = product.media?.mediaUrl ??
-        'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&h=400&fit=crop';
+    final imageUrl = product.getMainImage();
+    final productImages = product.getAllImages();
 
     return GestureDetector(
       onTap: () {
-        final List<String> productImages = [];
-        if (product.media != null && product.media!.mediaUrl.isNotEmpty) {
-          productImages.add(product.media!.mediaUrl);
-        }
-
         Navigator.push(
           context,
           MaterialPageRoute(

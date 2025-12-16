@@ -204,15 +204,13 @@ class _ProductCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final imageUrl = product.media?.mediaUrl ?? 
-        'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&h=400&fit=crop';
+    final imageUrl = product.getMainImage();
+    final productImages = product.getAllImages();
     final categoryName = product.category?.name ?? '';
     final vendeurId = product.vendeurId.toString();
 
     return GestureDetector(
       onTap: () {
-        // Passer l'image principale dans productImages
-        // La logique dans ProductDetailScreen complétera avec l'image principale si nécessaire
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -226,7 +224,8 @@ class _ProductCard extends StatelessWidget {
               name: product.name,
               price: product.price,
               imagePath: imageUrl,
-              productImages: [imageUrl], // Image principale, sera complétée automatiquement
+              productImages: productImages.isNotEmpty ? productImages : null,
+              product: product, // Passer le produit complet avec toutes les infos
             ),
           ),
         );

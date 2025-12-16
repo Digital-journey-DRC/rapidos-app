@@ -63,8 +63,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     _checkIfInCart();
     context.read<MerchantCubit>().fetchMerchants(context);
     _checkIfFavorite();
-    // Initialiser l'image principale avec l'image par défaut
-    _currentMainImage = widget.imagePath;
+    // Initialiser l'image principale : utiliser getMainImage() si product est disponible, sinon widget.imagePath
+    _currentMainImage = widget.product?.getMainImage() ?? widget.imagePath;
   }
 
   /// Vérifie si l'utilisateur est autorisé à effectuer des actions
@@ -84,13 +84,15 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
   /// Redirige vers le login si l'utilisateur n'est pas autorisé
   void _checkAuthorizationAndRedirect() {
-    if (!_isAuthorizedUser() || !mounted) {
+    if (!mounted) {
       return;
     }
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (_) => const LoginScreen()),
-      (route) => false,
-    );
+    if (!_isAuthorizedUser()) {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+        (route) => false,
+      );
+    }
   }
 
   void _checkIfInCart() async {
@@ -120,26 +122,32 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
   /// Retourne toutes les images disponibles (principale + secondaires)
   List<String> _getAllImages() {
-    final List<String> images = [];
-    
-    // Ajouter l'image principale en premier
-    images.add(widget.imagePath);
-    
-    // Si productImages est fourni, ajouter les images secondaires
-    if (widget.productImages != null && widget.productImages!.isNotEmpty) {
-      for (var image in widget.productImages!) {
-        if (image != widget.imagePath && !images.contains(image)) {
-          images.add(image);
-        }
+    // Priorité 1: Utiliser getAllImages() du produit complet si disponible
+    if (widget.product != null) {
+      final productImages = widget.product!.getAllImages();
+      print('🖼️ ProductDetailScreen._getAllImages - Produit complet disponible, images: ${productImages.length}');
+      print('🖼️ ProductDetailScreen._getAllImages - Liste: $productImages');
+      if (productImages.isNotEmpty) {
+        // Retourner toutes les images telles quelles, sans compléter
+        return productImages;
       }
     }
     
-    // Si on a moins de 4 images au total, compléter avec l'image principale
-    while (images.length < 4) {
-      images.add(widget.imagePath);
+    // Priorité 2: Utiliser productImages si fourni
+    if (widget.productImages != null && widget.productImages!.isNotEmpty) {
+      print('🖼️ ProductDetailScreen._getAllImages - productImages fourni: ${widget.productImages!.length}');
+      print('🖼️ ProductDetailScreen._getAllImages - Liste: ${widget.productImages}');
+      final List<String> images = List<String>.from(widget.productImages!);
+      // Ajouter l'image principale si elle n'est pas déjà dans la liste
+      if (!images.contains(widget.imagePath)) {
+        images.insert(0, widget.imagePath);
+      }
+      return images;
     }
     
-    return images;
+    // Priorité 3: Utiliser uniquement l'image principale
+    print('🖼️ ProductDetailScreen._getAllImages - Utilisation de l\'image principale uniquement: ${widget.imagePath}');
+    return [widget.imagePath];
   }
 
   /// Change l'image principale lorsqu'on clique ou scroll sur une image secondaire
@@ -158,15 +166,30 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   Map<String, dynamic>? _getMerchantInfo() {
     // Construire le nom du vendeur directement à partir de firstName et lastName de la clé vendeur
     String fallbackVendeurName = 'Inconnu';
-    final firstName = widget.product?.vendeur?.firstName ?? widget.vendeur?.firstName ?? '';
-    final lastName = widget.product?.vendeur?.lastName ?? widget.vendeur?.lastName ?? '';
-    final name = '$firstName $lastName'.trim();
-    if (name.isNotEmpty) {
-      fallbackVendeurName = name;
+    
+    // Priorité 1: Utiliser le vendeur depuis widget.product (format commun)
+    if (widget.product?.vendeur != null) {
+      final vendeur = widget.product!.vendeur!;
+      final firstName = vendeur.firstName.trim();
+      final lastName = vendeur.lastName.trim();
+      final name = '$firstName $lastName'.trim();
+      if (name.isNotEmpty) {
+        fallbackVendeurName = name;
+      }
     }
+    // Priorité 2: Utiliser widget.vendeur directement
+    else if (widget.vendeur != null) {
+      final firstName = widget.vendeur!.firstName.trim();
+      final lastName = widget.vendeur!.lastName.trim();
+      final name = '$firstName $lastName'.trim();
+      if (name.isNotEmpty) {
+        fallbackVendeurName = name;
+      }
+    }
+    
     final fallbackVendeurId = widget.product?.vendeurId ??
-        (int.tryParse(widget.idVendeur)) ??
         widget.product?.vendeur?.id ??
+        (int.tryParse(widget.idVendeur)) ??
         widget.vendeur?.id;
 
     final staticMerchantData = {
@@ -279,9 +302,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   void _addToCart() async {
-    // Vérifier l'autorisation et rediriger si nécessaire (même logique que new_home.dart)
-    _checkAuthorizationAndRedirect();
+    // Vérifier l'autorisation avant d'ajouter au panier
     if (!_isAuthorizedUser() || !mounted) {
+      _checkAuthorizationAndRedirect();
       return;
     }
 
@@ -795,11 +818,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         final vendeurId = widget.product?.vendeurId ?? 
                                          (widget.idVendeur.isNotEmpty ? int.tryParse(widget.idVendeur) : null);
                         
-                        // Prioriser les informations du vendeur depuis le produit
-                        if (widget.vendeur != null && vendeurId != null) {
-                          return _buildVendeurCard(widget.vendeur!, vendeurId);
-                        } else if (widget.product?.vendeur != null && vendeurId != null) {
+                        // Prioriser les informations du vendeur depuis le produit (format commun)
+                        if (widget.product?.vendeur != null && vendeurId != null) {
                           return _buildVendeurCard(widget.product!.vendeur!, vendeurId);
+                        } else if (widget.vendeur != null && vendeurId != null) {
+                          return _buildVendeurCard(widget.vendeur!, vendeurId);
                         }
                         // Fallback vers l'ancienne méthode
                         final merchantInfo = _getMerchantInfo();
@@ -1139,8 +1162,15 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
   /// Widget pour afficher la carte du vendeur cliquable (version dynamique)
   Widget _buildVendeurCard(Vendeur vendeur, int vendeurId) {
-    // Afficher toujours firstName + lastName du vendeur
-    final vendeurName = '${vendeur.firstName} ${vendeur.lastName}'.trim();
+    // Afficher toujours firstName + lastName du vendeur (format commun)
+    final firstName = vendeur.firstName.trim();
+    final lastName = vendeur.lastName.trim();
+    final vendeurName = '$firstName $lastName'.trim();
+    
+    // Si le nom est vide, utiliser un fallback
+    final displayName = vendeurName.isNotEmpty 
+        ? vendeurName 
+        : (vendeur.email.isNotEmpty ? vendeur.email : 'Vendeur');
     // Utiliser l'id du vendeur provenant de l'objet, sinon le paramètre fourni
     final targetVendeurId = vendeur.id != 0 ? vendeur.id : vendeurId;
     // Utiliser l'image de la boutique (media) au lieu de l'image du profil
@@ -1232,7 +1262,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     children: [
                       Flexible(
                         child: Text(
-                          vendeurName,
+                          displayName,
                           style: const TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 16,

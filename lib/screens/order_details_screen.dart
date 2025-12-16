@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:immo/cubit/auth_cubit.dart';
+import 'package:immo/services/invoice_service.dart';
 
 class OrderDetailsScreen extends StatelessWidget {
   final Map<String, dynamic> orderData;
@@ -65,6 +66,59 @@ class OrderDetailsScreen extends StatelessWidget {
       await launchUrl(launchUri);
     } else {
       throw 'Could not launch $launchUri';
+    }
+  }
+
+  Future<void> _generateInvoice(BuildContext context, dynamic authState) async {
+    if (authState is! AuthSuccess || authState.user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Impossible de générer la facture. Utilisateur non connecté.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    final user = authState.user!;
+    
+    // Informations du marchand
+    final merchantInfo = {
+      'firstName': user['firstName'] ?? '',
+      'lastName': user['lastName'] ?? '',
+      'name': '${user['firstName'] ?? ''} ${user['lastName'] ?? ''}'.trim(),
+      'phone': user['phone'] ?? '',
+      'email': user['email'] ?? '',
+    };
+
+    // Informations du client
+    final clientInfo = {
+      'name': orderData['client']?.toString() ?? 'Client',
+      'phone': orderData['phone']?.toString() ?? '',
+      'address': orderData['adresse']?.toString() ?? 'Adresse non spécifiée',
+    };
+
+    // Afficher un indicateur de chargement
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(),
+      ),
+    );
+
+    try {
+      await InvoiceService.generateInvoice(
+        context: context,
+        orderData: orderData,
+        orderId: orderId,
+        merchantInfo: merchantInfo,
+        clientInfo: clientInfo,
+      );
+    } finally {
+      if (context.mounted) {
+        Navigator.of(context).pop(); // Fermer le dialog de chargement
+      }
     }
   }
 
@@ -290,7 +344,7 @@ class OrderDetailsScreen extends StatelessWidget {
                             ),
                           ),
                           Text(
-                            '${total ?? 0} FC',
+                            '$total FC',
                             style: const TextStyle(
                               fontWeight: FontWeight.bold,
                               color: AppColors.primary,
@@ -308,6 +362,19 @@ class OrderDetailsScreen extends StatelessWidget {
           ],
         ),
       ),
+      // Bouton flottant pour générer la facture PDF (uniquement pour les marchands)
+      floatingActionButton: userRole == 'vendeur'
+          ? FloatingActionButton.extended(
+              onPressed: () => _generateInvoice(context, authState),
+              backgroundColor: AppColors.primary,
+              icon: const Icon(Icons.picture_as_pdf, color: Colors.white),
+              label: const Text(
+                'Générer la facture',
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              ),
+              tooltip: 'Générer la facture PDF',
+            )
+          : null,
     );
   }
 } 

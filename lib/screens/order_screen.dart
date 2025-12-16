@@ -576,10 +576,7 @@ class _OrderScreenState extends State<OrderScreen> {
             )
           else if (authState.user!['role'] == 'vendeur')
             Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
-                child: _buildVendeurOrders(),
-              ),
+              child: _buildVendeurOrders(),
             )
           else
             Expanded(
@@ -1674,11 +1671,9 @@ class _OrderScreenState extends State<OrderScreen> {
         });
 
         return ListView.separated(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+          padding: const EdgeInsets.all(16),
           separatorBuilder: (_, __) => const SizedBox(height: 8),
           itemCount: filteredDocs.length,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
           itemBuilder: (context, index) {
             try {
               final doc = filteredDocs[index];

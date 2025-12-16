@@ -57,8 +57,8 @@ dependencies:
   http_parser: ^4.1.2
   flutter_expandable_fab: ^2.3.0
   shared_preferences: ^2.2.2
-  # pdf: ^3.10.4
-  # printing: ^5.11.0
+  pdf: ^3.10.4
+  printing: ^5.11.0
   share_plus: ^10.1.4
   app_links: ^6.4.0
   url_launcher: ^6.2.5

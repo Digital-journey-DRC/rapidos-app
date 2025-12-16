@@ -165,7 +165,7 @@ class _VoirPlusProduitsScreenState extends State<VoirPlusProduitsScreen> {
                           stock: product.stock.toString(),
                           price: product.price.toString(),
                           isPromo: false,
-                          imageUrl: product.media?.mediaUrl ?? 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&h=400&fit=crop',
+                          imageUrl: product.getMainImage(),
                           productId: product.id,
                         );
                       },

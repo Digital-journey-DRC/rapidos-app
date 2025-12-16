@@ -126,10 +126,28 @@ class Promotion {
   }
 
   /// Retourne toutes les images (principale + secondaires)
+  /// Si les images secondaires sont vides, l'image principale prend leur place
   List<String> getAllImages() {
-    final allImages = <String>[image];
-    allImages.addAll(images);
-    return allImages.where((img) => img.isNotEmpty).toList();
+    final mainImage = image.isNotEmpty ? image : '';
+    if (mainImage.isEmpty) {
+      return [];
+    }
+    
+    final allImages = <String>[mainImage];
+    
+    // Si des images secondaires existent, les ajouter
+    if (images.isNotEmpty) {
+      for (var img in images) {
+        if (img.isNotEmpty) {
+          allImages.add(img);
+        } else {
+          // Si une image secondaire est vide, utiliser l'image principale
+          allImages.add(mainImage);
+        }
+      }
+    }
+    
+    return allImages;
   }
 
   /// Vérifie si la promotion est encore active

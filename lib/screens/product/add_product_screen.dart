@@ -199,7 +199,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
         'Authorization': 'Bearer $token',
       });
 
-      // Fields
+      // Fields (Form-Data)
       request.fields.addAll({
         'name': _nameController.text,
         'description': _descriptionController.text,
@@ -208,24 +208,39 @@ class _AddProductScreenState extends State<AddProductScreen> {
         'category': _selectedCategory!,
       });
 
-      // Image principale
+      // Print des données à envoyer
+      print('📦 ========== CRÉATION DE PRODUIT ==========');
+      print('📦 Fields (Form-Data):');
+      print('  - name: ${_nameController.text}');
+      print('  - description: ${_descriptionController.text}');
+      print('  - price: ${_priceController.text}');
+      print('  - stock: ${_stockController.text}');
+      print('  - category: ${_selectedCategory!}');
+      print('📦 Files (Form-Data):');
+      print('  - image: [fichier] ${_mainImage!.path.split('/').last}');
+
+      // Image principale (obligatoire)
       request.files.add(
         await http.MultipartFile.fromPath(
-          'medias',
+          'image',
           _mainImage!.path,
         ),
       );
 
-      // Images secondaires (si disponibles)
-      for (var i = 0; i < _secondaryImages.length; i++) {
+      // Images secondaires (optionnelles, max 4)
+      // Format: image1, image2, image3, image4
+      for (var i = 0; i < _secondaryImages.length && i < 4; i++) {
         if (!mounted) break; // Vérifier mounted à chaque itération
+        final imageFieldName = 'image${i + 1}'; // image1, image2, image3, image4
+        print('  - $imageFieldName: [fichier] ${_secondaryImages[i].path.split('/').last}');
         request.files.add(
           await http.MultipartFile.fromPath(
-            'medias',
+            imageFieldName,
             _secondaryImages[i].path,
           ),
         );
       }
+      print('📦 ===========================================');
 
       if (!mounted) return;
       

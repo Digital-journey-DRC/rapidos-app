@@ -47,7 +47,7 @@ class _EditProductScreenState extends State<EditProductScreen> {
     _priceController.text = widget.product.price.toStringAsFixed(2);
     _stockController.text = widget.product.stock.toString();
     _selectedCategory = widget.product.category?.name;
-    _mainImageUrl = widget.product.media?.mediaUrl;
+    _mainImageUrl = widget.product.getMainImage();
     
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {

@@ -589,11 +589,10 @@ class PromoProductsSection extends StatelessWidget {
 
     final discount = promotion.discountPercentage.round();
     final dateFormat = DateFormat('dd/MM/yyyy');
+    // Priorité: image de la promotion, sinon getMainImage() du produit
     final imageUrl = promotion.image.isNotEmpty 
         ? promotion.image 
-        : (product.media != null && product.media!.mediaUrl.isNotEmpty
-            ? product.media!.mediaUrl
-            : 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&h=400&fit=crop');
+        : product.getMainImage();
 
     return GestureDetector(
       onTap: () {

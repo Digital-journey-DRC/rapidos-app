@@ -266,6 +266,11 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> with Sing
 
   @override
   Widget build(BuildContext context) {
+    // Ensure imagePath is not null or empty
+    final safeImagePath = widget.imagePath.isNotEmpty 
+        ? widget.imagePath 
+        : 'https://www.shutterstock.com/image-vector/vector-flat-illustration-grayscale-avatar-600nw-2281862025.jpg';
+    
     return Scaffold(
       body: CustomScrollView(
         slivers: [
@@ -290,7 +295,7 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> with Sing
                     },
                     blendMode: BlendMode.dstIn,
                     child: Image.network(
-                      widget.imagePath,
+                      safeImagePath,
                       fit: BoxFit.cover,
                       errorBuilder: (context, error, stackTrace) {
                         return Container(
@@ -353,11 +358,11 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> with Sing
                         child: CircleAvatar(
                           radius: 32,
                           backgroundColor: Colors.grey.shade100,
-                          backgroundImage: NetworkImage(widget.imagePath),
+                          backgroundImage: NetworkImage(safeImagePath),
                           onBackgroundImageError: (_, __) {},
                           child: ClipOval(
                             child: Image.network(
-                              widget.imagePath,
+                              safeImagePath,
                               width: 64,
                               height: 64,
                               fit: BoxFit.cover,
@@ -708,6 +713,21 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> with Sing
       itemCount: products.length,
       itemBuilder: (context, index) {
         final product = products[index];
+        // Safe access to image: nouveau format (image) ou ancien format (media.mediaUrl)
+        String imagePath = 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&h=400&fit=crop';
+        
+        // Priorité 1: Nouveau format avec 'image' (string)
+        if (product['image'] != null && product['image'].toString().isNotEmpty) {
+          imagePath = product['image'].toString();
+        }
+        // Priorité 2: Ancien format avec 'media.mediaUrl'
+        else if (product['media'] != null && product['media'] is Map) {
+          final media = product['media'] as Map<String, dynamic>;
+          if (media['mediaUrl'] != null && media['mediaUrl'].toString().isNotEmpty) {
+            imagePath = media['mediaUrl'].toString();
+          }
+        }
+        
         return _buildProductItem(
           idVendeur: product['vendeurId']?.toString() ?? '',
           description: product['description']?.toString() ?? '',
@@ -715,9 +735,7 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> with Sing
           id: int.tryParse(product['id']?.toString() ?? index.toString()) ?? index,
           name: product['name']?.toString() ?? '',
           price: product['price'] != null ? double.tryParse(product['price'].toString()) ?? 0.0 : 0.0,
-          imagePath: product['media'] != null && product['media']['mediaUrl'] != null
-              ? product['media']['mediaUrl']
-              : 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&h=400&fit=crop',
+          imagePath: imagePath,
           tag: 'Produit',
           category: product['description']?.toString() ?? '',
         );

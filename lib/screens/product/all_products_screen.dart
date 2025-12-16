@@ -90,11 +90,9 @@ class _TwitterStyleProductCard extends StatelessWidget {
               category: product.category?.name ?? '',
               name: product.name,
               price: product.price,
-              imagePath: product.media?.mediaUrl != null
-                                    ? product.media!.mediaUrl
-                                    : 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&h=400&fit=crop',
+              imagePath: product.getMainImage(),
               product: product, // Passage du produit complet avec vendeur
-              productImages: [], // Liste vide, images principales déjà fournies
+              productImages: product.getAllImages(), // Toutes les images (principale + secondaires)
               goToCartTab: () {
                 Navigator.of(context).popUntil((route) => route.isFirst);
               },
@@ -115,9 +113,7 @@ class _TwitterStyleProductCard extends StatelessWidget {
                 topRight: Radius.circular(16),
               ),
               child: Image.network(
-                product.media?.mediaUrl != null
-                                  ? product.media!.mediaUrl
-                                  : 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&h=400&fit=crop',
+                product.getMainImage(),
                 width: double.infinity,
                 height: 100,
                 fit: BoxFit.cover,

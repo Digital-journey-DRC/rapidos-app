@@ -49,7 +49,7 @@ class _CreatePromotionScreenState extends State<CreatePromotionScreen> {
       _productIdController.text = widget.product!.id.toString();
       _ancienPrixController.text = widget.product!.price.toStringAsFixed(2);
       // Pré-remplir l'image principale du produit
-      _mainImageUrl = widget.product!.media?.mediaUrl;
+      _mainImageUrl = widget.product!.getMainImage();
       // Pré-remplir les 4 images supplémentaires avec l'image principale
       _prefillSecondaryImages();
     }
@@ -57,7 +57,7 @@ class _CreatePromotionScreenState extends State<CreatePromotionScreen> {
 
   /// Pré-remplit les 4 images supplémentaires avec l'image principale si elles sont vides
   void _prefillSecondaryImages() {
-    final mainImageUrl = _mainImageUrl ?? _selectedProduct?.media?.mediaUrl;
+    final mainImageUrl = _mainImageUrl ?? _selectedProduct?.getMainImage();
     if (mainImageUrl != null && mainImageUrl.isNotEmpty) {
       setState(() {
         // Pré-remplir avec l'image principale jusqu'à 4 images seulement si aucune image n'est sélectionnée
@@ -435,7 +435,7 @@ class _CreatePromotionScreenState extends State<CreatePromotionScreen> {
                   isExpanded: true,
                   menuMaxHeight: 400,
                   items: _products.map((product) {
-                    final imageUrl = product.media?.mediaUrl ?? '';
+                    final imageUrl = product.getMainImage();
                     return DropdownMenuItem(
                       value: product,
                       child: Container(
@@ -503,7 +503,7 @@ class _CreatePromotionScreenState extends State<CreatePromotionScreen> {
                       _productIdController.text = product?.id.toString() ?? '';
                       _ancienPrixController.text = product?.price.toStringAsFixed(2) ?? '';
                       // Pré-remplir l'image principale du produit
-                      _mainImageUrl = product?.media?.mediaUrl;
+                      _mainImageUrl = product?.getMainImage();
                       // Réinitialiser les images secondaires
                       _selectedImages = [];
                       // Pré-remplir les 4 images supplémentaires avec l'image principale
@@ -532,7 +532,7 @@ class _CreatePromotionScreenState extends State<CreatePromotionScreen> {
                       ClipRRect(
                         borderRadius: BorderRadius.circular(6),
                         child: Image.network(
-                          widget.product!.media?.mediaUrl ?? '',
+                          widget.product!.getMainImage(),
                           width: 40,
                           height: 40,
                           fit: BoxFit.cover,

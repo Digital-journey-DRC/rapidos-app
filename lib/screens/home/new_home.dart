@@ -24,6 +24,7 @@ import 'dart:convert';
 import 'package:immo/screens/auth/login_screen.dart';
 import 'dart:math' as math;
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:immo/models/product.dart';
 
 class NewHomeScreen extends StatefulWidget {
   const NewHomeScreen({Key? key}) : super(key: key);
@@ -863,9 +864,8 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                                       category: product.category?.name ?? '',
                                       name: product.name,
                                       price: product.price,
-                                      imagePath: product.media?.mediaUrl != null
-                                          ? product.media!.mediaUrl
-                                          : 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&h=400&fit=crop',
+                                      imagePath: product.getMainImage(),
+                                      product: product, // Passer le produit complet pour le print
                                     );
                                   },
                                 ),
@@ -956,6 +956,54 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                                         '${vendeur['firstName']} ${vendeur['lastName']}';
                                     return GestureDetector(
                                       onTap: () {
+                                        // Print des données du marchand
+                                        print('🏪 ========== DONNÉES DU MARCHAND CLIQUE ==========');
+                                        print('🏪 Marchand (vendeur):');
+                                        print('  - id: ${vendeur['id']}');
+                                        print('  - firstName: ${vendeur['firstName']}');
+                                        print('  - lastName: ${vendeur['lastName']}');
+                                        print('  - email: ${vendeur['email']}');
+                                        print('  - phone: ${vendeur['phone']}');
+                                        print('  - role: ${vendeur['role']}');
+                                        print('  - userStatus: ${vendeur['userStatus']}');
+                                        
+                                        if (vendeur['profil'] != null) {
+                                          print('  - profil:');
+                                          print('    * id: ${vendeur['profil']['id']}');
+                                          if (vendeur['profil']['media'] != null) {
+                                            print('    * media:');
+                                            print('      - id: ${vendeur['profil']['media']['id']}');
+                                            print('      - mediaUrl: ${vendeur['profil']['media']['mediaUrl']}');
+                                            print('      - mediaType: ${vendeur['profil']['media']['mediaType']}');
+                                          }
+                                        }
+                                        
+                                        if (media != null) {
+                                          print('  - media (boutique):');
+                                          print('    * id: ${media['id']}');
+                                          print('    * mediaUrl: ${media['mediaUrl']}');
+                                          print('    * mediaType: ${media['mediaType']}');
+                                        }
+                                        
+                                        print('🏪 Produits du marchand: ${products.length}');
+                                        for (var i = 0; i < products.length && i < 3; i++) {
+                                          final product = products[i];
+                                          print('  - Produit ${i + 1}:');
+                                          print('    * id: ${product['id']}');
+                                          print('    * name: ${product['name']}');
+                                          print('    * price: ${product['price']}');
+                                        }
+                                        if (products.length > 3) {
+                                          print('  - ... et ${products.length - 3} autres produits');
+                                        }
+                                        
+                                        print('🏪 Données affichées:');
+                                        print('  - name: $name');
+                                        print('  - image: $image');
+                                        print('  - rating: 4.5');
+                                        print('  - isVerified: true');
+                                        print('🏪 ===========================================');
+                                        
                                         // Permettre l'accès aux profils de marchands sans connexion
                                         Navigator.push(
                                           context,
@@ -1251,11 +1299,78 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
     required String name,
     required double price,
     required String imagePath,
+    Product? product, // Produit complet optionnel pour le print
   }) {
     return Builder(
       builder: (context) {
         return GestureDetector(
           onTap: () {
+            // Print des données du produit
+            print('📦 ========== DONNÉES DU PRODUIT CLIQUE ==========');
+            if (product != null) {
+              print('📦 Produit complet:');
+              print('  - id: ${product.id}');
+              print('  - name: ${product.name}');
+              print('  - description: ${product.description}');
+              print('  - price: ${product.price}');
+              print('  - stock: ${product.stock}');
+              print('  - vendeurId: ${product.vendeurId}');
+              print('  - categorieId: ${product.categorieId}');
+              print('  - createdAt: ${product.createdAt}');
+              print('  - updatedAt: ${product.updatedAt}');
+              
+              if (product.category != null) {
+                print('  - category:');
+                print('    * id: ${product.category!.id}');
+                print('    * name: ${product.category!.name}');
+                print('    * description: ${product.category!.description}');
+              }
+              
+              if (product.media != null) {
+                print('  - media:');
+                print('    * id: ${product.media!.id}');
+                print('    * mediaUrl: ${product.media!.mediaUrl}');
+                print('    * mediaType: ${product.media!.mediaType}');
+                print('    * productId: ${product.media!.productId}');
+              }
+              
+              if (product.vendeur != null) {
+                print('  - vendeur:');
+                print('    * id: ${product.vendeur!.id}');
+                print('    * firstName: ${product.vendeur!.firstName}');
+                print('    * lastName: ${product.vendeur!.lastName}');
+                print('    * email: ${product.vendeur!.email}');
+                print('    * phone: ${product.vendeur!.phone}');
+                print('    * role: ${product.vendeur!.role}');
+                print('    * userStatus: ${product.vendeur!.userStatus}');
+                
+                if (product.vendeur!.profil != null) {
+                  print('    * profil:');
+                  print('      - id: ${product.vendeur!.profil!.id}');
+                  if (product.vendeur!.profil!.media != null) {
+                    print('      - media:');
+                    print('        * id: ${product.vendeur!.profil!.media!.id}');
+                    print('        * mediaUrl: ${product.vendeur!.profil!.media!.mediaUrl}');
+                    print('        * mediaType: ${product.vendeur!.profil!.media!.mediaType}');
+                  }
+                }
+              } else {
+                print('  - vendeur: null');
+              }
+            } else {
+              print('📦 Données partielles (produit complet non disponible):');
+              print('  - id: $id');
+              print('  - name: $name');
+              print('  - description: $description');
+              print('  - price: $price');
+              print('  - stock: $stock');
+              print('  - idVendeur: $idVendeur');
+              print('  - category: $category');
+              print('  - tag: $tag');
+              print('  - imagePath: $imagePath');
+            }
+            print('📦 ===========================================');
+            
             // Permettre de voir les détails du produit sans être connecté
             Navigator.push(
               context,
@@ -1270,6 +1385,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                   name: name,
                   price: price,
                   imagePath: imagePath,
+                  product: product, // Passer le produit complet si disponible
                 ),
               ),
             );
@@ -1346,9 +1462,9 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                       right: 8,
                       child: GestureDetector(
                         onTap: () async {
-                          // Vérifier la connexion uniquement pour l'ajout au panier
-                          if (!_isUserLoggedIn()) {
-                            _checkLoginAndRedirect();
+                          // Vérifier l'autorisation avant d'ajouter au panier (même logique que product_detail_screen)
+                          if (!_isAuthorizedUser() || !mounted) {
+                            _checkAuthorizationAndRedirect();
                             return;
                           }
 
@@ -1460,6 +1576,31 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
     return Builder(
       builder: (context) => GestureDetector(
         onTap: () {
+          // Print des données du marchand
+          print('🏪 ========== DONNÉES DU MARCHAND CLIQUE ==========');
+          print('🏪 Données du marchand:');
+          print('  - id: $id');
+          print('  - name: $name');
+          print('  - rating: $rating');
+          print('  - category: $category');
+          print('  - imagePath: $imagePath');
+          print('  - isVerified: $isVerified');
+          print('🏪 Produits du marchand: ${products.length}');
+          for (var i = 0; i < products.length && i < 3; i++) {
+            final product = products[i];
+            print('  - Produit ${i + 1}:');
+            print('    * id: ${product['id']}');
+            print('    * name: ${product['name']}');
+            print('    * price: ${product['price']}');
+            if (product['description'] != null) {
+              print('    * description: ${product['description']}');
+            }
+          }
+          if (products.length > 3) {
+            print('  - ... et ${products.length - 3} autres produits');
+          }
+          print('🏪 ===========================================');
+          
           // Permettre l'accès aux profils de marchands sans connexion
           Navigator.push(
             context,

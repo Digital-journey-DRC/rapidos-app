@@ -17,6 +17,8 @@ class DetailProduitMarchantScreen extends StatefulWidget {
   final String productBadge;
   final String productImageUrl;
   final bool isPromo;
+  final Product? product; // Produit complet avec toutes les infos (images, etc.)
+  final List<String>? productImages; // Images supplémentaires
 
   const DetailProduitMarchantScreen({
     Key? key,
@@ -27,6 +29,8 @@ class DetailProduitMarchantScreen extends StatefulWidget {
     required this.productBadge,
     required this.productImageUrl,
     required this.isPromo,
+    this.product,
+    this.productImages,
   }) : super(key: key);
 
   @override
@@ -43,11 +47,23 @@ class _DetailProduitMarchantScreenState extends State<DetailProduitMarchantScree
   @override
   void initState() {
     super.initState();
-    // Initialiser l'image principale
-    _currentMainImage = _getImageUrl(widget.productImageUrl);
     
-    // Récupérer le produit complet depuis ProductCubit
-    _loadProduct();
+    // Utiliser le produit passé en paramètre s'il est disponible
+    if (widget.product != null) {
+      _product = widget.product;
+      final allImages = _getAllImages();
+      if (allImages.isNotEmpty) {
+        _currentMainImage = _getImageUrl(allImages[0]);
+      } else {
+        _currentMainImage = _getImageUrl(widget.productImageUrl);
+      }
+    } else {
+      // Initialiser l'image principale
+      _currentMainImage = _getImageUrl(widget.productImageUrl);
+      
+      // Récupérer le produit complet depuis ProductCubit
+      _loadProduct();
+    }
   }
 
   void _loadProduct() {
@@ -137,22 +153,33 @@ class _DetailProduitMarchantScreenState extends State<DetailProduitMarchantScree
   }
 
   /// Retourne toutes les images disponibles (principale + secondaires)
-  /// Si les images supplémentaires n'existent pas, utilise l'image principale
+  /// Priorité: product.getAllImages() > productImages > productImageUrl
   List<String> _getAllImages() {
-    final List<String> images = [];
-    final mainImage = _getImageUrl(widget.productImageUrl);
-    
-    // Ajouter l'image principale en premier
-    images.add(mainImage);
-    
-    // Pour l'instant, on n'a qu'une seule image, donc on complète avec l'image principale
-    // Si des images supplémentaires existent dans le futur, elles seront ajoutées ici
-    // Pour l'instant, on crée 3 miniatures supplémentaires avec l'image principale
-    while (images.length < 4) {
-      images.add(mainImage);
+    // Priorité 1: Utiliser getAllImages() du produit complet si disponible
+    if (_product != null) {
+      final productImages = _product!.getAllImages();
+      if (productImages.isNotEmpty) {
+        print('🖼️ DetailProduitMarchantScreen._getAllImages - Produit complet disponible, images: ${productImages.length}');
+        return productImages;
+      }
     }
     
-    return images;
+    // Priorité 2: Utiliser productImages si fourni
+    if (widget.productImages != null && widget.productImages!.isNotEmpty) {
+      print('🖼️ DetailProduitMarchantScreen._getAllImages - productImages fourni: ${widget.productImages!.length}');
+      final List<String> images = List<String>.from(widget.productImages!);
+      // Ajouter l'image principale si elle n'est pas déjà dans la liste
+      final mainImage = _getImageUrl(widget.productImageUrl);
+      if (!images.contains(mainImage)) {
+        images.insert(0, mainImage);
+      }
+      return images;
+    }
+    
+    // Priorité 3: Utiliser uniquement l'image principale
+    print('🖼️ DetailProduitMarchantScreen._getAllImages - Utilisation de l\'image principale uniquement');
+    final mainImage = _getImageUrl(widget.productImageUrl);
+    return [mainImage];
   }
 
   void _changeMainImage(int index) {

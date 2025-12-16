@@ -42,10 +42,16 @@ class FavorisScreen extends StatelessWidget {
               itemCount: favoris.length,
               itemBuilder: (context, index) {
                 final product = favoris[index];
-                final hasImage = product['media'] != null && product['media']['mediaUrl'] != null && product['media']['mediaUrl'].toString().isNotEmpty;
-                final imageUrl = hasImage
-                  ? product['media']['mediaUrl']
-                  : 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=200&h=200&fit=crop';
+                // Gérer le nouveau format (image) et l'ancien format (media.mediaUrl)
+                String imageUrl = 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=200&h=200&fit=crop';
+                if (product['image'] != null && product['image'].toString().isNotEmpty) {
+                  imageUrl = product['image'].toString();
+                } else if (product['media'] != null && product['media'] is Map) {
+                  final media = product['media'] as Map<String, dynamic>;
+                  if (media['mediaUrl'] != null && media['mediaUrl'].toString().isNotEmpty) {
+                    imageUrl = media['mediaUrl'].toString();
+                  }
+                }
                 return InkWell(
                   borderRadius: BorderRadius.circular(12),
                   onTap: () {
