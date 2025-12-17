@@ -230,13 +230,14 @@ class PromotionService {
   
   /// Crée une nouvelle promotion avec multipart/form-data
   /// 
-  /// [productId] : ID du produit à mettre en promotion
-  /// [image] : Fichier de l'image principale (requis)
+  /// [productId] : ID du produit à mettre en promotion (obligatoire)
+  /// [image] : Fichier de l'image principale (obligatoire)
   /// [image1-4] : Fichiers des images supplémentaires (optionnel)
-  /// [libelle] : Libellé de la promotion
-  /// [delaiPromotion] : Date de fin de la promotion (ISO 8601)
-  /// [nouveauPrix] : Nouveau prix en promotion
-  /// [ancienPrix] : Ancien prix avant promotion
+  /// [libelle] : Libellé de la promotion (obligatoire)
+  /// [delaiPromotion] : Date de fin de la promotion (obligatoire, ISO 8601)
+  /// [dateDebutPromotion] : Date de début de la promotion (optionnel, ISO 8601)
+  /// [nouveauPrix] : Nouveau prix en promotion (obligatoire)
+  /// [ancienPrix] : Ancien prix avant promotion (obligatoire)
   /// [likes] : Nombre de likes (optionnel, défaut: 0)
   Future<Map<String, dynamic>> createPromotion({
     required int productId,
@@ -247,6 +248,7 @@ class PromotionService {
     File? image4,
     required String libelle,
     required DateTime delaiPromotion,
+    DateTime? dateDebutPromotion,
     required double nouveauPrix,
     required double ancienPrix,
     int likes = 0,
@@ -278,6 +280,11 @@ class PromotionService {
         'ancienPrix': ancienPrix.toString(),
         'likes': likes.toString(),
       });
+
+      // Ajouter la date de début si fournie (optionnel)
+      if (dateDebutPromotion != null) {
+        request.fields['dateDebutPromotion'] = dateDebutPromotion.toUtc().toIso8601String();
+      }
 
       // Ajouter l'image principale (requis)
       request.files.add(
@@ -350,6 +357,7 @@ class PromotionService {
   /// [promotionId] : ID de la promotion à mettre à jour
   /// [libelle] : Nouveau libellé (optionnel)
   /// [delaiPromotion] : Nouvelle date de fin (optionnel)
+  /// [dateDebutPromotion] : Nouvelle date de début (optionnel)
   /// [nouveauPrix] : Nouveau prix en promotion (optionnel)
   /// [ancienPrix] : Ancien prix avant promotion (optionnel)
   /// [likes] : Nombre de likes (optionnel)
@@ -360,6 +368,7 @@ class PromotionService {
     required int promotionId,
     String? libelle,
     DateTime? delaiPromotion,
+    DateTime? dateDebutPromotion,
     double? nouveauPrix,
     double? ancienPrix,
     int? likes,
@@ -397,6 +406,9 @@ class PromotionService {
       }
       if (delaiPromotion != null) {
         request.fields['delaiPromotion'] = delaiPromotion.toUtc().toIso8601String();
+      }
+      if (dateDebutPromotion != null) {
+        request.fields['dateDebutPromotion'] = dateDebutPromotion.toUtc().toIso8601String();
       }
       if (nouveauPrix != null) {
         request.fields['nouveauPrix'] = nouveauPrix.toString();

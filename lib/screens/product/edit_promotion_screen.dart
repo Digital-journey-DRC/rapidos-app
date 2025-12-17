@@ -25,10 +25,9 @@ class _EditPromotionScreenState extends State<EditPromotionScreen> {
   final _nouveauPrixController = TextEditingController();
   final _ancienPrixController = TextEditingController();
   
-  DateTime? _delaiPromotion;
-  List<String> _existingSecondaryImages = []; // URLs des images existantes
-  List<bool> _deleteSecondaryImages = []; // Indique si on doit supprimer chaque image
-  List<File> _newSecondaryImages = []; // Nouvelles images à uploader
+  DateTime? _delaiPromotion; // Date de fin (obligatoire)
+  DateTime? _dateDebutPromotion; // Date de début (optionnel)
+  List<String> _productSecondaryImages = []; // URLs des images supplémentaires du produit (non modifiables)
   String? _mainImageUrl; // URL de l'image principale existante
   File? _mainImageFile; // Nouveau fichier de l'image principale
   final ImagePicker _picker = ImagePicker();
@@ -42,9 +41,18 @@ class _EditPromotionScreenState extends State<EditPromotionScreen> {
     _nouveauPrixController.text = widget.promotion.nouveauPrix.toStringAsFixed(2);
     _ancienPrixController.text = widget.promotion.ancienPrix.toStringAsFixed(2);
     _delaiPromotion = widget.promotion.delaiPromotion;
+    _dateDebutPromotion = widget.promotion.dateDebutPromotion;
     _mainImageUrl = widget.promotion.image;
-    _existingSecondaryImages = List.from(widget.promotion.images);
-    _deleteSecondaryImages = List.filled(_existingSecondaryImages.length, false);
+    
+    // Pré-remplir les images supplémentaires avec les vraies images du produit (non modifiables)
+    final product = widget.promotion.product;
+    if (product != null && product.images.isNotEmpty) {
+      // Utiliser les images du produit si disponibles
+      _productSecondaryImages = product.images.take(4).toList();
+    } else if (widget.promotion.images.isNotEmpty) {
+      // Sinon, utiliser les images de la promotion existante (verrouillées aussi)
+      _productSecondaryImages = widget.promotion.images.take(4).toList();
+    }
   }
 
   @override
@@ -80,50 +88,6 @@ class _EditPromotionScreenState extends State<EditPromotionScreen> {
     }
   }
 
-  Future<void> _pickSecondaryImages() async {
-    try {
-      final List<XFile> images = await _picker.pickMultiImage(
-        imageQuality: 85,
-        maxWidth: 800,
-      );
-      if (images.isNotEmpty && mounted) {
-        setState(() {
-          final newImages = images.map((xFile) => File(xFile.path)).toList();
-          final totalSlots = _existingSecondaryImages.length + _newSecondaryImages.length;
-          final remainingSlots = 4 - totalSlots;
-          if (remainingSlots > 0) {
-            _newSecondaryImages.addAll(newImages.take(remainingSlots));
-            if (newImages.length > remainingSlots && mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Maximum 4 images secondaires autorisées'),
-                  backgroundColor: Colors.orange,
-                ),
-              );
-            }
-          } else {
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Maximum 4 images secondaires autorisées'),
-                  backgroundColor: Colors.orange,
-                ),
-              );
-            }
-          }
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erreur lors de la sélection des images: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
 
   Future<File?> _compressImage(File imageFile) async {
     try {
@@ -152,13 +116,15 @@ class _EditPromotionScreenState extends State<EditPromotionScreen> {
     }
   }
 
-  Future<void> _selectDate() async {
+  Future<void> _selectDate({bool isStartDate = false}) async {
     if (!mounted) return;
     
     final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: _delaiPromotion ?? DateTime.now().add(const Duration(days: 30)),
-      firstDate: DateTime.now(),
+      initialDate: isStartDate 
+          ? (_dateDebutPromotion ?? DateTime.now())
+          : (_delaiPromotion ?? DateTime.now().add(const Duration(days: 30))),
+      firstDate: isStartDate ? DateTime.now().subtract(const Duration(days: 30)) : DateTime.now(),
       lastDate: DateTime.now().add(const Duration(days: 365)),
       builder: (context, child) {
         return Theme(
@@ -173,7 +139,7 @@ class _EditPromotionScreenState extends State<EditPromotionScreen> {
     if (picked != null && mounted) {
       final TimeOfDay? time = await showTimePicker(
         context: context,
-        initialTime: TimeOfDay.fromDateTime(_delaiPromotion ?? DateTime.now()),
+        initialTime: TimeOfDay.now(),
         builder: (context, child) {
           return Theme(
             data: Theme.of(context).copyWith(
@@ -186,13 +152,27 @@ class _EditPromotionScreenState extends State<EditPromotionScreen> {
 
       if (time != null && mounted) {
         setState(() {
-          _delaiPromotion = DateTime(
+          final selectedDateTime = DateTime(
             picked.year,
             picked.month,
             picked.day,
             time.hour,
             time.minute,
           );
+          
+          if (isStartDate) {
+            _dateDebutPromotion = selectedDateTime;
+            // Si la date de début est après la date de fin, ajuster la date de fin
+            if (_delaiPromotion != null && _dateDebutPromotion!.isAfter(_delaiPromotion!)) {
+              _delaiPromotion = _dateDebutPromotion!.add(const Duration(days: 7));
+            }
+          } else {
+            _delaiPromotion = selectedDateTime;
+            // Si la date de fin est avant la date de début, ajuster la date de début
+            if (_dateDebutPromotion != null && _delaiPromotion!.isBefore(_dateDebutPromotion!)) {
+              _dateDebutPromotion = _delaiPromotion!.subtract(const Duration(days: 7));
+            }
+          }
         });
       }
     }
@@ -219,17 +199,35 @@ class _EditPromotionScreenState extends State<EditPromotionScreen> {
     setState(() => _isLoading = true);
 
     try {
+      // Ne télécharger et envoyer les images que si elles ont été modifiées
+      // Si on modifie seulement les dates, on ne touche pas aux images
       File? mainImageFile;
+      bool imageModified = _mainImageFile != null;
+      
       if (_mainImageFile != null) {
+        // Image principale modifiée : compresser et envoyer
         mainImageFile = await _compressImage(_mainImageFile!);
       }
+      // Si l'image principale n'a pas été modifiée, on ne l'envoie pas (null)
+      // Le backend gardera l'image existante
 
-      final List<File> compressedSecondaryImages = [];
-      for (var image in _newSecondaryImages) {
-        if (!mounted) break;
-        final compressed = await _compressImage(image);
-        if (compressed != null) {
-          compressedSecondaryImages.add(compressed);
+      // Les images secondaires sont toujours celles du produit (verrouillées)
+      // On ne les envoie pas lors de la modification car elles ne changent jamais
+      // Le backend gardera les images existantes
+
+      // Vérifier que la date de début est avant la date de fin si les deux sont définies
+      if (_dateDebutPromotion != null && _delaiPromotion != null) {
+        if (_dateDebutPromotion!.isAfter(_delaiPromotion!)) {
+          if (mounted) {
+            setState(() => _isLoading = false);
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('La date de début doit être antérieure à la date de fin'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+          return;
         }
       }
 
@@ -239,17 +237,17 @@ class _EditPromotionScreenState extends State<EditPromotionScreen> {
         promotionId: widget.promotion.id,
         libelle: _libelleController.text,
         delaiPromotion: _delaiPromotion,
+        dateDebutPromotion: _dateDebutPromotion,
         nouveauPrix: double.parse(_nouveauPrixController.text),
         ancienPrix: double.parse(_ancienPrixController.text),
-        image: mainImageFile,
-        image1: compressedSecondaryImages.isNotEmpty ? compressedSecondaryImages[0] : null,
-        image2: compressedSecondaryImages.length > 1 ? compressedSecondaryImages[1] : null,
-        image3: compressedSecondaryImages.length > 2 ? compressedSecondaryImages[2] : null,
-        image4: compressedSecondaryImages.length > 3 ? compressedSecondaryImages[3] : null,
-        deleteImage1: _deleteSecondaryImages.isNotEmpty && _deleteSecondaryImages[0],
-        deleteImage2: _deleteSecondaryImages.length > 1 && _deleteSecondaryImages[1],
-        deleteImage3: _deleteSecondaryImages.length > 2 && _deleteSecondaryImages[2],
-        deleteImage4: _deleteSecondaryImages.length > 3 && _deleteSecondaryImages[3],
+        // Envoyer l'image principale seulement si elle a été modifiée
+        image: imageModified ? mainImageFile : null,
+        // Ne pas envoyer les images secondaires si elles n'ont pas été modifiées
+        // Le backend gardera les images existantes
+        image1: null,
+        image2: null,
+        image3: null,
+        image4: null,
       );
 
       if (mounted) {
@@ -374,34 +372,109 @@ class _EditPromotionScreenState extends State<EditPromotionScreen> {
               ),
               const SizedBox(height: 12),
 
-              // Date de fin
-              const Text('Date de fin de promotion', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+              // Date de début (optionnel)
+              const Text(
+                'Date de début de promotion (optionnel)',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Si non spécifiée, la promotion commence immédiatement',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Colors.grey.shade600,
+                ),
+              ),
               const SizedBox(height: 6),
-              InkWell(
-                onTap: _selectDate,
+              GestureDetector(
+                onTap: () => _selectDate(isStartDate: true),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                   decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey.shade300),
+                    color: Colors.white,
                     borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.grey.shade300),
                   ),
                   child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
+                      Icon(Icons.calendar_today, color: AppColors.primary, size: 18),
+                      const SizedBox(width: 10),
                       Text(
-                        _delaiPromotion != null
-                            ? '${_delaiPromotion!.day}/${_delaiPromotion!.month}/${_delaiPromotion!.year} ${_delaiPromotion!.hour}:${_delaiPromotion!.minute.toString().padLeft(2, '0')}'
-                            : 'Sélectionner une date',
+                        _dateDebutPromotion != null
+                            ? '${_dateDebutPromotion!.day}/${_dateDebutPromotion!.month}/${_dateDebutPromotion!.year} ${_dateDebutPromotion!.hour}:${_dateDebutPromotion!.minute.toString().padLeft(2, '0')}'
+                            : 'Sélectionner une date de début (optionnel)',
                         style: TextStyle(
                           fontSize: 13,
-                          color: _delaiPromotion != null ? Colors.black87 : Colors.grey.shade600,
+                          color: _dateDebutPromotion != null ? Colors.black : Colors.grey.shade600,
                         ),
                       ),
-                      const Icon(Icons.calendar_today, size: 20),
+                      if (_dateDebutPromotion != null) ...[
+                        const Spacer(),
+                        GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              _dateDebutPromotion = null;
+                            });
+                          },
+                          child: Icon(Icons.close, color: Colors.grey.shade400, size: 18),
+                        ),
+                      ],
                     ],
                   ),
                 ),
               ),
+              const SizedBox(height: 12),
+
+              // Date de fin (obligatoire)
+              const Text(
+                'Date de fin de promotion *',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 6),
+              GestureDetector(
+                onTap: () => _selectDate(isStartDate: false),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: _delaiPromotion == null ? Colors.red.shade300 : Colors.grey.shade300,
+                      width: _delaiPromotion == null ? 2 : 1,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.calendar_today, 
+                        color: _delaiPromotion == null ? Colors.red : AppColors.primary, 
+                        size: 18,
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        _delaiPromotion != null
+                            ? '${_delaiPromotion!.day}/${_delaiPromotion!.month}/${_delaiPromotion!.year} ${_delaiPromotion!.hour}:${_delaiPromotion!.minute.toString().padLeft(2, '0')}'
+                            : 'Sélectionner une date de fin *',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: _delaiPromotion != null ? Colors.black : Colors.grey.shade600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              if (_delaiPromotion == null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(
+                    'Ce champ est obligatoire',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.red.shade600,
+                    ),
+                  ),
+                ),
               const SizedBox(height: 12),
 
               // Image principale
@@ -440,140 +513,93 @@ class _EditPromotionScreenState extends State<EditPromotionScreen> {
               ),
               const SizedBox(height: 12),
 
-              // Images secondaires existantes
-              if (_existingSecondaryImages.isNotEmpty) ...[
-                const Text('Images secondaires existantes', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 6),
-                SizedBox(
-                  height: 100,
-                  child: ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: _existingSecondaryImages.length,
-                    itemBuilder: (context, index) {
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: Stack(
-                          children: [
-                            Container(
-                              width: 100,
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(
-                                  color: _deleteSecondaryImages[index] ? Colors.red : Colors.grey.shade300,
-                                  width: _deleteSecondaryImages[index] ? 2 : 1,
-                                ),
-                              ),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(8),
-                                child: Image.network(
-                                  _existingSecondaryImages[index],
-                                  fit: BoxFit.cover,
-                                  width: 100,
-                                  height: 100,
-                                ),
-                              ),
-                            ),
-                            Positioned(
-                              top: 4,
-                              right: 4,
-                              child: GestureDetector(
-                                onTap: () {
-                                  setState(() {
-                                    _deleteSecondaryImages[index] = !_deleteSecondaryImages[index];
-                                  });
-                                },
-                                child: Container(
-                                  padding: const EdgeInsets.all(4),
-                                  decoration: BoxDecoration(
-                                    color: _deleteSecondaryImages[index] ? Colors.red : Colors.grey.shade700,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: Icon(
-                                    _deleteSecondaryImages[index] ? Icons.close : Icons.delete,
-                                    color: Colors.white,
-                                    size: 16,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-                ),
-                const SizedBox(height: 12),
-              ],
-
-              // Nouvelles images secondaires
-              const Text('Nouvelles images secondaires (optionnelles, max 4)', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 6),
-              GestureDetector(
-                onTap: _pickSecondaryImages,
-                child: Container(
-                  height: 100,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: Colors.grey.shade300),
-                  ),
-                  child: _newSecondaryImages.isEmpty
-                      ? Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.add_photo_alternate, color: Colors.grey.shade400, size: 20),
-                              const SizedBox(height: 4),
-                              Text('Ajouter des images', style: TextStyle(color: Colors.grey.shade600, fontSize: 11)),
-                            ],
-                          ),
-                        )
-                      : GridView.builder(
-                          padding: const EdgeInsets.all(4),
-                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 4,
-                            crossAxisSpacing: 6,
-                            mainAxisSpacing: 6,
-                          ),
-                          itemCount: _newSecondaryImages.length,
-                          itemBuilder: (context, index) {
-                            return Stack(
-                              children: [
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(8),
-                                  child: Image.file(
-                                    _newSecondaryImages[index],
-                                    fit: BoxFit.cover,
-                                    width: double.infinity,
-                                    height: double.infinity,
-                                  ),
-                                ),
-                                Positioned(
-                                  top: 2,
-                                  right: 2,
-                                  child: GestureDetector(
-                                    onTap: () {
-                                      setState(() {
-                                        _newSecondaryImages.removeAt(index);
-                                      });
-                                    },
-                                    child: Container(
-                                      padding: const EdgeInsets.all(2),
-                                      decoration: const BoxDecoration(
-                                        color: Colors.red,
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: const Icon(Icons.close, color: Colors.white, size: 12),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            );
-                          },
-                        ),
+              // Images secondaires (non modifiables)
+              const Text(
+                'Images secondaires (non modifiables)',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
-              const SizedBox(height: 30),
+              const SizedBox(height: 4),
+              Text(
+                'Ces images proviennent du produit et ne peuvent pas être modifiées',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Colors.grey.shade600,
+                ),
+              ),
+              const SizedBox(height: 6),
+              SizedBox(
+                height: 100,
+                child: _productSecondaryImages.isEmpty
+                    ? Center(
+                        child: Text(
+                          'Aucune image supplémentaire',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade500,
+                          ),
+                        ),
+                      )
+                    : ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: _productSecondaryImages.length,
+                        itemBuilder: (context, index) {
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: Opacity(
+                              opacity: 0.7,
+                              child: Container(
+                                width: 100,
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: Colors.grey.shade300,
+                                    width: 1,
+                                  ),
+                                ),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Image.network(
+                                    _productSecondaryImages[index],
+                                    fit: BoxFit.cover,
+                                    width: 100,
+                                    height: 100,
+                                    errorBuilder: (context, error, stackTrace) {
+                                      return Container(
+                                        color: Colors.grey.shade200,
+                                        child: Icon(Icons.image_not_supported, 
+                                          size: 20, 
+                                          color: Colors.grey.shade400),
+                                      );
+                                    },
+                                    loadingBuilder: (context, child, loadingProgress) {
+                                      if (loadingProgress == null) return child;
+                                      return Container(
+                                        color: Colors.grey.shade100,
+                                        child: Center(
+                                          child: CircularProgressIndicator(
+                                            value: loadingProgress.expectedTotalBytes != null
+                                                ? loadingProgress.cumulativeBytesLoaded /
+                                                    loadingProgress.expectedTotalBytes!
+                                                : null,
+                                            strokeWidth: 2,
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+              ),
+              const SizedBox(height: 12),
+
+              const SizedBox(height: 20),
 
               // Bouton de soumission
               SizedBox(

@@ -30,7 +30,8 @@ class _CreatePromotionScreenState extends State<CreatePromotionScreen> {
   final _ancienPrixController = TextEditingController();
   final _productIdController = TextEditingController();
   
-  DateTime? _delaiPromotion;
+  DateTime? _delaiPromotion; // Date de fin (obligatoire)
+  DateTime? _dateDebutPromotion; // Date de début (optionnel)
   List<File> _selectedImages = []; // Images secondaires (optionnelles)
   List<String> _selectedImageUrls = []; // URLs des images secondaires pour affichage
   String? _mainImageUrl; // Image principale du produit (pré-remplie) - pour affichage uniquement
@@ -48,21 +49,24 @@ class _CreatePromotionScreenState extends State<CreatePromotionScreen> {
       _selectedProduct = widget.product;
       _productIdController.text = widget.product!.id.toString();
       _ancienPrixController.text = widget.product!.price.toStringAsFixed(2);
-      // Pré-remplir l'image principale du produit
+      // Pré-remplir l'image principale du produit (modifiable)
       _mainImageUrl = widget.product!.getMainImage();
-      // Pré-remplir les 4 images supplémentaires avec l'image principale
+      // Pré-remplir les vraies images supplémentaires du produit (non modifiables)
       _prefillSecondaryImages();
     }
   }
 
-  /// Pré-remplit les 4 images supplémentaires avec l'image principale si elles sont vides
+  /// Pré-remplit les images supplémentaires avec les vraies images du produit
   void _prefillSecondaryImages() {
-    final mainImageUrl = _mainImageUrl ?? _selectedProduct?.getMainImage();
-    if (mainImageUrl != null && mainImageUrl.isNotEmpty) {
+    if (_selectedProduct != null) {
       setState(() {
-        // Pré-remplir avec l'image principale jusqu'à 4 images seulement si aucune image n'est sélectionnée
-        if (_selectedImages.isEmpty) {
-          _selectedImageUrls = List.filled(4, mainImageUrl);
+        // Pré-remplir avec les vraies images supplémentaires du produit (max 4)
+        final productSecondaryImages = _selectedProduct!.images.take(4).toList();
+        if (productSecondaryImages.isNotEmpty && _selectedImages.isEmpty) {
+          _selectedImageUrls = productSecondaryImages;
+        } else if (productSecondaryImages.isEmpty && _selectedImages.isEmpty) {
+          // Si le produit n'a pas d'images supplémentaires, ne rien pré-remplir
+          _selectedImageUrls = [];
         }
       });
     }
@@ -117,6 +121,19 @@ class _CreatePromotionScreenState extends State<CreatePromotionScreen> {
         }
       } else {
         // Sélectionner les images secondaires
+        // Si des images sont pré-remplies, on ne peut pas ajouter de nouvelles images
+        if (_selectedImageUrls.isNotEmpty && _selectedImages.isEmpty) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Les images supplémentaires du produit sont verrouillées. Sélectionnez un autre produit pour modifier les images.'),
+                backgroundColor: Colors.orange,
+              ),
+            );
+          }
+          return;
+        }
+        
         final List<XFile> images = await _picker.pickMultiImage(
           imageQuality: 85,
           maxWidth: 800,
@@ -196,13 +213,15 @@ class _CreatePromotionScreenState extends State<CreatePromotionScreen> {
   }
 
 
-  Future<void> _selectDate() async {
+  Future<void> _selectDate({bool isStartDate = false}) async {
     if (!mounted) return;
     
     final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: _delaiPromotion ?? DateTime.now().add(const Duration(days: 30)),
-      firstDate: DateTime.now(),
+      initialDate: isStartDate 
+          ? (_dateDebutPromotion ?? DateTime.now())
+          : (_delaiPromotion ?? DateTime.now().add(const Duration(days: 30))),
+      firstDate: isStartDate ? DateTime.now().subtract(const Duration(days: 30)) : DateTime.now(),
       lastDate: DateTime.now().add(const Duration(days: 365)),
       builder: (context, child) {
         return Theme(
@@ -234,13 +253,27 @@ class _CreatePromotionScreenState extends State<CreatePromotionScreen> {
 
       if (time != null && mounted) {
         setState(() {
-          _delaiPromotion = DateTime(
+          final selectedDateTime = DateTime(
             picked.year,
             picked.month,
             picked.day,
             time.hour,
             time.minute,
           );
+          
+          if (isStartDate) {
+            _dateDebutPromotion = selectedDateTime;
+            // Si la date de début est après la date de fin, ajuster la date de fin
+            if (_delaiPromotion != null && _dateDebutPromotion!.isAfter(_delaiPromotion!)) {
+              _delaiPromotion = _dateDebutPromotion!.add(const Duration(days: 7));
+            }
+          } else {
+            _delaiPromotion = selectedDateTime;
+            // Si la date de fin est avant la date de début, ajuster la date de début
+            if (_dateDebutPromotion != null && _delaiPromotion!.isBefore(_dateDebutPromotion!)) {
+              _dateDebutPromotion = _delaiPromotion!.subtract(const Duration(days: 7));
+            }
+          }
         });
       }
     }
@@ -251,17 +284,32 @@ class _CreatePromotionScreenState extends State<CreatePromotionScreen> {
       return;
     }
 
-    // Vérifier qu'on a l'image principale
-    if (_mainImageFile == null) {
+    // Vérifier qu'on a l'image principale (obligatoire) - soit un fichier, soit une URL pré-remplie
+    if (_mainImageFile == null && (_mainImageUrl == null || _mainImageUrl!.isEmpty)) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Veuillez sélectionner une image principale'),
+            content: Text('Veuillez sélectionner une image principale (obligatoire)'),
             backgroundColor: Colors.red,
           ),
         );
       }
       return;
+    }
+
+    // Vérifier que la date de début est avant la date de fin si les deux sont définies
+    if (_dateDebutPromotion != null && _delaiPromotion != null) {
+      if (_dateDebutPromotion!.isAfter(_delaiPromotion!)) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('La date de début doit être antérieure à la date de fin'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
     }
 
     if (_delaiPromotion == null) {
@@ -292,11 +340,43 @@ class _CreatePromotionScreenState extends State<CreatePromotionScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // Compresser l'image principale si nécessaire
+      // Gérer l'image principale : utiliser le fichier sélectionné ou télécharger depuis l'URL pré-remplie
       File? mainImageFile = _mainImageFile;
+      if (mainImageFile == null && _mainImageUrl != null && _mainImageUrl!.isNotEmpty) {
+        // Télécharger l'image principale depuis l'URL pré-remplie
+        mainImageFile = await _downloadImageFromUrl(_mainImageUrl!);
+        if (mainImageFile == null) {
+          if (mounted) {
+            setState(() => _isLoading = false);
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Erreur lors du téléchargement de l\'image principale'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+          return;
+        }
+      }
+      
+      // Compresser l'image principale si nécessaire
       if (mainImageFile != null) {
         final compressed = await _compressImage(mainImageFile);
         mainImageFile = compressed ?? mainImageFile;
+      }
+      
+      // Vérifier qu'on a bien un fichier image principale
+      if (mainImageFile == null) {
+        if (mounted) {
+          setState(() => _isLoading = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Erreur : aucune image principale disponible'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
       }
 
       // Gérer les images secondaires : utiliser les fichiers sélectionnés ou télécharger depuis les URLs pré-remplies
@@ -327,13 +407,14 @@ class _CreatePromotionScreenState extends State<CreatePromotionScreen> {
       
       final result = await promotionService.createPromotion(
         productId: productId,
-        image: mainImageFile!,
+        image: mainImageFile,
         image1: compressedSecondaryImages.isNotEmpty ? compressedSecondaryImages[0] : null,
         image2: compressedSecondaryImages.length > 1 ? compressedSecondaryImages[1] : null,
         image3: compressedSecondaryImages.length > 2 ? compressedSecondaryImages[2] : null,
         image4: compressedSecondaryImages.length > 3 ? compressedSecondaryImages[3] : null,
         libelle: _libelleController.text,
         delaiPromotion: _delaiPromotion!,
+        dateDebutPromotion: _dateDebutPromotion, // Optionnel
         nouveauPrix: double.parse(_nouveauPrixController.text),
         ancienPrix: double.parse(_ancienPrixController.text),
       );
@@ -397,7 +478,7 @@ class _CreatePromotionScreenState extends State<CreatePromotionScreen> {
               // Sélection du produit
               if (widget.product == null) ...[
                 const Text(
-                  'Produit',
+                  'Produit *',
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
@@ -502,11 +583,12 @@ class _CreatePromotionScreenState extends State<CreatePromotionScreen> {
                       _selectedProduct = product;
                       _productIdController.text = product?.id.toString() ?? '';
                       _ancienPrixController.text = product?.price.toStringAsFixed(2) ?? '';
-                      // Pré-remplir l'image principale du produit
+                      // Pré-remplir l'image principale du produit (modifiable)
                       _mainImageUrl = product?.getMainImage();
+                      _mainImageFile = null; // Réinitialiser le fichier pour permettre la modification
                       // Réinitialiser les images secondaires
                       _selectedImages = [];
-                      // Pré-remplir les 4 images supplémentaires avec l'image principale
+                      // Pré-remplir les vraies images supplémentaires du produit (non modifiables)
                       _prefillSecondaryImages();
                     });
                   },
@@ -578,7 +660,7 @@ class _CreatePromotionScreenState extends State<CreatePromotionScreen> {
 
               // Libellé
               const Text(
-                'Libellé de la promotion',
+                'Libellé de la promotion *',
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
@@ -615,7 +697,7 @@ class _CreatePromotionScreenState extends State<CreatePromotionScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
-                          'Ancien prix',
+                          'Ancien prix *',
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
@@ -660,7 +742,7 @@ class _CreatePromotionScreenState extends State<CreatePromotionScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
-                          'Nouveau prix',
+                          'Nouveau prix *',
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
@@ -708,17 +790,25 @@ class _CreatePromotionScreenState extends State<CreatePromotionScreen> {
               ),
               const SizedBox(height: 12),
 
-              // Date de fin
+              // Date de début (optionnel)
               const Text(
-                'Date de fin de promotion',
+                'Date de début de promotion (optionnel)',
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
                 ),
               ),
+              const SizedBox(height: 4),
+              Text(
+                'Si non spécifiée, la promotion commence immédiatement',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Colors.grey.shade600,
+                ),
+              ),
               const SizedBox(height: 6),
               GestureDetector(
-                onTap: _selectDate,
+                onTap: () => _selectDate(isStartDate: true),
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                   decoration: BoxDecoration(
@@ -731,9 +821,64 @@ class _CreatePromotionScreenState extends State<CreatePromotionScreen> {
                       Icon(Icons.calendar_today, color: AppColors.primary, size: 18),
                       const SizedBox(width: 10),
                       Text(
+                        _dateDebutPromotion != null
+                            ? '${_dateDebutPromotion!.day}/${_dateDebutPromotion!.month}/${_dateDebutPromotion!.year} ${_dateDebutPromotion!.hour}:${_dateDebutPromotion!.minute.toString().padLeft(2, '0')}'
+                            : 'Sélectionner une date de début (optionnel)',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: _dateDebutPromotion != null ? Colors.black : Colors.grey.shade600,
+                        ),
+                      ),
+                      if (_dateDebutPromotion != null) ...[
+                        const Spacer(),
+                        GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              _dateDebutPromotion = null;
+                            });
+                          },
+                          child: Icon(Icons.close, color: Colors.grey.shade400, size: 18),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // Date de fin (obligatoire)
+              const Text(
+                'Date de fin de promotion *',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 6),
+              GestureDetector(
+                onTap: () => _selectDate(isStartDate: false),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: _delaiPromotion == null ? Colors.red.shade300 : Colors.grey.shade300,
+                      width: _delaiPromotion == null ? 2 : 1,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.calendar_today, 
+                        color: _delaiPromotion == null ? Colors.red : AppColors.primary, 
+                        size: 18,
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
                         _delaiPromotion != null
                             ? '${_delaiPromotion!.day}/${_delaiPromotion!.month}/${_delaiPromotion!.year} ${_delaiPromotion!.hour}:${_delaiPromotion!.minute.toString().padLeft(2, '0')}'
-                            : 'Sélectionner une date',
+                            : 'Sélectionner une date de fin *',
                         style: TextStyle(
                           fontSize: 13,
                           color: _delaiPromotion != null ? Colors.black : Colors.grey.shade600,
@@ -743,14 +888,33 @@ class _CreatePromotionScreenState extends State<CreatePromotionScreen> {
                   ),
                 ),
               ),
+              if (_delaiPromotion == null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(
+                    'Ce champ est obligatoire',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.red.shade600,
+                    ),
+                  ),
+                ),
               const SizedBox(height: 12),
 
               // Image principale
               const Text(
-                'Image principale',
+                'Image principale *',
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Ce champ est obligatoire',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Colors.grey.shade600,
                 ),
               ),
               const SizedBox(height: 4),
@@ -825,7 +989,9 @@ class _CreatePromotionScreenState extends State<CreatePromotionScreen> {
               ),
               const SizedBox(height: 4),
               Text(
-                'Vous pouvez ajouter jusqu\'à 4 images supplémentaires',
+                _selectedImageUrls.isNotEmpty && _selectedImages.isEmpty
+                    ? 'Images pré-remplies depuis le produit (non modifiables)'
+                    : 'Vous pouvez ajouter jusqu\'à 4 images supplémentaires',
                 style: TextStyle(
                   fontSize: 11,
                   color: Colors.grey.shade600,
@@ -833,14 +999,18 @@ class _CreatePromotionScreenState extends State<CreatePromotionScreen> {
               ),
               const SizedBox(height: 6),
               GestureDetector(
-                onTap: () => _pickImages(isMain: false),
-                child: Container(
-                  height: 80,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: Colors.grey.shade300),
-                  ),
+                onTap: _selectedImageUrls.isNotEmpty && _selectedImages.isEmpty
+                    ? null // Désactiver le tap si les images sont pré-remplies
+                    : () => _pickImages(isMain: false),
+                child: Opacity(
+                  opacity: _selectedImageUrls.isNotEmpty && _selectedImages.isEmpty ? 0.6 : 1.0,
+                  child: Container(
+                    height: 80,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.grey.shade300),
+                    ),
                   child: (_selectedImages.isEmpty && _selectedImageUrls.isEmpty)
                       ? Center(
                           child: Column(
@@ -867,6 +1037,8 @@ class _CreatePromotionScreenState extends State<CreatePromotionScreen> {
                               : _selectedImageUrls.length,
                           itemBuilder: (context, index) {
                             final isFile = _selectedImages.isNotEmpty;
+                            // Les images pré-remplies depuis le produit ne sont pas modifiables
+                            final isPrefilled = !isFile && _selectedImageUrls.isNotEmpty;
                             return Stack(
                               children: [
                                 ClipRRect(
@@ -908,41 +1080,44 @@ class _CreatePromotionScreenState extends State<CreatePromotionScreen> {
                                           },
                                         ),
                                 ),
-                                Positioned(
-                                  top: 2,
-                                  right: 2,
-                                  child: GestureDetector(
-                                    onTap: () {
-                                      setState(() {
-                                        if (isFile) {
-                                          _selectedImages.removeAt(index);
-                                          // Si toutes les images sont supprimées, réinitialiser avec les URLs
-                                          if (_selectedImages.isEmpty) {
-                                            _prefillSecondaryImages();
+                                // Afficher le bouton de suppression uniquement pour les images non pré-remplies
+                                if (!isPrefilled)
+                                  Positioned(
+                                    top: 2,
+                                    right: 2,
+                                    child: GestureDetector(
+                                      onTap: () {
+                                        setState(() {
+                                          if (isFile) {
+                                            _selectedImages.removeAt(index);
+                                            // Si toutes les images sont supprimées, réinitialiser avec les URLs
+                                            if (_selectedImages.isEmpty) {
+                                              _prefillSecondaryImages();
+                                            }
+                                          } else {
+                                            _selectedImageUrls.removeAt(index);
                                           }
-                                        } else {
-                                          _selectedImageUrls.removeAt(index);
-                                        }
-                                      });
-                                    },
-                                    child: Container(
-                                      padding: const EdgeInsets.all(3),
-                                      decoration: const BoxDecoration(
-                                        color: Colors.red,
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: const Icon(
-                                        Icons.close,
-                                        color: Colors.white,
-                                        size: 14,
+                                        });
+                                      },
+                                      child: Container(
+                                        padding: const EdgeInsets.all(3),
+                                        decoration: const BoxDecoration(
+                                          color: Colors.red,
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: const Icon(
+                                          Icons.close,
+                                          color: Colors.white,
+                                          size: 14,
+                                        ),
                                       ),
                                     ),
                                   ),
-                                ),
                               ],
                             );
                           },
                         ),
+                  ),
                 ),
               ),
               const SizedBox(height: 20),

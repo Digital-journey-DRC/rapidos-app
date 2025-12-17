@@ -506,6 +506,15 @@ class _PromotionDetailScreenState extends State<PromotionDetailScreen> {
                           crossAxisSpacing: 8,
                           childAspectRatio: 3.0,
                           children: [
+                            // Date de début (si disponible)
+                            if (promotion.dateDebutPromotion != null)
+                              _buildInfoCard(
+                                icon: Icons.play_circle_outline,
+                                title: 'Début',
+                                value: DateFormat('dd/MM/yyyy').format(promotion.dateDebutPromotion!),
+                                color: Colors.green,
+                              ),
+                            // Date de fin (toujours affichée)
                             _buildInfoCard(
                               icon: Icons.calendar_today,
                               title: 'Expiration',

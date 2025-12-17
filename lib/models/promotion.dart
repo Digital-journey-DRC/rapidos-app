@@ -13,6 +13,7 @@ class Promotion {
   final String libelle;
   final int likes;
   final DateTime delaiPromotion;
+  final DateTime? dateDebutPromotion; // Date de début (optionnel)
   final double nouveauPrix;
   final double ancienPrix;
   final Product? product;
@@ -31,6 +32,7 @@ class Promotion {
     required this.libelle,
     required this.likes,
     required this.delaiPromotion,
+    this.dateDebutPromotion,
     required this.nouveauPrix,
     required this.ancienPrix,
     this.product,
@@ -117,6 +119,9 @@ class Promotion {
       libelle: json['libelle']?.toString() ?? '',
       likes: parseToInt(json['likes'], 0),
       delaiPromotion: parseDate(json['delaiPromotion'], now.add(const Duration(days: 30))),
+      dateDebutPromotion: json['dateDebutPromotion'] != null 
+          ? parseDate(json['dateDebutPromotion'], now)
+          : null,
       nouveauPrix: parseToDouble(json['nouveauPrix'], 0.0),
       ancienPrix: parseToDouble(json['ancienPrix'], 0.0),
       product: json['product'] != null ? Product.fromJson(json['product']) : null,
