@@ -1704,6 +1704,8 @@ class _SettingScreenState extends State<SettingScreen>
     bool _isLoading = false;
     final FocusNode phoneFocusNode = FocusNode();
     final GlobalKey<FormState> formKey = GlobalKey<FormState>();
+    // Capturer le contexte parent pour la navigation
+    final parentContext = context;
     
     showModalBottomSheet(
       context: context,
@@ -1841,10 +1843,17 @@ class _SettingScreenState extends State<SettingScreen>
                               newPhone: _newPhoneController.text.trim(),
                             );
                             
+                            // Vérifier que le code de réponse est 200 (succès)
                             if (result['success'] == true) {
-                              // Afficher le message de succès
+                              // Fermer le dialogue d'entrée du numéro
+                              Navigator.pop(modalContext);
+                              
+                              // Attendre que le modal se ferme complètement
+                              await Future.delayed(const Duration(milliseconds: 300));
+                              
+                              // Afficher le message de succès avec le contexte parent
                               if (mounted) {
-                                ScaffoldMessenger.of(modalContext).showSnackBar(
+                                ScaffoldMessenger.of(parentContext).showSnackBar(
                                   SnackBar(
                                     content: Text(result['message'] ?? 'Code OTP envoyé avec succès au nouveau numéro'),
                                     backgroundColor: Colors.green,
@@ -1853,15 +1862,13 @@ class _SettingScreenState extends State<SettingScreen>
                                 );
                               }
                               
-                              Navigator.pop(modalContext);
-                              
                               // Attendre un peu pour que le message s'affiche
                               await Future.delayed(const Duration(milliseconds: 500));
                               
-                              // Rediriger vers la page de vérification OTP
+                              // Rediriger vers la page de vérification OTP (processus 2)
+                              // Utiliser le contexte de l'écran parent, pas celui du modal
                               if (mounted) {
-                                final otpResult = await Navigator.push(
-                                  context,
+                                final otpResult = await Navigator.of(parentContext).push(
                                   MaterialPageRoute(
                                     builder: (context) => PhoneOTPVerificationScreen(
                                       newPhone: _newPhoneController.text.trim(),
@@ -1869,7 +1876,7 @@ class _SettingScreenState extends State<SettingScreen>
                                   ),
                                 );
                                 
-                                // Si la vérification a réussi, recharger les données utilisateur
+                                // Si la vérification OTP a réussi (processus 2 terminé), recharger les données utilisateur
                                 if (otpResult == true && this.mounted) {
                                   _loadUserData();
                                 }
