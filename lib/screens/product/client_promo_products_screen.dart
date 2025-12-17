@@ -194,10 +194,7 @@ class _PromoProductCard extends StatelessWidget {
     final product = promotion.product;
     if (product == null) return const SizedBox.shrink();
 
-    final productName = product.name;
-    final productCategory = product.category?.name ?? '';
-    final productStock = product.stock;
-
+    // Utiliser la même structure que les autres produits
     // Priorité: image de la promotion, sinon getMainImage() du produit
     final imageUrl = promotion.image.isNotEmpty
         ? promotion.image
@@ -205,9 +202,9 @@ class _PromoProductCard extends StatelessWidget {
 
     return GestureDetector(
       onTap: () {
-        final List<String> productImages = [promotion.image];
-        productImages.addAll(promotion.images.where((img) => img.isNotEmpty));
-
+        // Utiliser les images de la promotion si disponibles, sinon celles du produit
+        final productImages = promotion.getAllImages();
+        
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -216,9 +213,9 @@ class _PromoProductCard extends StatelessWidget {
               idVendeur: product.vendeurId.toString(),
               id: product.id,
               tag: 'PROMO',
-              category: productCategory,
-              stock: productStock,
-              name: productName,
+              category: product.category?.name ?? '',
+              stock: product.stock,
+              name: product.name,
               price: promotion.nouveauPrix,
               imagePath: imageUrl,
               productImages: productImages.length > 1 ? productImages : null,
@@ -305,7 +302,7 @@ class _PromoProductCard extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         // Catégorie discrète
-                        if (productCategory.isNotEmpty)
+                        if (product.category?.name != null && product.category!.name.isNotEmpty)
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                             decoration: BoxDecoration(
@@ -313,7 +310,7 @@ class _PromoProductCard extends StatelessWidget {
                               borderRadius: BorderRadius.circular(6),
                             ),
                             child: Text(
-                              productCategory,
+                              product.category!.name,
                               style: TextStyle(
                                 color: Colors.grey.shade700,
                                 fontSize: 10,
@@ -323,10 +320,10 @@ class _PromoProductCard extends StatelessWidget {
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                        if (productCategory.isNotEmpty) const SizedBox(height: 8),
+                        if (product.category?.name != null && product.category!.name.isNotEmpty) const SizedBox(height: 8),
                         // Nom du produit - Plus visible
                         Text(
-                          productName,
+                          product.name,
                           style: const TextStyle(
                             fontWeight: FontWeight.w600,
                             fontSize: 15,
@@ -389,7 +386,7 @@ class _PromoProductCard extends StatelessWidget {
                             Icon(Icons.check_circle_outline, size: 14, color: Colors.grey.shade500),
                             const SizedBox(width: 4),
                             Text(
-                              '$productStock disponibles',
+                              '${product.stock} disponibles',
                               style: TextStyle(
                                 color: Colors.grey.shade600,
                                 fontSize: 11,

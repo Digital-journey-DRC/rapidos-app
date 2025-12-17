@@ -3,7 +3,6 @@ import 'dart:io';
 import 'dart:async';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
-import '../constants.dart';
 
 class ProfileService {
   final String baseUrl = 'http://24.144.87.127:3333';
@@ -169,6 +168,205 @@ class ProfileService {
       throw Exception('HTTP error while fetching income summary');
     } catch (e) {
       throw Exception('Error getting income summary: $e');
+    }
+  }
+
+  /// Met à jour le numéro de téléphone et envoie un OTP
+  Future<Map<String, dynamic>> updatePhone({
+    required String token,
+    required String newPhone,
+  }) async {
+    try {
+      print('🔄 Mise à jour du numéro de téléphone: $newPhone');
+      
+      final response = await http.post(
+        Uri.parse('$baseUrl/users/update-phone'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'newPhone': newPhone,
+        }),
+      );
+
+      print('📡 Status Code: ${response.statusCode}');
+      print('📡 Response Body: ${response.body}');
+
+      // Gérer les cas où la réponse n'est pas du JSON valide
+      Map<String, dynamic> data = {};
+      try {
+        data = jsonDecode(response.body) as Map<String, dynamic>;
+      } catch (e) {
+        print('⚠️ Erreur de parsing JSON: $e');
+        if (response.statusCode == 200) {
+          return {
+            'success': true,
+            'message': 'Code OTP envoyé avec succès au nouveau numéro',
+            'data': {},
+          };
+        }
+      }
+      
+      if (response.statusCode == 200) {
+        print('✅ OTP envoyé avec succès');
+        return {
+          'success': true,
+          'message': data['message']?.toString() ?? 'Code OTP envoyé avec succès au nouveau numéro',
+          'data': data,
+        };
+      } else if (response.statusCode == 400) {
+        // Nouveau numéro requis ou identique à l'ancien
+        final message = data['message']?.toString() ?? 'Le nouveau numéro de téléphone doit être différent de l\'ancien';
+        throw Exception(message);
+      } else if (response.statusCode == 401) {
+        // Non autorisé
+        final message = data['message']?.toString() ?? 'Vous devez être connecté pour modifier votre numéro de téléphone';
+        throw Exception(message);
+      } else if (response.statusCode == 409) {
+        // Numéro déjà utilisé
+        final message = data['message']?.toString() ?? 'Ce numéro de téléphone est déjà utilisé par un autre utilisateur';
+        throw Exception(message);
+      } else if (response.statusCode == 500) {
+        // Erreur serveur
+        final message = data['message']?.toString() ?? 'Erreur serveur interne. Veuillez réessayer plus tard';
+        throw Exception(message);
+      } else {
+        print('❌ Erreur lors de l\'envoi de l\'OTP: ${response.statusCode}');
+        final message = data['message']?.toString() ?? 'Erreur lors de l\'envoi de l\'OTP';
+        throw Exception(message);
+      }
+    } catch (e) {
+      print('❌ Erreur lors de la mise à jour du téléphone: $e');
+      if (e is String) {
+        throw e;
+      }
+      if (e.toString().contains('Exception:')) {
+        // Si c'est déjà une Exception avec un message, la relancer telle quelle
+        rethrow;
+      }
+      throw Exception('Erreur lors de la mise à jour du téléphone: $e');
+    }
+  }
+
+  /// Change le mot de passe de l'utilisateur
+  Future<Map<String, dynamic>> changePassword({
+    required String token,
+    required String oldPassword,
+    required String newPassword,
+  }) async {
+    try {
+      print('🔄 Changement de mot de passe');
+      
+      final response = await http.post(
+        Uri.parse('$baseUrl/users/change-password'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'oldPassword': oldPassword,
+          'newPassword': newPassword,
+        }),
+      );
+
+      print('📡 Status Code: ${response.statusCode}');
+      print('📡 Response Body: ${response.body}');
+
+      // Gérer les cas où la réponse n'est pas du JSON valide
+      Map<String, dynamic> data = {};
+      try {
+        data = jsonDecode(response.body) as Map<String, dynamic>;
+      } catch (e) {
+        print('⚠️ Erreur de parsing JSON: $e');
+        if (response.statusCode == 200) {
+          return {
+            'success': true,
+            'message': 'Mot de passe modifié avec succès',
+            'data': {},
+          };
+        }
+      }
+      
+      if (response.statusCode == 200) {
+        print('✅ Mot de passe modifié avec succès');
+        return {
+          'success': true,
+          'message': data['message']?.toString() ?? 'Mot de passe modifié avec succès',
+          'data': data,
+        };
+      } else if (response.statusCode == 400) {
+        // Ancien mot de passe incorrect ou nouveau mot de passe invalide
+        final message = data['message']?.toString() ?? 'Ancien mot de passe incorrect ou nouveau mot de passe invalide';
+        throw Exception(message);
+      } else if (response.statusCode == 401) {
+        // Non autorisé
+        final message = data['message']?.toString() ?? 'Vous devez être connecté pour modifier votre mot de passe';
+        throw Exception(message);
+      } else if (response.statusCode == 500) {
+        // Erreur serveur
+        final message = data['message']?.toString() ?? 'Erreur serveur interne. Veuillez réessayer plus tard';
+        throw Exception(message);
+      } else {
+        print('❌ Erreur lors du changement de mot de passe: ${response.statusCode}');
+        final message = data['message']?.toString() ?? 'Erreur lors du changement de mot de passe';
+        throw Exception(message);
+      }
+    } catch (e) {
+      print('❌ Erreur lors du changement de mot de passe: $e');
+      if (e is String) {
+        throw e;
+      }
+      if (e.toString().contains('Exception:')) {
+        // Si c'est déjà une Exception avec un message, la relancer telle quelle
+        rethrow;
+      }
+      throw Exception('Erreur lors du changement de mot de passe: $e');
+    }
+  }
+
+  /// Vérifie l'OTP pour le nouveau numéro de téléphone
+  Future<Map<String, dynamic>> verifyPhoneOTP({
+    required String token,
+    required String otp,
+    required String newPhone,
+  }) async {
+    try {
+      print('🔄 Vérification de l\'OTP pour le téléphone: $newPhone');
+      
+      final response = await http.post(
+        Uri.parse('$baseUrl/users/verify-phone-otp'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'otp': otp,
+          'newPhone': newPhone,
+        }),
+      );
+
+      print('📡 Status Code: ${response.statusCode}');
+      print('📡 Response Body: ${response.body}');
+
+      final data = jsonDecode(response.body);
+      
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        print('✅ Numéro de téléphone vérifié avec succès');
+        return {
+          'success': true,
+          'data': data,
+        };
+      } else {
+        print('❌ Erreur lors de la vérification de l\'OTP: ${response.statusCode}');
+        throw Exception(data['message'] ?? 'Code OTP incorrect');
+      }
+    } catch (e) {
+      print('❌ Erreur lors de la vérification de l\'OTP: $e');
+      if (e is String) {
+        throw e;
+      }
+      throw Exception('Erreur lors de la vérification de l\'OTP: $e');
     }
   }
 }

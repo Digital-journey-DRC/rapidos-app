@@ -13,7 +13,9 @@ import '../../cubit/auth_cubit.dart';
 import '../../cubits/profile/profile_cubit.dart';
 import '../../widgets/app_logo.dart';
 import '../../services/profile_service.dart';
+import '../../services/storage_service.dart';
 import '../auth/login_screen.dart';
+import '../auth/phone_otp_verification_screen.dart';
 import '../home/new_home.dart';
 import '../../widgets/merchant_section_card.dart';
 // import '../../widgets/merchant_closed_banner.dart';
@@ -40,6 +42,7 @@ class _SettingScreenState extends State<SettingScreen>
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
   final _phoneController = TextEditingController();
+  final _newPhoneController = TextEditingController();
 
   // Profile image
   File? _selectedImage;
@@ -169,7 +172,6 @@ class _SettingScreenState extends State<SettingScreen>
       // Mettre à jour les contrôleurs avec les données actuelles
         _firstNameController.text = authState.user!['firstName'] ?? '';
         _lastNameController.text = authState.user!['lastName'] ?? '';
-        _phoneController.text = authState.user!['phone'] ?? '';
 
         // Injecter l'AuthCubit dans le ProfileCubit
         // Vérifier à nouveau que le widget est monté avant d'accéder au contexte
@@ -266,6 +268,7 @@ class _SettingScreenState extends State<SettingScreen>
     _firstNameController.dispose();
     _lastNameController.dispose();
     _phoneController.dispose();
+    _newPhoneController.dispose();
     _profileCubit.close();
     super.dispose();
   }
@@ -1482,6 +1485,16 @@ class _SettingScreenState extends State<SettingScreen>
                     _showUpdateProfileDialog();
                   },
                 ),
+                // Modifier numéro de téléphone
+                MerchantSectionCard(
+                  title: 'Modifier numéro de téléphone',
+                  subtitle: 'Changer votre numéro de téléphone',
+                  icon: Icons.phone_outlined,
+                  iconColor: AppColors.primary,
+                  onTap: () {
+                    _showUpdatePhoneDialog();
+                  },
+                ),
                 // Modifier mot de passe
                 MerchantSectionCard(
                   title: 'Modifier mot de passe',
@@ -1630,142 +1643,6 @@ class _SettingScreenState extends State<SettingScreen>
                         return null;
                       },
                     ),
-                    const SizedBox(height: 16),
-                    // Champ Téléphone
-                    TextFormField(
-                      controller: _phoneController,
-                      decoration: InputDecoration(
-                        labelText: 'Téléphone',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: Colors.grey.shade300),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: AppColors.buttonColor, width: 2),
-                        ),
-                        filled: true,
-                        fillColor: Colors.grey.shade50,
-                        prefixIcon: Icon(Icons.phone, color: AppColors.buttonColor),
-                      ),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Veuillez entrer votre numéro de téléphone';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 24),
-                    // Section Photo de profil
-                    const Text(
-                      'Photo de profil',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black87,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    GestureDetector(
-                      onTap: () {
-                        _showImageSourceDialog();
-                      },
-                      child: Container(
-                        height: 120,
-                        width: double.infinity,
-                        decoration: BoxDecoration(
-                          border: Border.all(color: Colors.grey.shade300),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: _selectedImage != null
-                            ? Stack(
-                                children: [
-                                  ClipRRect(
-                                    borderRadius: BorderRadius.circular(12),
-                                    child: Image.file(
-                                      _selectedImage!,
-                                      fit: BoxFit.cover,
-                                      width: double.infinity,
-                                      height: double.infinity,
-                                    ),
-                                  ),
-                                  Positioned(
-                                    top: 4,
-                                    right: 4,
-                                    child: Container(
-                                      padding: const EdgeInsets.all(6),
-                                      decoration: BoxDecoration(
-                                        color: Colors.black.withOpacity(0.5),
-                                        borderRadius: BorderRadius.circular(20),
-                                      ),
-                                      child: const Icon(
-                                        Icons.edit,
-                                        color: Colors.white,
-                                        size: 18,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              )
-                            : Builder(
-                                builder: (context) {
-                                  final currentAuthState = context.read<AuthCubit>().state;
-                                  return Stack(
-                                    children: [
-                                      // Afficher l'image actuelle si disponible
-                                      if (currentAuthState is AuthSuccess && 
-                                          currentAuthState.user != null && 
-                                          currentAuthState.user!['media'] != null)
-                                        ClipRRect(
-                                          borderRadius: BorderRadius.circular(12),
-                                          child: Image.network(
-                                            currentAuthState.user!['media'].toString().startsWith('http')
-                                                ? currentAuthState.user!['media']
-                                                : 'http://24.144.87.127:3333/${currentAuthState.user!['media']}',
-                                            fit: BoxFit.cover,
-                                            width: double.infinity,
-                                            height: double.infinity,
-                                            errorBuilder: (context, error, stackTrace) {
-                                              return Container(
-                                                color: Colors.grey.shade200,
-                                                child: const Icon(Icons.person, size: 40, color: Colors.grey),
-                                              );
-                                            },
-                                          ),
-                                        )
-                                      else
-                                        Container(
-                                          color: Colors.grey.shade200,
-                                          child: const Icon(Icons.person, size: 40, color: Colors.grey),
-                                        ),
-                                      Container(
-                                        decoration: BoxDecoration(
-                                          color: Colors.black.withOpacity(0.3),
-                                          borderRadius: BorderRadius.circular(12),
-                                        ),
-                                        child: const Center(
-                                          child: Column(
-                                            mainAxisAlignment: MainAxisAlignment.center,
-                                            children: [
-                                              Icon(Icons.camera_alt, color: Colors.white, size: 24),
-                                              SizedBox(height: 4),
-                                              Text(
-                                                'Cliquer pour changer',
-                                                style: TextStyle(color: Colors.white, fontSize: 12),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  );
-                                },
-                              ),
-                      ),
-                    ),
                     const SizedBox(height: 28),
                     // Bouton Mettre à jour le profil
                     SizedBox(
@@ -1773,10 +1650,6 @@ class _SettingScreenState extends State<SettingScreen>
                       child: ElevatedButton(
                         onPressed: () async {
                           if (_formKey.currentState!.validate()) {
-                            // Si une nouvelle image a été sélectionnée, l'uploader d'abord
-                            if (_selectedImage != null) {
-                              await _uploadImageToServer(_selectedImage!);
-                            }
                             Navigator.pop(context);
                             _updateProfile();
                           }
@@ -1825,14 +1698,247 @@ class _SettingScreenState extends State<SettingScreen>
     );
   }
 
-  /// Affiche le dialogue de modification du mot de passe
+  /// Affiche le dialogue de mise à jour du numéro de téléphone
+  void _showUpdatePhoneDialog() {
+    _newPhoneController.clear();
+    bool _isLoading = false;
+    final FocusNode phoneFocusNode = FocusNode();
+    final GlobalKey<FormState> formKey = GlobalKey<FormState>();
+    
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      enableDrag: false,
+      isDismissible: true,
+      useSafeArea: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (modalContext) => StatefulBuilder(
+        builder: (context, setState) {
+          return AnimatedPadding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(context).viewInsets.bottom,
+            ),
+            duration: const Duration(milliseconds: 100),
+            curve: Curves.easeOut,
+            child: Container(
+              padding: const EdgeInsets.all(24),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+              ),
+              child: Form(
+                key: formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Modifier numéro de téléphone',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black87,
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close, color: Colors.grey),
+                          onPressed: () {
+                            phoneFocusNode.unfocus();
+                            Navigator.pop(context);
+                          },
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+                    
+                    // Description
+                    Text(
+                      'Entrez votre nouveau numéro de téléphone. Un code de vérification sera envoyé à ce numéro.',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    
+                    // Champ Nouveau numéro
+                    TextFormField(
+                      controller: _newPhoneController,
+                      focusNode: phoneFocusNode,
+                      keyboardType: TextInputType.phone,
+                      textInputAction: TextInputAction.done,
+                      autofocus: false,
+                      decoration: InputDecoration(
+                        labelText: 'Nouveau numéro de téléphone',
+                        hintText: '+243819493099',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: Colors.grey.shade300),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: AppColors.buttonColor, width: 2),
+                        ),
+                        filled: true,
+                        fillColor: Colors.grey.shade50,
+                        prefixIcon: Icon(Icons.phone, color: AppColors.buttonColor),
+                      ),
+                      onTap: () {
+                        // S'assurer que le focus est bien géré
+                        Future.delayed(const Duration(milliseconds: 100), () {
+                          phoneFocusNode.requestFocus();
+                        });
+                      },
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Veuillez entrer un numéro de téléphone';
+                        }
+                        if (!value.startsWith('+')) {
+                          return 'Le numéro doit commencer par +';
+                        }
+                        if (value.length < 10) {
+                          return 'Numéro de téléphone invalide';
+                        }
+                        return null;
+                      },
+                    ),
+                  const SizedBox(height: 28),
+                  
+                  // Bouton Continuer
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: ElevatedButton(
+                      onPressed: _isLoading ? null : () async {
+                        // Fermer le clavier avant de valider
+                        phoneFocusNode.unfocus();
+                        
+                        // Attendre un peu pour que le clavier se ferme
+                        await Future.delayed(const Duration(milliseconds: 100));
+                        
+                        if (formKey.currentState!.validate()) {
+                          setState(() {
+                            _isLoading = true;
+                          });
+                          
+                          try {
+                            final token = await StorageService().getToken();
+                            if (token == null) {
+                              throw Exception('Token d\'authentification manquant');
+                            }
+                            
+                            final profileService = ProfileService();
+                            final result = await profileService.updatePhone(
+                              token: token,
+                              newPhone: _newPhoneController.text.trim(),
+                            );
+                            
+                            if (result['success'] == true) {
+                              // Afficher le message de succès
+                              if (mounted) {
+                                ScaffoldMessenger.of(modalContext).showSnackBar(
+                                  SnackBar(
+                                    content: Text(result['message'] ?? 'Code OTP envoyé avec succès au nouveau numéro'),
+                                    backgroundColor: Colors.green,
+                                    duration: const Duration(seconds: 2),
+                                  ),
+                                );
+                              }
+                              
+                              Navigator.pop(modalContext);
+                              
+                              // Attendre un peu pour que le message s'affiche
+                              await Future.delayed(const Duration(milliseconds: 500));
+                              
+                              // Rediriger vers la page de vérification OTP
+                              if (mounted) {
+                                final otpResult = await Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => PhoneOTPVerificationScreen(
+                                      newPhone: _newPhoneController.text.trim(),
+                                    ),
+                                  ),
+                                );
+                                
+                                // Si la vérification a réussi, recharger les données utilisateur
+                                if (otpResult == true && this.mounted) {
+                                  _loadUserData();
+                                }
+                              }
+                            }
+                          } catch (e) {
+                            setState(() {
+                              _isLoading = false;
+                            });
+                            
+                            // Extraire le message d'erreur
+                            String errorMessage = e.toString();
+                            if (errorMessage.contains('Exception: ')) {
+                              errorMessage = errorMessage.replaceAll('Exception: ', '');
+                            }
+                            
+                            if (mounted) {
+                              ScaffoldMessenger.of(modalContext).showSnackBar(
+                                SnackBar(
+                                  content: Text(errorMessage),
+                                  backgroundColor: Colors.red,
+                                  duration: const Duration(seconds: 4),
+                                ),
+                              );
+                            }
+                          }
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.buttonColor,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: _isLoading
+                          ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              ),
+                            )
+                          : const Text(
+                              'Continuer',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+        },
+      ),
+    );
+  }
+
   void _showChangePasswordDialog() {
     final oldPasswordController = TextEditingController();
     final newPasswordController = TextEditingController();
-    final confirmPasswordController = TextEditingController();
     bool obscureOldPassword = true;
     bool obscureNewPassword = true;
-    bool obscureConfirmPassword = true;
+    bool _isLoading = false;
 
     showModalBottomSheet(
       context: context,
@@ -1938,52 +2044,96 @@ class _SettingScreenState extends State<SettingScreen>
                     ),
                   ),
                 ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: confirmPasswordController,
-                  obscureText: obscureConfirmPassword,
-                  decoration: InputDecoration(
-                    labelText: 'Confirmer le mot de passe',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Colors.grey.shade300),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: AppColors.buttonColor, width: 2),
-                    ),
-                    filled: true,
-                    fillColor: Colors.grey.shade50,
-                    prefixIcon: Icon(Icons.lock, color: AppColors.buttonColor),
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        obscureConfirmPassword ? Icons.visibility_off : Icons.visibility,
-                        color: Colors.grey.shade600,
-                      ),
-                      onPressed: () {
-                        setState(() {
-                          obscureConfirmPassword = !obscureConfirmPassword;
-                        });
-                      },
-                    ),
-                  ),
-                ),
                 const SizedBox(height: 28),
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: () {
-                      // TODO: Implémenter la logique de changement de mot de passe
-                      Navigator.pop(context);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Fonctionnalité en cours de développement'),
-                          backgroundColor: Colors.orange,
-                        ),
-                      );
+                    onPressed: _isLoading ? null : () async {
+                      // Validation
+                      if (oldPasswordController.text.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Veuillez entrer votre ancien mot de passe'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                        return;
+                      }
+                      
+                      if (newPasswordController.text.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Veuillez entrer un nouveau mot de passe'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                        return;
+                      }
+                      
+                      if (newPasswordController.text.length < 6) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Le nouveau mot de passe doit contenir au moins 6 caractères'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                        return;
+                      }
+                      
+                      // Afficher un indicateur de chargement
+                      setState(() {
+                        _isLoading = true;
+                      });
+                      
+                      try {
+                        final token = await StorageService().getToken();
+                        if (token == null) {
+                          throw Exception('Token d\'authentification manquant');
+                        }
+                        
+                        final profileService = ProfileService();
+                        final result = await profileService.changePassword(
+                          token: token,
+                          oldPassword: oldPasswordController.text,
+                          newPassword: newPasswordController.text,
+                        );
+                        
+                        if (result['success'] == true) {
+                          // Fermer le dialogue
+                          Navigator.pop(context);
+                          
+                          // Afficher le message de succès
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(result['message'] ?? 'Mot de passe modifié avec succès'),
+                                backgroundColor: Colors.green,
+                                duration: const Duration(seconds: 3),
+                              ),
+                            );
+                          }
+                        }
+                      } catch (e) {
+                        setState(() {
+                          _isLoading = false;
+                        });
+                        
+                        // Extraire le message d'erreur
+                        String errorMessage = e.toString();
+                        if (errorMessage.contains('Exception: ')) {
+                          errorMessage = errorMessage.replaceAll('Exception: ', '');
+                        }
+                        
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(errorMessage),
+                              backgroundColor: Colors.red,
+                              duration: const Duration(seconds: 4),
+                            ),
+                          );
+                        }
+                      }
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.buttonColor,
@@ -1994,14 +2144,23 @@ class _SettingScreenState extends State<SettingScreen>
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    child: const Text(
-                      'Modifier le mot de passe',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
+                    child: _isLoading
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            ),
+                          )
+                        : const Text(
+                            'Modifier le mot de passe',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -3094,7 +3253,6 @@ class _SettingScreenState extends State<SettingScreen>
         // Récupérer les valeurs des inputs
         final String firstName = _firstNameController.text.trim();
         final String lastName = _lastNameController.text.trim();
-        final String phone = _phoneController.text.trim();
         final String email = authState.user!['email'] ?? ''; // Récupérer l'email depuis l'état actuel
         final String userId = authState.user!['id'].toString();
         final String token = authState.token!;
@@ -3104,7 +3262,6 @@ class _SettingScreenState extends State<SettingScreen>
         print('  - firstName: $firstName');
         print('  - lastName: $lastName');
         print('  - email: $email');
-        print('  - phone: $phone');
         print('  - token: ${token.substring(0, 20)}...');
         
         try {
@@ -3116,7 +3273,6 @@ class _SettingScreenState extends State<SettingScreen>
             firstName: firstName,
             lastName: lastName,
             email: email,
-            phone: phone,
           );
           print('✅ Mise à jour du profil terminée avec succès');
           
