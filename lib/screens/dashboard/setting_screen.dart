@@ -16,7 +16,7 @@ import '../../services/profile_service.dart';
 import '../../services/storage_service.dart';
 import '../auth/login_screen.dart';
 import '../auth/phone_otp_verification_screen.dart';
-import '../home/new_home.dart';
+import '../../widgets/auth_gate.dart';
 import '../../widgets/merchant_section_card.dart';
 // import '../../widgets/merchant_closed_banner.dart';
 import '../product/merchant_promo_products_screen.dart';
@@ -1858,6 +1858,7 @@ class _SettingScreenState extends State<SettingScreen>
                                     content: Text(result['message'] ?? 'Code OTP envoyé avec succès au nouveau numéro'),
                                     backgroundColor: Colors.green,
                                     duration: const Duration(seconds: 2),
+                                    behavior: SnackBarBehavior.floating,
                                   ),
                                 );
                               }
@@ -1894,11 +1895,12 @@ class _SettingScreenState extends State<SettingScreen>
                             }
                             
                             if (mounted) {
-                              ScaffoldMessenger.of(modalContext).showSnackBar(
+                              ScaffoldMessenger.of(parentContext).showSnackBar(
                                 SnackBar(
                                   content: Text(errorMessage),
                                   backgroundColor: Colors.red,
                                   duration: const Duration(seconds: 4),
+                                  behavior: SnackBarBehavior.floating,
                                 ),
                               );
                             }
@@ -1943,9 +1945,13 @@ class _SettingScreenState extends State<SettingScreen>
   void _showChangePasswordDialog() {
     final oldPasswordController = TextEditingController();
     final newPasswordController = TextEditingController();
+    final confirmPasswordController = TextEditingController();
     bool obscureOldPassword = true;
     bool obscureNewPassword = true;
+    bool obscureConfirmPassword = true;
     bool _isLoading = false;
+    // Capturer le contexte parent pour afficher les messages
+    final parentContext = context;
 
     showModalBottomSheet(
       context: context,
@@ -1953,7 +1959,7 @@ class _SettingScreenState extends State<SettingScreen>
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (context) => StatefulBuilder(
+      builder: (modalContext) => StatefulBuilder(
         builder: (context, setState) => Padding(
           padding: EdgeInsets.only(
             bottom: MediaQuery.of(context).viewInsets.bottom,
@@ -1981,7 +1987,7 @@ class _SettingScreenState extends State<SettingScreen>
                     ),
                     IconButton(
                       icon: const Icon(Icons.close, color: Colors.grey),
-                      onPressed: () => Navigator.pop(context),
+                      onPressed: () => Navigator.pop(modalContext),
                     ),
                   ],
                 ),
@@ -2051,6 +2057,40 @@ class _SettingScreenState extends State<SettingScreen>
                     ),
                   ),
                 ),
+                const SizedBox(height: 16),
+                // Champ de confirmation (validation côté client uniquement)
+                TextFormField(
+                  controller: confirmPasswordController,
+                  obscureText: obscureConfirmPassword,
+                  decoration: InputDecoration(
+                    labelText: 'Confirmer le mot de passe',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.grey.shade300),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: AppColors.buttonColor, width: 2),
+                    ),
+                    filled: true,
+                    fillColor: Colors.grey.shade50,
+                    prefixIcon: Icon(Icons.lock, color: AppColors.buttonColor),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        obscureConfirmPassword ? Icons.visibility_off : Icons.visibility,
+                        color: Colors.grey.shade600,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          obscureConfirmPassword = !obscureConfirmPassword;
+                        });
+                      },
+                    ),
+                  ),
+                ),
                 const SizedBox(height: 28),
                 SizedBox(
                   width: double.infinity,
@@ -2058,30 +2098,45 @@ class _SettingScreenState extends State<SettingScreen>
                     onPressed: _isLoading ? null : () async {
                       // Validation
                       if (oldPasswordController.text.isEmpty) {
-                        ScaffoldMessenger.of(context).showSnackBar(
+                        ScaffoldMessenger.of(parentContext).showSnackBar(
                           const SnackBar(
                             content: Text('Veuillez entrer votre ancien mot de passe'),
                             backgroundColor: Colors.red,
+                            behavior: SnackBarBehavior.floating,
                           ),
                         );
                         return;
                       }
                       
                       if (newPasswordController.text.isEmpty) {
-                        ScaffoldMessenger.of(context).showSnackBar(
+                        ScaffoldMessenger.of(parentContext).showSnackBar(
                           const SnackBar(
                             content: Text('Veuillez entrer un nouveau mot de passe'),
                             backgroundColor: Colors.red,
+                            behavior: SnackBarBehavior.floating,
                           ),
                         );
                         return;
                       }
                       
                       if (newPasswordController.text.length < 6) {
-                        ScaffoldMessenger.of(context).showSnackBar(
+                        ScaffoldMessenger.of(parentContext).showSnackBar(
                           const SnackBar(
                             content: Text('Le nouveau mot de passe doit contenir au moins 6 caractères'),
                             backgroundColor: Colors.red,
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                        return;
+                      }
+                      
+                      // Vérifier que les deux mots de passe correspondent
+                      if (newPasswordController.text != confirmPasswordController.text) {
+                        ScaffoldMessenger.of(parentContext).showSnackBar(
+                          const SnackBar(
+                            content: Text('Les deux mots de passe ne correspondent pas'),
+                            backgroundColor: Colors.red,
+                            behavior: SnackBarBehavior.floating,
                           ),
                         );
                         return;
@@ -2107,15 +2162,16 @@ class _SettingScreenState extends State<SettingScreen>
                         
                         if (result['success'] == true) {
                           // Fermer le dialogue
-                          Navigator.pop(context);
+                          Navigator.pop(modalContext);
                           
                           // Afficher le message de succès
                           if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
+                            ScaffoldMessenger.of(parentContext).showSnackBar(
                               SnackBar(
                                 content: Text(result['message'] ?? 'Mot de passe modifié avec succès'),
                                 backgroundColor: Colors.green,
                                 duration: const Duration(seconds: 3),
+                                behavior: SnackBarBehavior.floating,
                               ),
                             );
                           }
@@ -2132,11 +2188,12 @@ class _SettingScreenState extends State<SettingScreen>
                         }
                         
                         if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
+                          ScaffoldMessenger.of(parentContext).showSnackBar(
                             SnackBar(
                               content: Text(errorMessage),
                               backgroundColor: Colors.red,
                               duration: const Duration(seconds: 4),
+                              behavior: SnackBarBehavior.floating,
                             ),
                           );
                         }
@@ -3179,9 +3236,9 @@ class _SettingScreenState extends State<SettingScreen>
                       (route) => false,
                     );
                   } else {
-                    // Pour les autres utilisateurs, rediriger vers l'écran home non connecté
+                    // Pour les clients, rediriger vers l'écran de démarrage (AuthGate)
                     Navigator.of(context).pushAndRemoveUntil(
-                      MaterialPageRoute(builder: (_) => const NewHomeScreen()),
+                      MaterialPageRoute(builder: (_) => const AuthGate()),
                       (route) => false,
                     );
                   }

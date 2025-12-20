@@ -10,6 +10,9 @@ import 'package:immo/cubit/auth_cubit.dart';
 import '../auth/login_screen.dart';
 import '../../models/product.dart';
 import '../../models/vendeur.dart';
+import '../../services/review_service.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart';
 
 class ProductDetailScreen extends StatefulWidget {
   final int id;
@@ -56,6 +59,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   bool isFavorite = false;
   String _currentMainImage = ''; // Image principale actuellement affichée
   int _currentSecondaryImageIndex = 0;
+  final ReviewService _reviewService = ReviewService();
+  int _selectedRating = 0; // Note sélectionnée (1-4)
+  final TextEditingController _commentController = TextEditingController();
+  double _averageRating = 0.0;
+  bool _showAllReviews = false; // Afficher tous les commentaires ou seulement 5
 
   @override
   void initState() {
@@ -65,6 +73,23 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     _checkIfFavorite();
     // Initialiser l'image principale : utiliser getMainImage() si product est disponible, sinon widget.imagePath
     _currentMainImage = widget.product?.getMainImage() ?? widget.imagePath;
+    _loadRatingData();
+  }
+
+  @override
+  void dispose() {
+    _commentController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadRatingData() async {
+    final authState = context.read<AuthCubit>().state;
+    if (authState is AuthSuccess && authState.user != null) {
+      _averageRating = await _reviewService.getCachedAverageRating(widget.id);
+      if (mounted) {
+        setState(() {});
+      }
+    }
   }
 
   /// Vérifie si l'utilisateur est autorisé à effectuer des actions
@@ -871,6 +896,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     ),
                     
                     const SizedBox(height: 18),
+
+                    // Section Notes et Commentaires
+                    _buildReviewsSection(),
+
+                    const SizedBox(height: 18),
                   
                     // Quantity Selector - Design compact et élégant optimisé
                     Row(
@@ -1399,6 +1429,901 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       decoration: BoxDecoration(
         color: isActive ? AppColors.primary : Colors.grey.shade400,
         borderRadius: BorderRadius.circular(2.5),
+      ),
+    );
+  }
+
+  /// Widget pour la section des notes et commentaires
+  Widget _buildReviewsSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // En-tête avec note moyenne
+        Row(
+          children: [
+            Icon(
+              Icons.star_rounded,
+              size: 18,
+              color: Colors.amber.shade700,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              'Notes et commentaires',
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
+                color: Colors.grey.shade800,
+              ),
+            ),
+            const Spacer(),
+            if (_averageRating > 0)
+              Row(
+                children: [
+                  Text(
+                    _averageRating.toStringAsFixed(1),
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  ...List.generate(4, (index) {
+                    return Icon(
+                      index < _averageRating.round()
+                          ? Icons.star_rounded
+                          : Icons.star_border_rounded,
+                      size: 14,
+                      color: Colors.amber.shade700,
+                    );
+                  }),
+                ],
+              ),
+          ],
+        ),
+        const SizedBox(height: 12),
+
+        // Formulaire d'ajout de note et commentaire (toujours visible si utilisateur connecté)
+        if (_isAuthorizedUser())
+          _buildAddReviewForm(),
+
+        const SizedBox(height: 12),
+
+        // Liste des commentaires
+        StreamBuilder<List<Map<String, dynamic>>>(
+          stream: _reviewService.getProductReviews(widget.id),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(16.0),
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                  ),
+                ),
+              );
+            }
+
+            if (snapshot.hasError) {
+              print('❌ Erreur StreamBuilder: ${snapshot.error}');
+              return Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.red.shade200),
+                ),
+                child: Column(
+                  children: [
+                    Icon(Icons.error_outline, size: 24, color: Colors.red.shade600),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Erreur lors du chargement des commentaires',
+                      style: TextStyle(
+                        color: Colors.red.shade700,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 8),
+                    TextButton(
+                      onPressed: () {
+                        setState(() {
+                          // Forcer le rechargement
+                        });
+                      },
+                      child: const Text(
+                        'Réessayer',
+                        style: TextStyle(fontSize: 12),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }
+
+            final reviews = snapshot.data ?? [];
+
+            if (reviews.isEmpty) {
+              return Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.comment_outlined, size: 16, color: Colors.grey.shade400),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Aucun commentaire pour le moment',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }
+
+            // Limiter à 3 commentaires par défaut
+            final displayedReviews = _showAllReviews ? reviews : reviews.take(3).toList();
+            final hasMoreReviews = reviews.length > 3;
+
+            return Column(
+              children: [
+                ...displayedReviews.map((review) => _buildReviewCard(review)).toList(),
+                // Bouton "Voir plus" / "Voir moins"
+                if (hasMoreReviews)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: TextButton(
+                      onPressed: () {
+                        setState(() {
+                          _showAllReviews = !_showAllReviews;
+                        });
+                      },
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            _showAllReviews ? 'Voir moins' : 'Voir plus',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Icon(
+                            _showAllReviews ? Icons.expand_less : Icons.expand_more,
+                            size: 16,
+                            color: AppColors.primary,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  /// Obtenir la mention correspondant à une note
+  String _getRatingLabel(int rating) {
+    switch (rating) {
+      case 1:
+        return 'Mauvais';
+      case 2:
+        return 'Bon';
+      case 3:
+        return 'Très bon';
+      case 4:
+        return 'Excellent';
+      default:
+        return '';
+    }
+  }
+
+  /// Obtenir la couleur correspondant à une note
+  Color _getRatingColor(int rating) {
+    switch (rating) {
+      case 1:
+        return Colors.red;
+      case 2:
+        return Colors.orange;
+      case 3:
+        return Colors.amber;
+      case 4:
+        return Colors.green;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  /// Widget pour le formulaire d'ajout de note et commentaire
+  Widget _buildAddReviewForm() {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Donnez votre avis',
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: 12,
+              color: Colors.grey.shade800,
+            ),
+          ),
+          const SizedBox(height: 8),
+          // Sélection de la note (4 étoiles max) avec mentions
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Text(
+                    'Note:',
+                    style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
+                  ),
+                  const SizedBox(width: 6),
+                  ...List.generate(4, (index) {
+                    final starRating = index + 1;
+                    return GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _selectedRating = starRating;
+                        });
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.only(right: 3),
+                        child: Icon(
+                          index < _selectedRating
+                              ? Icons.star_rounded
+                              : Icons.star_border_rounded,
+                          size: 20,
+                          color: _selectedRating > index
+                              ? _getRatingColor(starRating)
+                              : Colors.grey.shade400,
+                        ),
+                      ),
+                    );
+                  }),
+                ],
+              ),
+              // Afficher la mention correspondante
+              if (_selectedRating > 0) ...[
+                const SizedBox(height: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: _getRatingColor(_selectedRating).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(
+                      color: _getRatingColor(_selectedRating).withOpacity(0.3),
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.label_outline,
+                        size: 12,
+                        color: _getRatingColor(_selectedRating),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        _getRatingLabel(_selectedRating),
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: _getRatingColor(_selectedRating),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 8),
+          // Champ de commentaire
+          TextField(
+            controller: _commentController,
+            maxLines: 3,
+            style: const TextStyle(fontSize: 11),
+            decoration: InputDecoration(
+              hintText: 'Écrivez votre commentaire...',
+              hintStyle: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+              filled: true,
+              fillColor: Colors.white,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: Colors.grey.shade300),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: Colors.grey.shade300),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: AppColors.primary, width: 1.5),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          // Bouton de soumission
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _selectedRating > 0 && _commentController.text.trim().isNotEmpty
+                  ? _submitReview
+                  : null,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                elevation: 0,
+              ),
+              child: const Text(
+                'Publier',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Soumettre un avis
+  Future<void> _submitReview() async {
+    if (!_isAuthorizedUser()) {
+      _checkAuthorizationAndRedirect();
+      return;
+    }
+
+    final authState = context.read<AuthCubit>().state;
+    if (authState is! AuthSuccess || authState.user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Vous devez être connecté pour commenter'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    final userId = authState.user!['id']?.toString() ?? '';
+    final firstName = authState.user!['firstName']?.toString() ?? '';
+    final lastName = authState.user!['lastName']?.toString() ?? '';
+    final userName = '$firstName $lastName'.trim().isEmpty
+        ? 'Utilisateur'
+        : '$firstName $lastName'.trim();
+
+    try {
+      await _reviewService.addReview(
+        productId: widget.id,
+        userId: userId,
+        userName: userName,
+        rating: _selectedRating,
+        comment: _commentController.text.trim(),
+      );
+
+      setState(() {
+        _selectedRating = 0;
+        _commentController.clear();
+      });
+
+      await _loadRatingData();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Votre avis a été publié avec succès'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  /// Widget pour afficher une carte de commentaire
+  Widget _buildReviewCard(Map<String, dynamic> review) {
+    final timestamp = review['createdAt'] as Timestamp?;
+    final dateStr = timestamp != null
+        ? DateFormat('dd/MM/yyyy').format(timestamp.toDate())
+        : '';
+    final rating = review['rating'] ?? 0;
+    final ratingColor = _getRatingColor(rating);
+    final ratingLabel = _getRatingLabel(rating);
+    
+    // Vérifier si l'utilisateur actuel est l'auteur du commentaire
+    final authState = context.read<AuthCubit>().state;
+    final currentUserId = (authState is AuthSuccess && authState.user != null)
+        ? authState.user!['id']?.toString() ?? ''
+        : '';
+    final reviewUserId = review['userId']?.toString() ?? '';
+    final isCurrentUserReview = currentUserId.isNotEmpty && currentUserId == reviewUserId;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: Colors.grey.shade200, width: 0.5),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 2,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              CircleAvatar(
+                radius: 12,
+                backgroundColor: AppColors.primary.withOpacity(0.1),
+                child: Text(
+                  (review['userName'] ?? 'U')[0].toUpperCase(),
+                  style: TextStyle(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 10,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            review['userName'] ?? 'Utilisateur',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 11,
+                              color: Colors.black87,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        // Boutons Modifier/Supprimer (uniquement pour l'auteur)
+                        if (isCurrentUserReview)
+                          PopupMenuButton<String>(
+                            icon: Icon(
+                              Icons.more_vert,
+                              size: 12,
+                              color: Colors.grey.shade600,
+                            ),
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            itemBuilder: (context) => [
+                              PopupMenuItem(
+                                value: 'edit',
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.edit, size: 13, color: AppColors.primary),
+                                    const SizedBox(width: 6),
+                                    const Text('Modifier', style: TextStyle(fontSize: 11)),
+                                  ],
+                                ),
+                              ),
+                              PopupMenuItem(
+                                value: 'delete',
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.delete, size: 13, color: Colors.red),
+                                    const SizedBox(width: 6),
+                                    const Text('Supprimer', style: TextStyle(fontSize: 11, color: Colors.red)),
+                                  ],
+                                ),
+                              ),
+                            ],
+                            onSelected: (value) {
+                              if (value == 'edit') {
+                                _showEditReviewDialog(review);
+                              } else if (value == 'delete') {
+                                _showDeleteReviewConfirmation(review);
+                              }
+                            },
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Row(
+                      children: [
+                        if (dateStr.isNotEmpty)
+                          Text(
+                            dateStr,
+                            style: TextStyle(
+                              fontSize: 9,
+                              color: Colors.grey.shade500,
+                            ),
+                          ),
+                        const SizedBox(width: 6),
+                        // Note compacte
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: ratingColor.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(3),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.star_rounded,
+                                size: 8,
+                                color: ratingColor,
+                              ),
+                              const SizedBox(width: 2),
+                              Text(
+                                '$rating/4',
+                                style: TextStyle(
+                                  fontSize: 8,
+                                  fontWeight: FontWeight.bold,
+                                  color: ratingColor,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        // Mention compacte
+                        if (ratingLabel.isNotEmpty)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                            decoration: BoxDecoration(
+                              color: ratingColor.withOpacity(0.08),
+                              borderRadius: BorderRadius.circular(3),
+                            ),
+                            child: Text(
+                              ratingLabel,
+                              style: TextStyle(
+                                fontSize: 8,
+                                fontWeight: FontWeight.w600,
+                                color: ratingColor,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            review['comment'] ?? '',
+            style: TextStyle(
+              fontSize: 10,
+              color: Colors.grey.shade800,
+              height: 1.3,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Afficher le dialog de modification d'un commentaire
+  void _showEditReviewDialog(Map<String, dynamic> review) {
+    final reviewId = review['id']?.toString() ?? '';
+    final currentRating = review['rating'] ?? 0;
+    final currentComment = review['comment']?.toString() ?? '';
+    
+    int selectedRating = currentRating;
+    final commentController = TextEditingController(text: currentComment);
+    bool isLoading = false;
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text(
+            'Modifier votre avis',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Sélection de la note
+                Text(
+                  'Note:',
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    ...List.generate(4, (index) {
+                      final starRating = index + 1;
+                      return GestureDetector(
+                        onTap: () {
+                          setDialogState(() {
+                            selectedRating = starRating;
+                          });
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.only(right: 4),
+                          child: Icon(
+                            index < selectedRating
+                                ? Icons.star_rounded
+                                : Icons.star_border_rounded,
+                            size: 24,
+                            color: selectedRating > index
+                                ? _getRatingColor(starRating)
+                                : Colors.grey.shade400,
+                          ),
+                        ),
+                      );
+                    }),
+                  ],
+                ),
+                if (selectedRating > 0) ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: _getRatingColor(selectedRating).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: _getRatingColor(selectedRating).withOpacity(0.3),
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.label_outline,
+                          size: 14,
+                          color: _getRatingColor(selectedRating),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          _getRatingLabel(selectedRating),
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: _getRatingColor(selectedRating),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 16),
+                // Champ de commentaire
+                TextField(
+                  controller: commentController,
+                  maxLines: 3,
+                  style: const TextStyle(fontSize: 12),
+                  decoration: InputDecoration(
+                    hintText: 'Écrivez votre commentaire...',
+                    hintStyle: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                    filled: true,
+                    fillColor: Colors.grey.shade50,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(color: Colors.grey.shade300),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(color: Colors.grey.shade300),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(color: AppColors.primary, width: 1.5),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: isLoading ? null : () => Navigator.pop(dialogContext),
+              child: const Text('Annuler', style: TextStyle(fontSize: 13)),
+            ),
+            ElevatedButton(
+              onPressed: isLoading || selectedRating == 0 || commentController.text.trim().isEmpty
+                  ? null
+                  : () async {
+                      setDialogState(() {
+                        isLoading = true;
+                      });
+                      
+                      try {
+                        await _reviewService.updateReview(
+                          reviewId: reviewId,
+                          productId: widget.id,
+                          rating: selectedRating,
+                          comment: commentController.text.trim(),
+                        );
+                        
+                        await _loadRatingData();
+                        
+                        if (mounted) {
+                          Navigator.pop(dialogContext);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Votre avis a été modifié avec succès'),
+                              backgroundColor: Colors.green,
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
+                        }
+                      } catch (e) {
+                        if (mounted) {
+                          setDialogState(() {
+                            isLoading = false;
+                          });
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Erreur: $e'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                      }
+                    },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              ),
+              child: isLoading
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : const Text('Enregistrer', style: TextStyle(fontSize: 13)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Afficher la confirmation de suppression
+  void _showDeleteReviewConfirmation(Map<String, dynamic> review) {
+    final reviewId = review['id']?.toString() ?? '';
+    bool isLoading = false;
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text(
+            'Supprimer votre avis',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          ),
+          content: const Text(
+            'Êtes-vous sûr de vouloir supprimer votre avis ? Cette action est irréversible.',
+            style: TextStyle(fontSize: 13),
+          ),
+          actions: [
+            TextButton(
+              onPressed: isLoading ? null : () => Navigator.pop(dialogContext),
+              child: const Text('Annuler', style: TextStyle(fontSize: 13)),
+            ),
+            ElevatedButton(
+              onPressed: isLoading
+                  ? null
+                  : () async {
+                      setDialogState(() {
+                        isLoading = true;
+                      });
+                      
+                      try {
+                        await _reviewService.deleteReview(
+                          reviewId: reviewId,
+                          productId: widget.id,
+                        );
+                        
+                        await _loadRatingData();
+                        
+                        if (mounted) {
+                          Navigator.pop(dialogContext);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Votre avis a été supprimé avec succès'),
+                              backgroundColor: Colors.green,
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
+                        }
+                      } catch (e) {
+                        if (mounted) {
+                          setDialogState(() {
+                            isLoading = false;
+                          });
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Erreur: $e'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                      }
+                    },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              ),
+              child: isLoading
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : const Text('Supprimer', style: TextStyle(fontSize: 13)),
+            ),
+          ],
+        ),
       ),
     );
   }

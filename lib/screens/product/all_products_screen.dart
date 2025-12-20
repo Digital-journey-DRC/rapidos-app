@@ -3,6 +3,7 @@ import 'package:immo/constants.dart';
 import 'package:immo/widgets/app_logo.dart';
 import 'package:immo/models/product.dart';
 import 'package:immo/screens/product/product_detail_screen.dart';
+import 'package:immo/services/review_service.dart';
 
 class AllProductsScreen extends StatefulWidget {
   final List<Product> products;
@@ -164,6 +165,35 @@ class _TwitterStyleProductCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text('${product.price} FC', style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 4),
+                  FutureBuilder<double>(
+                    future: ReviewService().getCachedAverageRating(product.id),
+                    builder: (context, snapshot) {
+                      if (snapshot.hasData && snapshot.data! > 0) {
+                        final rating = snapshot.data!;
+                        return Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.star_rounded,
+                              size: 12,
+                              color: Colors.amber.shade700,
+                            ),
+                            const SizedBox(width: 3),
+                            Text(
+                              rating.toStringAsFixed(1),
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.grey.shade700,
+                              ),
+                            ),
+                          ],
+                        );
+                      }
+                      return const SizedBox.shrink();
+                    },
+                  ),
                 ],
               ),
             ),

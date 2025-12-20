@@ -19,6 +19,7 @@ import 'package:immo/services/promotion_service.dart';
 import 'package:immo/models/promotion.dart';
 import 'package:immo/screens/product/add_product_screen.dart';
 import 'package:immo/models/product.dart';
+import 'package:immo/services/review_service.dart';
 
 class HomeMarchantScreen extends StatefulWidget {
   const HomeMarchantScreen({Key? key}) : super(key: key);
@@ -817,6 +818,35 @@ class _ProductCardState extends State<_ProductCard> with SingleTickerProviderSta
                                   fontWeight: FontWeight.bold,
                                   fontSize: 11,
                                 ),
+                              ),
+                              const SizedBox(height: 2),
+                              FutureBuilder<double>(
+                                future: ReviewService().getCachedAverageRating(widget.productId),
+                                builder: (context, snapshot) {
+                                  if (snapshot.hasData && snapshot.data! > 0) {
+                                    final rating = snapshot.data!;
+                                    return Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          Icons.star_rounded,
+                                          size: 10,
+                                          color: Colors.amber.shade700,
+                                        ),
+                                        const SizedBox(width: 2),
+                                        Text(
+                                          rating.toStringAsFixed(1),
+                                          style: TextStyle(
+                                            fontSize: 9,
+                                            fontWeight: FontWeight.w600,
+                                            color: Colors.grey.shade700,
+                                          ),
+                                        ),
+                                      ],
+                                    );
+                                  }
+                                  return const SizedBox.shrink();
+                                },
                               ),
                             ],
                           ),

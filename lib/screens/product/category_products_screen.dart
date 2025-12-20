@@ -9,6 +9,7 @@ import 'package:immo/screens/auth/login_screen.dart';
 import 'package:immo/screens/product/product_detail_screen.dart';
 import 'package:immo/cubit/category_products_cubit.dart';
 import 'package:immo/widgets/shimmer_loading.dart';
+import 'package:immo/services/review_service.dart';
 
 class CategoryProductsScreen extends StatefulWidget {
   final Category category;
@@ -366,6 +367,35 @@ class _TwitterStyleProductCard extends StatelessWidget {
                   Text('${product.price} FC',
                       style: const TextStyle(
                           color: Colors.green, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 4),
+                  FutureBuilder<double>(
+                    future: ReviewService().getCachedAverageRating(product.id),
+                    builder: (context, snapshot) {
+                      if (snapshot.hasData && snapshot.data! > 0) {
+                        final rating = snapshot.data!;
+                        return Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.star_rounded,
+                              size: 12,
+                              color: Colors.amber.shade700,
+                            ),
+                            const SizedBox(width: 3),
+                            Text(
+                              rating.toStringAsFixed(1),
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.grey.shade700,
+                              ),
+                            ),
+                          ],
+                        );
+                      }
+                      return const SizedBox.shrink();
+                    },
+                  ),
                 ],
               ),
             ),

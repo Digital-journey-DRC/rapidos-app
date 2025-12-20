@@ -96,4 +96,3 @@ class CategoryProductsCubit extends Cubit<CategoryProductsState> {
     }
   }
 }
-

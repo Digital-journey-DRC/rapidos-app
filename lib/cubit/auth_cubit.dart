@@ -206,19 +206,9 @@ class AuthCubit extends Cubit<AuthState> {
     try {
       final token = await _storageService.getToken();
       final userData = await _storageService.getUserData();
-      final lastLogin = await _storageService.getLastLoginTime();
 
-      if (token != null && userData != null && lastLogin != null) {
-        // Session valable 24h depuis la dernière connexion
-        final now = DateTime.now();
-        final difference = now.difference(lastLogin);
-        if (difference.inHours >= 24) {
-          // Session expirée après 24h
-          await _storageService.clearAll();
-          emit(AuthInitial());
-          return;
-        }
-
+      if (token != null && userData != null) {
+        // Session valable indéfiniment tant que l'utilisateur ne se déconnecte pas
         try {
           final user = jsonDecode(userData);
           emit(AuthSuccess(
