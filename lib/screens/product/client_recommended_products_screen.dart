@@ -4,6 +4,7 @@ import 'package:immo/widgets/app_logo.dart';
 import 'package:immo/services/product_service.dart';
 import 'package:immo/models/product.dart';
 import 'package:immo/screens/product/product_detail_screen.dart';
+import 'package:immo/services/review_service.dart';
 
 /// Écran pour afficher tous les produits recommandés côté client
 class ClientRecommendedProductsScreen extends StatefulWidget {
@@ -73,21 +74,23 @@ class _ClientRecommendedProductsScreenState extends State<ClientRecommendedProdu
         backgroundColor: Colors.white,
         elevation: 0,
       ),
-      backgroundColor: const Color(0xFFF7F8FA),
+      backgroundColor: const Color(0xFFF5F5F5),
       body: Column(
         children: [
           // Barre de recherche
           Padding(
-            padding: const EdgeInsets.all(12.0),
+            padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
             child: TextField(
               decoration: InputDecoration(
                 hintText: 'Rechercher un produit...',
-                prefixIcon: const Icon(Icons.search),
+                prefixIcon: const Icon(Icons.search, size: 20),
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide.none,
                 ),
                 filled: true,
                 fillColor: Colors.white,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               ),
               onChanged: (val) => setState(() => _search = val),
             ),
@@ -101,32 +104,28 @@ class _ClientRecommendedProductsScreenState extends State<ClientRecommendedProdu
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.star_outline, size: 64, color: Colors.grey.shade400),
+                            Icon(Icons.search_off, size: 64, color: Colors.grey.shade400),
                             const SizedBox(height: 16),
                             Text(
-                              'Aucun produit recommandé',
+                              'Aucun produit recommandé trouvé',
                               style: TextStyle(
-                                fontSize: 18,
+                                fontSize: 16,
                                 color: Colors.grey.shade600,
-                                fontWeight: FontWeight.w500,
                               ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Aucun produit recommandé disponible pour le moment',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey.shade500,
-                              ),
-                              textAlign: TextAlign.center,
                             ),
                           ],
                         ),
                       )
                     : RefreshIndicator(
                         onRefresh: _loadRecommendedProducts,
-                        child: ListView.builder(
-                          padding: const EdgeInsets.all(12.0),
+                        child: GridView.builder(
+                          padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 2,
+                            crossAxisSpacing: 8,
+                            mainAxisSpacing: 8,
+                            childAspectRatio: 0.68,
+                          ),
                           itemCount: filtered.length,
                           itemBuilder: (context, index) {
                             final product = filtered[index];
@@ -173,99 +172,144 @@ class _RecommendedProductCard extends StatelessWidget {
           ),
         );
       },
-      child: Card(
-        margin: const EdgeInsets.only(bottom: 12),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: Colors.grey.shade200,
+            width: 0.5,
+          ),
         ),
-        elevation: 1,
-        child: Row(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Image
-            ClipRRect(
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(12),
-                bottomLeft: Radius.circular(12),
-              ),
-              child: Image.network(
-                imageUrl,
-                width: 100,
-                height: 100,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) => Container(
-                  width: 100,
-                  height: 100,
-                  color: Colors.grey.shade200,
-                  child: const Icon(Icons.image_not_supported, color: Colors.grey, size: 30),
+            // Image du produit
+            Expanded(
+              flex: 3,
+              child: ClipRRect(
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(8),
+                  topRight: Radius.circular(8),
+                ),
+                child: Container(
+                  width: double.infinity,
+                  color: Colors.grey.shade50,
+                  child: Image.network(
+                    imageUrl,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => Container(
+                      width: double.infinity,
+                      color: Colors.grey.shade100,
+                      child: Icon(
+                        Icons.image_not_supported,
+                        color: Colors.grey.shade400,
+                        size: 32,
+                      ),
+                    ),
+                    loadingBuilder: (context, child, loadingProgress) {
+                      if (loadingProgress == null) return child;
+                      return Container(
+                        color: Colors.grey.shade100,
+                        child: Center(
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            value: loadingProgress.expectedTotalBytes != null
+                                ? loadingProgress.cumulativeBytesLoaded /
+                                    loadingProgress.expectedTotalBytes!
+                                : null,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
                 ),
               ),
             ),
-            // Détails
+            // Contenu de la carte
             Expanded(
+              flex: 2,
               child: Padding(
-                padding: const EdgeInsets.all(12.0),
+                padding: const EdgeInsets.all(8.0),
                 child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     // Catégorie
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(
-                        color: AppColors.primary,
-                        borderRadius: BorderRadius.circular(6),
+                        color: AppColors.primary.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
-                        product.category?.name ?? 'Produit',
-                        style: const TextStyle(color: Colors.white, fontSize: 9),
+                        product.category?.name ?? '',
+                        style: TextStyle(
+                          color: AppColors.primary,
+                          fontSize: 8,
+                          fontWeight: FontWeight.w600,
+                        ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 4),
                     // Nom du produit
                     Text(
                       product.name,
                       style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 4),
-                    // Description
-                    Text(
-                      product.description,
-                      style: TextStyle(
-                        color: Colors.grey.shade700,
-                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                        height: 1.2,
+                        color: Color(0xFF1A1A1A),
                       ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 6),
-                    // Prix
-                    Text(
-                      '${product.price.toStringAsFixed(0)} FC',
-                      style: const TextStyle(
-                        color: AppColors.primary,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    // Stock
-                    Row(
+                    // Prix et note
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(Icons.inventory_2_outlined, size: 12, color: Colors.grey.shade600),
-                        const SizedBox(width: 4),
                         Text(
-                          'Stock: ${product.stock}',
-                          style: TextStyle(
-                            color: Colors.grey.shade600,
-                            fontSize: 11,
+                          '${product.price.toStringAsFixed(0)} FC',
+                          style: const TextStyle(
+                            color: Color(0xFF147C3C),
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
                           ),
+                        ),
+                        const SizedBox(height: 2),
+                        FutureBuilder<double>(
+                          future: ReviewService().getCachedAverageRating(product.id),
+                          builder: (context, snapshot) {
+                            if (snapshot.hasData && snapshot.data! > 0) {
+                              final rating = snapshot.data!;
+                              return Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.star_rounded,
+                                    size: 11,
+                                    color: Colors.amber.shade700,
+                                  ),
+                                  const SizedBox(width: 2),
+                                  Text(
+                                    rating.toStringAsFixed(1),
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w500,
+                                      color: Colors.grey.shade600,
+                                    ),
+                                  ),
+                                ],
+                              );
+                            }
+                            return const SizedBox.shrink();
+                          },
                         ),
                       ],
                     ),

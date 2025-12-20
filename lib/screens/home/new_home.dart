@@ -4,6 +4,7 @@ import 'package:immo/screens/home/all_merchants_screen.dart';
 import 'package:immo/screens/navigation_example.dart';
 import 'package:immo/screens/product/product_detail_screen.dart';
 import '../merchant/merchant_profile_screen.dart';
+import '../merchant/vendeur_detail_screen.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:immo/cubit/auth_cubit.dart';
 import 'package:immo/screens/dashboard/setting_screen.dart';
@@ -957,79 +958,21 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                                         '${vendeur['firstName']} ${vendeur['lastName']}';
                                     return GestureDetector(
                                       onTap: () {
-                                        // Print des données du marchand
-                                        print('🏪 ========== DONNÉES DU MARCHAND CLIQUE ==========');
-                                        print('🏪 Marchand (vendeur):');
-                                        print('  - id: ${vendeur['id']}');
-                                        print('  - firstName: ${vendeur['firstName']}');
-                                        print('  - lastName: ${vendeur['lastName']}');
-                                        print('  - email: ${vendeur['email']}');
-                                        print('  - phone: ${vendeur['phone']}');
-                                        print('  - role: ${vendeur['role']}');
-                                        print('  - userStatus: ${vendeur['userStatus']}');
+                                        // Naviguer vers VendeurDetailScreen de manière cohérente avec le détail produit
+                                        final vendeurId = vendeur['id'] is int 
+                                            ? vendeur['id'] 
+                                            : int.tryParse(vendeur['id'].toString());
                                         
-                                        if (vendeur['profil'] != null) {
-                                          print('  - profil:');
-                                          print('    * id: ${vendeur['profil']['id']}');
-                                          if (vendeur['profil']['media'] != null) {
-                                            print('    * media:');
-                                            print('      - id: ${vendeur['profil']['media']['id']}');
-                                            print('      - mediaUrl: ${vendeur['profil']['media']['mediaUrl']}');
-                                            print('      - mediaType: ${vendeur['profil']['media']['mediaType']}');
-                                          }
-                                        }
-                                        
-                                        if (media != null) {
-                                          print('  - media (boutique):');
-                                          print('    * id: ${media['id']}');
-                                          print('    * mediaUrl: ${media['mediaUrl']}');
-                                          print('    * mediaType: ${media['mediaType']}');
-                                        }
-                                        
-                                        print('🏪 Produits du marchand: ${products.length}');
-                                        for (var i = 0; i < products.length && i < 3; i++) {
-                                          final product = products[i];
-                                          print('  - Produit ${i + 1}:');
-                                          print('    * id: ${product['id']}');
-                                          print('    * name: ${product['name']}');
-                                          print('    * price: ${product['price']}');
-                                        }
-                                        if (products.length > 3) {
-                                          print('  - ... et ${products.length - 3} autres produits');
-                                        }
-                                        
-                                        print('🏪 Données affichées:');
-                                        print('  - name: $name');
-                                        print('  - image: $image');
-                                        print('  - rating: 4.5');
-                                        print('  - isVerified: true');
-                                        print('🏪 ===========================================');
-                                        
-                                        // Permettre l'accès aux profils de marchands sans connexion
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (context) =>
-                                                MerchantProfileScreen(
-                                              description: products.isNotEmpty
-                                                  ? products[0]
-                                                          ['description'] ??
-                                                      ''
-                                                  : '',
-                                              merchantId: vendeur['id'],
-                                              name: name,
-                                              rating: 4.5,
-                                              category: products.isNotEmpty
-                                                  ? products[0]
-                                                          ['description'] ??
-                                                      ''
-                                                  : '',
-                                              imagePath: image,
-                                              isVerified: true,
-                                              products: products,
+                                        if (vendeurId != null) {
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (context) => VendeurDetailScreen(
+                                                vendeurId: vendeurId,
+                                              ),
                                             ),
-                                          ),
-                                        );
+                                          );
+                                        }
                                       },
                                       child: _buildMerchantCard(
                                         id: vendeur['id'].toString(),

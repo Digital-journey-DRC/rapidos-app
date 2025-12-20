@@ -14,6 +14,8 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'dart:io';
 import 'package:camera/camera.dart';
+import 'package:immo/services/invoice_service.dart';
+import 'package:immo/services/merchant_service.dart';
 
 class CameraColisScreen extends StatefulWidget {
   final Function(String imagePath) onPictureTaken;
@@ -704,6 +706,96 @@ class _OrderScreenState extends State<OrderScreen> {
     );
   }
 
+  Future<void> _generateInvoiceForClient(
+    BuildContext context,
+    Map<String, dynamic> orderData,
+    String orderId,
+    List<Map<String, dynamic>> items,
+  ) async {
+    final authState = context.read<AuthCubit>().state;
+    if (authState is! AuthSuccess || authState.user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Impossible de générer la facture. Utilisateur non connecté.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    final client = authState.user!;
+
+    // Récupérer l'ID du vendeur depuis les items
+    int? vendeurId;
+    for (var item in items) {
+      if (item['idVendeur'] != null) {
+        vendeurId = int.tryParse(item['idVendeur'].toString());
+        break;
+      }
+    }
+
+    // Informations du client (utilisateur connecté)
+    final clientInfo = {
+      'name': '${client['firstName'] ?? ''} ${client['lastName'] ?? ''}'.trim().isEmpty
+          ? 'Client'
+          : '${client['firstName'] ?? ''} ${client['lastName'] ?? ''}'.trim(),
+      'phone': client['phone']?.toString() ?? '',
+      'address': orderData['adresse']?.toString() ?? 'Adresse non spécifiée',
+    };
+
+    // Informations du marchand
+    Map<String, dynamic> merchantInfo = {
+      'name': 'Marchand',
+      'phone': '',
+      'email': '',
+    };
+
+    // Afficher un indicateur de chargement
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(),
+      ),
+    );
+
+    try {
+      // Si on a un vendeurId, récupérer ses informations depuis l'API
+      if (vendeurId != null) {
+        try {
+          final merchantService = MerchantService();
+          final result = await merchantService.getVendeurById(vendeurId);
+
+          if (result['success'] == true && result['vendeur'] != null) {
+            final vendeur = result['vendeur'] as dynamic;
+            merchantInfo = {
+              'firstName': vendeur.firstName ?? '',
+              'lastName': vendeur.lastName ?? '',
+              'name': vendeur.fullName ?? 'Marchand',
+              'phone': vendeur.phone ?? '',
+              'email': vendeur.email ?? '',
+            };
+          }
+        } catch (e) {
+          print('Erreur lors de la récupération du marchand: $e');
+          // Continuer avec les informations par défaut
+        }
+      }
+
+      await InvoiceService.generateInvoice(
+        context: context,
+        orderData: orderData,
+        orderId: orderId,
+        merchantInfo: merchantInfo,
+        clientInfo: clientInfo,
+      );
+    } finally {
+      if (context.mounted) {
+        Navigator.of(context).pop(); // Fermer le dialog de chargement
+      }
+    }
+  }
+
   Widget _buildClientOrders() {
     final authState = context.read<AuthCubit>().state;
     if (authState is! AuthSuccess || authState.user == null) {
@@ -834,7 +926,7 @@ class _OrderScreenState extends State<OrderScreen> {
         }
 
         return ListView(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           children: sortedDocs.map((doc) {
             try {
               final data = doc.data() as Map<String, dynamic>;
@@ -871,19 +963,19 @@ class _OrderScreenState extends State<OrderScreen> {
               }
 
               return Container(
-                margin: const EdgeInsets.only(bottom: 12),
+                margin: const EdgeInsets.only(bottom: 8),
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(10),
                   border: Border.all(
                     color: Colors.grey.shade200,
-                    width: 1,
+                    width: 0.5,
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.04),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
+                      color: Colors.black.withOpacity(0.02),
+                      blurRadius: 4,
+                      offset: const Offset(0, 1),
                       spreadRadius: 0,
                     ),
                   ],
@@ -891,7 +983,7 @@ class _OrderScreenState extends State<OrderScreen> {
                 child: Material(
                   color: Colors.transparent,
                   child: InkWell(
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(10),
                     onTap: () {
                       Navigator.push(
                         context,
@@ -904,13 +996,13 @@ class _OrderScreenState extends State<OrderScreen> {
                       );
                     },
                     child: Padding(
-                      padding: const EdgeInsets.all(14),
+                      padding: const EdgeInsets.all(10),
                       child: Row(
                         children: [
                           // Icône de commande avec gradient
                           Container(
-                            width: 48,
-                            height: 48,
+                            width: 36,
+                            height: 36,
                             decoration: BoxDecoration(
                               gradient: LinearGradient(
                                 colors: [
@@ -920,22 +1012,15 @@ class _OrderScreenState extends State<OrderScreen> {
                                 begin: Alignment.topLeft,
                                 end: Alignment.bottomRight,
                               ),
-                              borderRadius: BorderRadius.circular(12),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: AppColors.primary.withOpacity(0.25),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 3),
-                                ),
-                              ],
+                              borderRadius: BorderRadius.circular(8),
                             ),
                             child: const Icon(
                               Icons.shopping_bag_outlined,
                               color: Colors.white,
-                              size: 24,
+                              size: 18,
                             ),
                           ),
-                          const SizedBox(width: 12),
+                          const SizedBox(width: 10),
                           // Informations principales
                           Expanded(
                             child: Column(
@@ -952,33 +1037,33 @@ class _OrderScreenState extends State<OrderScreen> {
                                             Text(
                                               'Commande #$shortCode',
                                               style: TextStyle(
-                                                fontSize: 12,
+                                                fontSize: 11,
                                                 fontWeight: FontWeight.w600,
-                                                color: Colors.grey.shade600,
+                                                color: Colors.grey.shade700,
                                               ),
                                             )
                                           else
                                             Text(
                                               'Commande #${doc.id.substring(0, 8)}',
                                               style: TextStyle(
-                                                fontSize: 12,
+                                                fontSize: 11,
                                                 fontWeight: FontWeight.w600,
-                                                color: Colors.grey.shade600,
+                                                color: Colors.grey.shade700,
                                               ),
                                             ),
-                                          const SizedBox(height: 4),
+                                          const SizedBox(height: 3),
                                           Row(
                                             children: [
                                               Icon(
                                                 Icons.calendar_today,
-                                                size: 12,
+                                                size: 10,
                                                 color: Colors.grey.shade500,
                                               ),
-                                              const SizedBox(width: 4),
+                                              const SizedBox(width: 3),
                                               Text(
                                                 _formatDate(timestamp),
                                                 style: TextStyle(
-                                                  fontSize: 11,
+                                                  fontSize: 10,
                                                   color: Colors.grey.shade600,
                                                 ),
                                               ),
@@ -989,29 +1074,29 @@ class _OrderScreenState extends State<OrderScreen> {
                                     ),
                                     Container(
                                       padding: const EdgeInsets.symmetric(
-                                        horizontal: 10,
-                                        vertical: 6,
+                                        horizontal: 6,
+                                        vertical: 3,
                                       ),
                                       decoration: BoxDecoration(
                                         color: _statusColor(status).withOpacity(0.15),
-                                        borderRadius: BorderRadius.circular(8),
+                                        borderRadius: BorderRadius.circular(6),
                                         border: Border.all(
                                           color: _statusColor(status).withOpacity(0.3),
-                                          width: 1,
+                                          width: 0.5,
                                         ),
                                       ),
                                       child: Text(
                                         _translateStatus(status),
                                         style: TextStyle(
                                           color: _statusColor(status),
-                                          fontSize: 10,
+                                          fontSize: 9,
                                           fontWeight: FontWeight.bold,
                                         ),
                                       ),
                                     ),
                                   ],
                                 ),
-                                const SizedBox(height: 10),
+                                const SizedBox(height: 6),
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
@@ -1019,16 +1104,16 @@ class _OrderScreenState extends State<OrderScreen> {
                                       children: [
                                         Icon(
                                           Icons.inventory_2_outlined,
-                                          size: 14,
+                                          size: 12,
                                           color: Colors.grey.shade600,
                                         ),
-                                        const SizedBox(width: 4),
+                                        const SizedBox(width: 3),
                                         Text(
                                           '${items.length} ${items.length > 1 ? 'produits' : 'produit'}',
                                           style: TextStyle(
-                                            fontSize: 13,
+                                            fontSize: 11,
                                             fontWeight: FontWeight.w600,
-                                            color: Colors.grey.shade800,
+                                            color: Colors.grey.shade700,
                                           ),
                                         ),
                                       ],
@@ -1036,7 +1121,7 @@ class _OrderScreenState extends State<OrderScreen> {
                                     Text(
                                       '$total FC',
                                       style: TextStyle(
-                                        fontSize: 16,
+                                        fontSize: 14,
                                         fontWeight: FontWeight.bold,
                                         color: AppColors.primary,
                                       ),
@@ -1046,21 +1131,49 @@ class _OrderScreenState extends State<OrderScreen> {
                               ],
                             ),
                           ),
-                          const SizedBox(width: 8),
+                          const SizedBox(width: 6),
+                          // Bouton générer facture PDF
+                          Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: Colors.red.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                color: Colors.red.withOpacity(0.2),
+                                width: 0.5,
+                              ),
+                            ),
+                            child: InkWell(
+                              onTap: () {
+                                _generateInvoiceForClient(
+                                  context,
+                                  data,
+                                  doc.id,
+                                  items,
+                                );
+                              },
+                              child: Icon(
+                                Icons.picture_as_pdf,
+                                size: 14,
+                                color: Colors.red.shade700,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 4),
                           // Bouton voir détails
                           Container(
-                            padding: const EdgeInsets.all(8),
+                            padding: const EdgeInsets.all(6),
                             decoration: BoxDecoration(
                               color: AppColors.primary.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(10),
+                              borderRadius: BorderRadius.circular(6),
                               border: Border.all(
                                 color: AppColors.primary.withOpacity(0.2),
-                                width: 1,
+                                width: 0.5,
                               ),
                             ),
                             child: Icon(
                               Icons.arrow_forward_ios,
-                              size: 16,
+                              size: 14,
                               color: AppColors.primary,
                             ),
                           ),
