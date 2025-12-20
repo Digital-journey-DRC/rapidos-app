@@ -9,7 +9,6 @@ import '../cubits/express/express_cubit.dart';
 import '../cubits/express/express_state.dart';
 import '../cubit/auth_cubit.dart';
 import '../constants.dart';
-import '../services/express_service.dart';
 import '../widgets/app_logo.dart';
 
 class ExpressScreen extends StatefulWidget {
@@ -145,50 +144,52 @@ class _ExpressScreenState extends State<ExpressScreen> with SingleTickerProvider
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         title: Row(
           children: [
             Container(
-              padding: const EdgeInsets.all(8),
+              padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
                 color: AppColors.primary.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(6),
               ),
-              child: Icon(Icons.people, color: AppColors.primary),
+              child: Icon(Icons.people, color: AppColors.primary, size: 16),
             ),
-            const SizedBox(width: 12),
-            const Text('Sélectionner un client', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            const SizedBox(width: 8),
+            const Text('Sélectionner un client', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
           ],
         ),
         content: SizedBox(
           width: double.maxFinite,
-          height: 400,
+          height: 350,
           child: Column(
             children: [
               // Barre de recherche
               Container(
-                margin: const EdgeInsets.only(bottom: 16),
+                margin: const EdgeInsets.only(bottom: 10),
                 child: TextField(
                   controller: _searchController,
                   onChanged: _filterClients,
+                  style: const TextStyle(fontSize: 12),
                   decoration: InputDecoration(
                     hintText: 'Rechercher un client...',
-                    prefixIcon: const Icon(Icons.search, color: AppColors.primary),
+                    hintStyle: const TextStyle(fontSize: 12),
+                    prefixIcon: const Icon(Icons.search, color: AppColors.primary, size: 16),
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(8),
                       borderSide: BorderSide(color: Colors.grey[300]!),
                     ),
                     enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(8),
                       borderSide: BorderSide(color: Colors.grey[300]!),
                     ),
                     focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: AppColors.primary, width: 2),
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(color: AppColors.primary, width: 1.5),
                     ),
                     filled: true,
                     fillColor: Colors.grey[50],
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                   ),
                 ),
               ),
@@ -200,30 +201,30 @@ class _ExpressScreenState extends State<ExpressScreen> with SingleTickerProvider
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.people_outline, size: 64, color: Colors.grey[400]),
-                            const SizedBox(height: 16),
+                            Icon(Icons.people_outline, size: 40, color: Colors.grey[400]),
+                            const SizedBox(height: 10),
                             Text(
                               _searchController.text.isEmpty 
                                   ? 'Aucun client trouvé'
                                   : 'Aucun client correspondant à "${_searchController.text}"',
                               style: TextStyle(
-                                fontSize: 16,
+                                fontSize: 12,
                                 color: Colors.grey[600],
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
-                            const SizedBox(height: 8),
+                            const SizedBox(height: 6),
                             Text(
                               _searchController.text.isEmpty
                                   ? 'Créez d\'abord un nouveau client'
                                   : 'Essayez avec d\'autres termes',
                               style: TextStyle(
-                                fontSize: 14,
+                                fontSize: 11,
                                 color: Colors.grey[500],
                               ),
                             ),
                             if (_searchController.text.isEmpty) ...[
-                              const SizedBox(height: 16),
+                              const SizedBox(height: 10),
                               ElevatedButton.icon(
                                 onPressed: () {
                                   Navigator.pop(context);
@@ -231,13 +232,14 @@ class _ExpressScreenState extends State<ExpressScreen> with SingleTickerProvider
                                     _isNewClient = true;
                                   });
                                 },
-                                icon: const Icon(Icons.person_add),
-                                label: const Text('Créer un nouveau client'),
+                                icon: const Icon(Icons.person_add, size: 14),
+                                label: const Text('Créer un nouveau client', style: TextStyle(fontSize: 11)),
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: AppColors.primary,
                                   foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                                   shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
+                                    borderRadius: BorderRadius.circular(8),
                                   ),
                                 ),
                               ),
@@ -250,30 +252,33 @@ class _ExpressScreenState extends State<ExpressScreen> with SingleTickerProvider
                         itemBuilder: (context, index) {
                           final client = _filteredClients[index];
                           return Container(
-                            margin: const EdgeInsets.only(bottom: 8),
+                            margin: const EdgeInsets.only(bottom: 6),
                             decoration: BoxDecoration(
                               color: Colors.grey[50],
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: Colors.grey[200]!),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.grey[200]!, width: 0.5),
                             ),
                             child: ListTile(
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                               leading: CircleAvatar(
+                                radius: 16,
                                 backgroundColor: AppColors.primary.withOpacity(0.1),
                                 child: Text(
                                   client['firstName'][0].toUpperCase(),
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     color: AppColors.primary,
                                     fontWeight: FontWeight.bold,
+                                    fontSize: 12,
                                   ),
                                 ),
                               ),
                               title: Text(
                                 '${client['firstName']} ${client['lastName']}',
-                                style: const TextStyle(fontWeight: FontWeight.w600),
+                                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
                               ),
                               subtitle: Text(
                                 client['phone'],
-                                style: TextStyle(color: Colors.grey[600]),
+                                style: TextStyle(color: Colors.grey[600], fontSize: 11),
                               ),
                               onTap: () {
                                 setState(() {
@@ -450,16 +455,16 @@ class _ExpressScreenState extends State<ExpressScreen> with SingleTickerProvider
         children: [
           // TabBar
           Container(
-            margin: const EdgeInsets.all(20),
-            padding: const EdgeInsets.all(4),
+            margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            padding: const EdgeInsets.all(2),
             decoration: BoxDecoration(
               color: Colors.grey[100],
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(8),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 10,
-                  offset: const Offset(0, 2),
+                  color: Colors.black.withOpacity(0.02),
+                  blurRadius: 2,
+                  offset: const Offset(0, 1),
                 ),
               ],
             ),
@@ -467,20 +472,13 @@ class _ExpressScreenState extends State<ExpressScreen> with SingleTickerProvider
               controller: _tabController,
               indicator: BoxDecoration(
                 color: AppColors.primary,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.primary.withOpacity(0.3),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
+                borderRadius: BorderRadius.circular(6),
               ),
               indicatorSize: TabBarIndicatorSize.tab,
               labelColor: Colors.white,
               unselectedLabelColor: Colors.grey[600],
               labelStyle: const TextStyle(
-                fontWeight: FontWeight.bold,
+                fontWeight: FontWeight.w600,
                 fontSize: 10,
               ),
               unselectedLabelStyle: const TextStyle(
@@ -490,11 +488,11 @@ class _ExpressScreenState extends State<ExpressScreen> with SingleTickerProvider
               dividerColor: Colors.transparent,
               tabs: const [
                 Tab(
-                  icon: Icon(Icons.add_circle_outline, size: 20),
+                  icon: Icon(Icons.add_circle_outline, size: 14),
                   text: 'Nouvelle commande',
                 ),
                 Tab(
-                  icon: Icon(Icons.list_alt, size: 20),
+                  icon: Icon(Icons.list_alt, size: 14),
                   text: 'Mes commandes',
                 ),
               ],
@@ -698,15 +696,19 @@ class _ExpressScreenState extends State<ExpressScreen> with SingleTickerProvider
   }) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: Colors.grey.shade200,
+          width: 0.5,
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 20,
-            offset: const Offset(0, 5),
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 4,
+            offset: const Offset(0, 1),
           ),
         ],
       ),
@@ -716,25 +718,25 @@ class _ExpressScreenState extends State<ExpressScreen> with SingleTickerProvider
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(8),
+                padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
                   color: AppColors.primary.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(6),
                 ),
-                child: Icon(icon, color: AppColors.primary, size: 20),
+                child: Icon(icon, color: AppColors.primary, size: 16),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 8),
               Text(
                 title,
                 style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
                   color: Colors.black87,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 12),
           child,
         ],
       ),
@@ -751,30 +753,30 @@ class _ExpressScreenState extends State<ExpressScreen> with SingleTickerProvider
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
           color: isSelected ? AppColors.primary.withOpacity(0.1) : Colors.grey[50],
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(8),
           border: Border.all(
             color: isSelected ? AppColors.primary : Colors.grey[200]!,
-            width: isSelected ? 2 : 1,
+            width: isSelected ? 1.5 : 0.5,
           ),
         ),
         child: Row(
           children: [
             Container(
-              padding: const EdgeInsets.all(8),
+              padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
                 color: isSelected ? AppColors.primary : Colors.grey[300],
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(6),
               ),
               child: Icon(
                 icon,
                 color: isSelected ? Colors.white : Colors.grey[600],
-                size: 20,
+                size: 16,
               ),
             ),
-            const SizedBox(width: 16),
+            const SizedBox(width: 10),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -782,7 +784,8 @@ class _ExpressScreenState extends State<ExpressScreen> with SingleTickerProvider
                   Text(
                     title,
                     style: TextStyle(
-                      fontWeight: FontWeight.bold,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
                       color: isSelected ? AppColors.primary : Colors.black87,
                     ),
                   ),
@@ -790,7 +793,7 @@ class _ExpressScreenState extends State<ExpressScreen> with SingleTickerProvider
                     subtitle,
                     style: TextStyle(
                       color: isSelected ? AppColors.primary.withOpacity(0.8) : Colors.grey[600],
-                      fontSize: 12,
+                      fontSize: 11,
                     ),
                   ),
                 ],
@@ -798,12 +801,12 @@ class _ExpressScreenState extends State<ExpressScreen> with SingleTickerProvider
             ),
             if (isSelected)
               Container(
-                padding: const EdgeInsets.all(4),
+                padding: const EdgeInsets.all(3),
                 decoration: BoxDecoration(
                   color: AppColors.primary,
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Icon(Icons.check, color: Colors.white, size: 16),
+                child: const Icon(Icons.check, color: Colors.white, size: 14),
               ),
           ],
         ),
@@ -824,32 +827,34 @@ class _ExpressScreenState extends State<ExpressScreen> with SingleTickerProvider
       keyboardType: keyboardType,
       maxLines: maxLines,
       validator: validator,
+      style: const TextStyle(fontSize: 13),
       decoration: InputDecoration(
         labelText: label,
-        prefixIcon: Icon(icon, color: AppColors.primary),
+        labelStyle: const TextStyle(fontSize: 13),
+        prefixIcon: Icon(icon, color: AppColors.primary, size: 18),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(8),
           borderSide: BorderSide(color: Colors.grey[300]!),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(8),
           borderSide: BorderSide(color: Colors.grey[300]!),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: AppColors.primary, width: 2),
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: AppColors.primary, width: 1.5),
         ),
         errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(8),
           borderSide: BorderSide(color: Colors.red[300]!),
         ),
         focusedErrorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.red, width: 2),
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: Colors.red, width: 1.5),
         ),
         filled: true,
         fillColor: Colors.grey[50],
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
       ),
     );
   }
@@ -1185,7 +1190,7 @@ class _ExpressScreenState extends State<ExpressScreen> with SingleTickerProvider
       },
       builder: (context, state) {
         return SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           child: Form(
             key: _formKey,
             child: Column(
@@ -1195,20 +1200,24 @@ class _ExpressScreenState extends State<ExpressScreen> with SingleTickerProvider
                 if (state is ExpressLoading)
                   Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.all(16),
-                    margin: const EdgeInsets.only(bottom: 16),
+                    padding: const EdgeInsets.all(10),
+                    margin: const EdgeInsets.only(bottom: 10),
                     decoration: BoxDecoration(
                       color: Colors.blue.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(8),
                       border: Border.all(color: Colors.blue.withOpacity(0.3)),
                     ),
                     child: Row(
                       children: [
-                        const CircularProgressIndicator(color: Colors.blue),
-                        const SizedBox(width: 12),
+                        const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(color: Colors.blue, strokeWidth: 2),
+                        ),
+                        const SizedBox(width: 8),
                         const Text(
                           'Chargement des clients...',
-                          style: TextStyle(color: Colors.blue, fontWeight: FontWeight.w500),
+                          style: TextStyle(color: Colors.blue, fontWeight: FontWeight.w500, fontSize: 12),
                         ),
                       ],
                     ),
@@ -1217,21 +1226,21 @@ class _ExpressScreenState extends State<ExpressScreen> with SingleTickerProvider
                 if (state is ExpressError)
                   Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.all(16),
-                    margin: const EdgeInsets.only(bottom: 16),
+                    padding: const EdgeInsets.all(10),
+                    margin: const EdgeInsets.only(bottom: 10),
                     decoration: BoxDecoration(
                       color: Colors.red.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(8),
                       border: Border.all(color: Colors.red.withOpacity(0.3)),
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.error, color: Colors.red),
-                        const SizedBox(width: 12),
+                        const Icon(Icons.error, color: Colors.red, size: 16),
+                        const SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             'Erreur: ${state.message}',
-                            style: const TextStyle(color: Colors.red, fontWeight: FontWeight.w500),
+                            style: const TextStyle(color: Colors.red, fontWeight: FontWeight.w500, fontSize: 12),
                           ),
                         ),
                       ],
@@ -1241,7 +1250,7 @@ class _ExpressScreenState extends State<ExpressScreen> with SingleTickerProvider
                 // Header avec gradient
                 Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.all(24),
+                  padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [
@@ -1251,50 +1260,50 @@ class _ExpressScreenState extends State<ExpressScreen> with SingleTickerProvider
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
-                    borderRadius: BorderRadius.circular(20),
+                    borderRadius: BorderRadius.circular(8),
                     boxShadow: [
                       BoxShadow(
-                        color: AppColors.primary.withOpacity(0.3),
-                        blurRadius: 20,
-                        offset: const Offset(0, 10),
+                        color: AppColors.primary.withOpacity(0.15),
+                        blurRadius: 4,
+                        offset: const Offset(0, 1),
                       ),
                     ],
                   ),
                   child: Column(
                     children: [
                       Container(
-                        padding: const EdgeInsets.all(16),
+                        padding: const EdgeInsets.all(6),
                         decoration: BoxDecoration(
                           color: Colors.white.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(16),
+                          borderRadius: BorderRadius.circular(6),
                         ),
                         child: const Icon(
                           Icons.flash_on,
                           color: Colors.white,
-                          size: 32,
+                          size: 16,
                         ),
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 6),
                       const Text(
                         'Livraison Express',
                         style: TextStyle(
                           color: Colors.white,
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 2),
                       Text(
                         'Livraison rapide et sécurisée',
                         style: TextStyle(
                           color: Colors.white.withOpacity(0.9),
-                          fontSize: 16,
+                          fontSize: 10,
                         ),
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 10),
 
                 // Options de client
                 _buildSectionCard(
@@ -1316,7 +1325,7 @@ class _ExpressScreenState extends State<ExpressScreen> with SingleTickerProvider
                           });
                         },
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 8),
                       _buildOptionCard(
                         title: 'Client récurrent',
                         subtitle: 'Sélectionner un client existant',
@@ -1335,7 +1344,7 @@ class _ExpressScreenState extends State<ExpressScreen> with SingleTickerProvider
                     ],
                   ),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 12),
 
                 // Informations client
                 if (_isNewClient) ...[
@@ -1359,7 +1368,7 @@ class _ExpressScreenState extends State<ExpressScreen> with SingleTickerProvider
                             return null;
                           },
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 10),
                         _buildTextField(
                           controller: _firstNameController,
                           label: 'Prénom',
@@ -1371,7 +1380,7 @@ class _ExpressScreenState extends State<ExpressScreen> with SingleTickerProvider
                             return null;
                           },
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 10),
                         
                         // Téléphone avec sélecteur de pays
                         TextFormField(
@@ -1651,24 +1660,24 @@ class _ExpressScreenState extends State<ExpressScreen> with SingleTickerProvider
                       children: [
                         Icon(
                           Icons.info_outline,
-                          size: 48,
+                          size: 32,
                           color: Colors.blue[600],
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 10),
                         Text(
                           'Sélectionnez ou créez un client',
                           style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
                             color: Colors.blue[700],
                           ),
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 6),
                         Text(
                           'Vous devez d\'abord sélectionner un client récurrent ou créer un nouveau client pour continuer.',
                           textAlign: TextAlign.center,
                           style: TextStyle(
-                            fontSize: 14,
+                            fontSize: 11,
                             color: Colors.blue[600],
                           ),
                         ),
@@ -1703,21 +1712,27 @@ class _ExpressScreenState extends State<ExpressScreen> with SingleTickerProvider
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.error, size: 64, color: Colors.red[300]),
-                const SizedBox(height: 16),
+                Icon(Icons.error, size: 48, color: Colors.red[300]),
+                const SizedBox(height: 12),
                 Text(
                   'Erreur: ${state.message}',
                   style: TextStyle(
-                    fontSize: 16,
+                    fontSize: 14,
                     color: Colors.red[600],
                     fontWeight: FontWeight.w500,
                   ),
                   textAlign: TextAlign.center,
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 12),
                 ElevatedButton(
                   onPressed: () => _loadVendeurClients(),
-                  child: const Text('Réessayer'),
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: const Text('Réessayer', style: TextStyle(fontSize: 12)),
                 ),
               ],
             ),
@@ -1734,37 +1749,38 @@ class _ExpressScreenState extends State<ExpressScreen> with SingleTickerProvider
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.inventory_2_outlined, size: 64, color: Colors.grey[400]),
-                const SizedBox(height: 16),
+                Icon(Icons.inventory_2_outlined, size: 48, color: Colors.grey[400]),
+                const SizedBox(height: 12),
                 Text(
                   'Aucune commande express',
                   style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
                     color: Colors.grey[600],
                   ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 6),
                 Text(
                   'Vous n\'avez pas encore créé de commandes express',
                   style: TextStyle(
-                    fontSize: 14,
+                    fontSize: 12,
                     color: Colors.grey[500],
                   ),
                   textAlign: TextAlign.center,
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 16),
                 ElevatedButton.icon(
                   onPressed: () {
                     _tabController.animateTo(0);
                   },
-                  icon: const Icon(Icons.add),
-                  label: const Text('Créer une commande'),
+                  icon: const Icon(Icons.add, size: 16),
+                  label: const Text('Créer une commande', style: TextStyle(fontSize: 12)),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
                     foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(8),
                     ),
                   ),
                 ),
@@ -1778,7 +1794,7 @@ class _ExpressScreenState extends State<ExpressScreen> with SingleTickerProvider
             _loadVendeurClients();
           },
           child: ListView.builder(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             itemCount: orders.length,
             itemBuilder: (context, index) {
               final order = orders[index];
@@ -1791,15 +1807,19 @@ class _ExpressScreenState extends State<ExpressScreen> with SingleTickerProvider
               final deliveryAddress = order['deliveryAddress']?.toString() ?? 'Non spécifié';
 
               return Container(
-                margin: const EdgeInsets.only(bottom: 16),
+                margin: const EdgeInsets.only(bottom: 8),
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: Colors.grey.shade200,
+                    width: 0.5,
+                  ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
-                      blurRadius: 10,
-                      offset: const Offset(0, 2),
+                      color: Colors.black.withOpacity(0.03),
+                      blurRadius: 4,
+                      offset: const Offset(0, 1),
                     ),
                   ],
                 ),
@@ -1807,29 +1827,29 @@ class _ExpressScreenState extends State<ExpressScreen> with SingleTickerProvider
                   children: [
                     // Header avec statut
                     Container(
-                      padding: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: _getStatusColor(status).withOpacity(0.1),
+                        color: _getStatusColor(status).withOpacity(0.08),
                         borderRadius: const BorderRadius.only(
-                          topLeft: Radius.circular(16),
-                          topRight: Radius.circular(16),
+                          topLeft: Radius.circular(10),
+                          topRight: Radius.circular(10),
                         ),
                       ),
                       child: Row(
                         children: [
                           Container(
-                            padding: const EdgeInsets.all(8),
+                            padding: const EdgeInsets.all(6),
                             decoration: BoxDecoration(
                               color: _getStatusColor(status),
-                              borderRadius: BorderRadius.circular(8),
+                              borderRadius: BorderRadius.circular(6),
                             ),
                             child: Icon(
                               Icons.local_shipping,
                               color: Colors.white,
-                              size: 20,
+                              size: 14,
                             ),
                           ),
-                          const SizedBox(width: 12),
+                          const SizedBox(width: 8),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1837,8 +1857,8 @@ class _ExpressScreenState extends State<ExpressScreen> with SingleTickerProvider
                                 Text(
                                   'Commande Express',
                                   style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 13,
                                     color: _getStatusColor(status),
                                   ),
                                 ),
@@ -1846,24 +1866,24 @@ class _ExpressScreenState extends State<ExpressScreen> with SingleTickerProvider
                                   _formatDate(createdAt),
                                   style: TextStyle(
                                     color: Colors.grey[600],
-                                    fontSize: 12,
+                                    fontSize: 10,
                                   ),
                                 ),
                               ],
                             ),
                           ),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                             decoration: BoxDecoration(
                               color: _getStatusColor(status),
-                              borderRadius: BorderRadius.circular(20),
+                              borderRadius: BorderRadius.circular(12),
                             ),
                             child: Text(
                               _getStatusText(status),
                               style: const TextStyle(
                                 color: Colors.white,
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
                           ),
@@ -1873,21 +1893,21 @@ class _ExpressScreenState extends State<ExpressScreen> with SingleTickerProvider
                     
                     // Contenu de la commande
                     Padding(
-                      padding: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.all(10),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           // Client
                           Row(
                             children: [
-                              Icon(Icons.person, color: Colors.grey[600], size: 16),
-                              const SizedBox(width: 8),
+                              Icon(Icons.person, color: Colors.grey[600], size: 14),
+                              const SizedBox(width: 6),
                               Expanded(
                                 child: Text(
                                   'Client: $clientName',
                                   style: const TextStyle(
                                     fontWeight: FontWeight.w500,
-                                    fontSize: 14,
+                                    fontSize: 12,
                                   ),
                                 ),
                               ),
@@ -1895,45 +1915,45 @@ class _ExpressScreenState extends State<ExpressScreen> with SingleTickerProvider
                                 Container(
                                   decoration: BoxDecoration(
                                     color: Colors.green,
-                                    borderRadius: BorderRadius.circular(8),
+                                    borderRadius: BorderRadius.circular(6),
                                   ),
                                   child: IconButton(
-                                    icon: const Icon(Icons.phone, color: Colors.white, size: 18),
+                                    icon: const Icon(Icons.phone, color: Colors.white, size: 14),
                                     onPressed: () => _showCallOptionsDialog(clientPhone, clientName),
-                                    padding: const EdgeInsets.all(8),
+                                    padding: const EdgeInsets.all(6),
                                     constraints: const BoxConstraints(
-                                      minWidth: 36,
-                                      minHeight: 36,
+                                      minWidth: 28,
+                                      minHeight: 28,
                                     ),
                                   ),
                                 ),
                             ],
                           ),
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 6),
                           
                           // Valeur du colis
                           Row(
                             children: [
-                              Icon(Icons.attach_money, color: Colors.grey[600], size: 16),
-                              const SizedBox(width: 8),
+                              Icon(Icons.attach_money, color: Colors.grey[600], size: 14),
+                              const SizedBox(width: 6),
                               Text(
                                 'Valeur: $packageValue FC',
                                 style: const TextStyle(
                                   fontWeight: FontWeight.w500,
-                                  fontSize: 14,
+                                  fontSize: 12,
                                 ),
                               ),
                             ],
                           ),
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 8),
                           
                           // Adresses
                           if (pickupAddress.isNotEmpty && pickupAddress != 'Non spécifié') ...[
                             Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Icon(Icons.location_on, color: Colors.grey[600], size: 16),
-                                const SizedBox(width: 8),
+                                Icon(Icons.location_on, color: Colors.grey[600], size: 14),
+                                const SizedBox(width: 6),
                                 Expanded(
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -1942,27 +1962,27 @@ class _ExpressScreenState extends State<ExpressScreen> with SingleTickerProvider
                                         'Ramassage:',
                                         style: TextStyle(
                                           color: Colors.grey[600],
-                                          fontSize: 12,
+                                          fontSize: 10,
                                         ),
                                       ),
                                       Text(
                                         pickupAddress,
-                                        style: const TextStyle(fontSize: 14),
+                                        style: const TextStyle(fontSize: 12),
                                       ),
                                     ],
                                   ),
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 8),
+                            const SizedBox(height: 6),
                           ],
                           
                           if (deliveryAddress.isNotEmpty && deliveryAddress != 'Non spécifié') ...[
                             Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Icon(Icons.location_on, color: Colors.grey[600], size: 16),
-                                const SizedBox(width: 8),
+                                Icon(Icons.location_on, color: Colors.grey[600], size: 14),
+                                const SizedBox(width: 6),
                                 Expanded(
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -1971,12 +1991,12 @@ class _ExpressScreenState extends State<ExpressScreen> with SingleTickerProvider
                                         'Livraison:',
                                         style: TextStyle(
                                           color: Colors.grey[600],
-                                          fontSize: 12,
+                                          fontSize: 10,
                                         ),
                                       ),
                                       Text(
                                         deliveryAddress,
-                                        style: const TextStyle(fontSize: 14),
+                                        style: const TextStyle(fontSize: 12),
                                       ),
                                     ],
                                   ),

@@ -186,8 +186,10 @@ class _VendeurDetailScreenState extends State<VendeurDetailScreen> {
                 )
               : _vendeur == null
                   ? const Center(child: Text('Aucune donnée disponible'))
-                  : CustomScrollView(
-                      slivers: [
+                  : RefreshIndicator(
+                      onRefresh: _loadVendeurData,
+                      child: CustomScrollView(
+                        slivers: [
                         // App Bar discret
                         SliverAppBar(
                           pinned: true,
@@ -346,6 +348,7 @@ class _VendeurDetailScreenState extends State<VendeurDetailScreen> {
                         // Grille de produits
                         _buildProductsSliverGrid(),
                       ],
+                      ),
                     ),
     );
   }

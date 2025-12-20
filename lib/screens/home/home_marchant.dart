@@ -20,6 +20,8 @@ import 'package:immo/models/promotion.dart';
 import 'package:immo/screens/product/add_product_screen.dart';
 import 'package:immo/models/product.dart';
 import 'package:immo/services/review_service.dart';
+import 'package:immo/services/sales_statistics_service.dart';
+import 'package:immo/screens/statistics/sales_statistics_detail_screen.dart';
 
 class HomeMarchantScreen extends StatefulWidget {
   const HomeMarchantScreen({Key? key}) : super(key: key);
@@ -159,9 +161,15 @@ void saveCommande() async {
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        child: Column(
+      body: RefreshIndicator(
+        onRefresh: () async {
+          context.read<ProductCubit>().fetchProducts();
+          context.read<CategoryCubit>().fetchCategories();
+          // Recharger les statistiques si nécessaire
+        },
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // const SizedBox(height: 30),
@@ -179,6 +187,9 @@ void saveCommande() async {
             // Profil
 
             // const SizedBox(height: 18),
+            // Section: Statistiques de vente
+            _SalesStatisticsWidget(),
+            const SizedBox(height: 20),
             // Section: Mes Produits
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -491,26 +502,6 @@ void saveCommande() async {
 
             const SizedBox(height: 24),
 
-            // Section: Statistiques de vente
-            const Text(
-              'Statistiques de Vente',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-            ),
-            const SizedBox(height: 12),
-            const Row(
-              children: [
-                Expanded(
-                  child: _StatCard(title: 'Ventes', value: '150', percent: '+10%'),
-                ),
-                SizedBox(width: 12),
-                Expanded(
-                  child: _StatCard(title: 'Clients', value: '200', percent: '-5%'),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 24),
-
             // Section: Avis Clients
             const Text(
               'Avis Clients',
@@ -547,6 +538,7 @@ void saveCommande() async {
      
 
           ],
+        ),
         ),
       ),
       floatingActionButton: FloatingActionButton(
@@ -1009,49 +1001,6 @@ class _CategoryCard extends StatelessWidget {
   }
 }
 
-class _StatCard extends StatelessWidget {
-  final String title;
-  final String value;
-  final String percent;
-  const _StatCard(
-      {required this.title, required this.value, required this.percent});
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: Container(
-        height: 70,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.grey.shade300),
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(title,
-                style:
-                    const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-            const Spacer(),
-            Row(
-              children: [
-                Text(value,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.bold, fontSize: 18)),
-                const SizedBox(width: 8),
-                Text(percent,
-                    style: TextStyle(
-                        color:
-                            percent.startsWith('+') ? Colors.green : Colors.red,
-                        fontWeight: FontWeight.bold)),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
 
 class OrderCardShimmer extends StatelessWidget {
   const OrderCardShimmer({Key? key}) : super(key: key);
@@ -1241,6 +1190,271 @@ class ProductCardShimmer extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _SalesStatisticsWidget extends StatefulWidget {
+  @override
+  State<_SalesStatisticsWidget> createState() => _SalesStatisticsWidgetState();
+}
+
+class _SalesStatisticsWidgetState extends State<_SalesStatisticsWidget> {
+  final SalesStatisticsService _statisticsService = SalesStatisticsService();
+  Map<String, dynamic>? _statistics;
+  bool _isLoading = true;
+  String? _merchantId;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadMerchantId();
+  }
+
+  void _loadMerchantId() {
+    final authState = context.read<AuthCubit>().state;
+    if (authState is AuthSuccess && authState.user != null) {
+      final userId = authState.user!['id'];
+      if (userId != null) {
+        setState(() {
+          _merchantId = userId.toString();
+        });
+        _loadStatistics();
+      }
+    }
+  }
+
+  Future<void> _loadStatistics() async {
+    if (_merchantId == null) return;
+    
+    setState(() => _isLoading = true);
+    try {
+      final result = await _statisticsService.getSalesStatistics(_merchantId!);
+      if (result['success'] == true) {
+        setState(() {
+          _statistics = result;
+          _isLoading = false;
+        });
+      } else {
+        setState(() => _isLoading = false);
+      }
+    } catch (e) {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_merchantId == null) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // En-tête de section
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: const Icon(
+                    Icons.bar_chart_rounded,
+                    color: AppColors.primary,
+                    size: 18,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                const Text(
+                  'Statistiques de vente',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
+                    color: Color(0xFF2B2D42),
+                  ),
+                ),
+              ],
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => SalesStatisticsDetailScreen(
+                      period: 'daily',
+                      merchantId: _merchantId!,
+                    ),
+                  ),
+                );
+              },
+              child: const Text(
+                'Voir plus',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        // Grille de statistiques
+        _isLoading
+            ? Container(
+                height: 100,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey.shade200, width: 0.5),
+                ),
+                child: const Center(
+                  child: CircularProgressIndicator(color: AppColors.primary),
+                ),
+              )
+            : _statistics == null
+                ? Container(
+                    height: 100,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.grey.shade200, width: 0.5),
+                    ),
+                    child: const Center(
+                      child: Text(
+                        'Aucune donnée disponible',
+                        style: TextStyle(color: Colors.grey),
+                      ),
+                    ),
+                  )
+                : Row(
+                    children: [
+                      Expanded(
+                        child: _buildStatCard(
+                          'Aujourd\'hui',
+                          _statistics!['daily']?['total'] ?? 0.0,
+                          _statistics!['daily']?['count'] ?? 0,
+                          Icons.today,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _buildStatCard(
+                          'Cette semaine',
+                          _statistics!['weekly']?['total'] ?? 0.0,
+                          _statistics!['weekly']?['count'] ?? 0,
+                          Icons.calendar_view_week,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _buildStatCard(
+                          'Ce mois',
+                          _statistics!['monthly']?['total'] ?? 0.0,
+                          _statistics!['monthly']?['count'] ?? 0,
+                          Icons.calendar_month,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _buildStatCard(
+                          'Cette année',
+                          _statistics!['yearly']?['total'] ?? 0.0,
+                          _statistics!['yearly']?['count'] ?? 0,
+                          Icons.calendar_today,
+                        ),
+                      ),
+                    ],
+                  ),
+      ],
+    );
+  }
+
+  Widget _buildStatCard(String label, double total, int count, IconData icon) {
+    return GestureDetector(
+      onTap: () {
+        String period = 'daily';
+        if (label.contains('semaine')) period = 'weekly';
+        if (label.contains('mois')) period = 'monthly';
+        if (label.contains('année')) period = 'yearly';
+        
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => SalesStatisticsDetailScreen(
+              period: period,
+              merchantId: _merchantId!,
+            ),
+          ),
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: Colors.grey.shade200, width: 0.5),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.withOpacity(0.05),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Icon(
+                icon,
+                color: AppColors.primary,
+                size: 16,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '${total.toStringAsFixed(0)} FC',
+              style: const TextStyle(
+                color: Color(0xFF147C3C),
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: TextStyle(
+                color: Colors.grey.shade700,
+                fontSize: 10,
+                fontWeight: FontWeight.w500,
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '$count cmd${count > 1 ? 's' : ''}',
+              style: TextStyle(
+                color: Colors.grey.shade600,
+                fontSize: 9,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

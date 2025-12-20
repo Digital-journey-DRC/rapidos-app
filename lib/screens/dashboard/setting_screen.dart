@@ -260,6 +260,122 @@ class _SettingScreenState extends State<SettingScreen>
     }
   }
 
+  // Méthode pour gérer la mise à jour du profil après upload d'image
+  Future<void> _handleProfileUpdate(ProfileSuccess state) async {
+    final authCubit = context.read<AuthCubit>();
+    final authState = authCubit.state;
+    
+    if (authState is! AuthSuccess || authState.user == null) return;
+    
+    // Préserver toutes les informations de l'utilisateur existant
+    Map<String, dynamic> updatedUserData = Map<String, dynamic>.from(authState.user!);
+    
+    print('📥 BlocListener: Réception ProfileSuccess');
+    print('📥 state.data: ${state.data}');
+    
+    // Si state.data est null, on récupère les données depuis l'API
+    if (state.data == null) {
+      print('⚠️ state.data est null, récupération depuis /users/me...');
+      // Récupérer les données utilisateur depuis l'API
+      try {
+        final response = await http.get(
+          Uri.parse('http://24.144.87.127:3333/users/me'),
+          headers: {
+            'Authorization': 'Bearer ${authState.token}',
+            'Content-Type': 'application/json',
+          },
+        );
+        
+        if (response.statusCode == 200) {
+          final apiData = jsonDecode(response.body);
+          print('✅ Données récupérées depuis API: ${apiData['data']}');
+          
+          if (apiData['data'] != null) {
+            final userData = apiData['data'];
+            
+            // Mettre à jour le champ media si disponible
+            if (userData['media'] != null) {
+              updatedUserData['media'] = userData['media'];
+              print('✅ Media mis à jour: ${userData['media']}');
+            }
+            
+            // Mettre à jour les autres champs
+            final fieldsToUpdate = ['firstName', 'lastName', 'email', 'phone'];
+            for (final field in fieldsToUpdate) {
+              if (userData[field] != null) {
+                updatedUserData[field] = userData[field];
+              }
+            }
+          }
+        }
+      } catch (e) {
+        print('❌ Erreur lors de la récupération des données: $e');
+      }
+    } else {
+      // Structure des données - format unifié
+      // - Cas 1: { user: { firstName, lastName, etc. }, profileImage: "url" }
+      // - Cas 2: { firstName, lastName, etc., media: "url" }
+      // - Cas 3: { data: { user: {...}, media: "url" } }
+      
+      Map<String, dynamic> userData = state.data!;
+      
+      // Si les données sont dans un objet 'data'
+      if (state.data!['data'] != null) {
+        userData = state.data!['data'];
+      }
+      
+      // Si les données sont dans un objet 'user'
+      if (userData['user'] != null) {
+        final userInfo = userData['user'];
+        // Mettre à jour les champs utilisateur
+        final fieldsToUpdate = ['firstName', 'lastName', 'email', 'phone'];
+        for (final field in fieldsToUpdate) {
+          if (userInfo[field] != null) {
+            updatedUserData[field] = userInfo[field];
+          }
+        }
+      }
+      
+      // 1. Gérer la mise à jour du media/profileImage
+      // L'API peut retourner 'media' ou 'profileImage'
+      if (userData['media'] != null) {
+        updatedUserData['media'] = userData['media'];
+        print('✅ Media mis à jour depuis state.data: ${userData['media']}');
+      } else if (userData['profileImage'] != null) {
+        updatedUserData['media'] = userData['profileImage'];
+        print('✅ ProfileImage mis à jour depuis state.data: ${userData['profileImage']}');
+      } else if (state.data!['media'] != null) {
+        updatedUserData['media'] = state.data!['media'];
+        print('✅ Media mis à jour depuis state.data (niveau racine): ${state.data!['media']}');
+      } else if (state.data!['profileImage'] != null) {
+        updatedUserData['media'] = state.data!['profileImage'];
+        print('✅ ProfileImage mis à jour depuis state.data (niveau racine): ${state.data!['profileImage']}');
+      }
+      
+      // 2. Gérer les autres champs de l'utilisateur 
+      final fieldsToUpdate = ['firstName', 'lastName', 'email', 'phone'];
+      
+      // Mettre à jour uniquement les champs qui existent dans la réponse
+      for (final field in fieldsToUpdate) {
+        if (userData[field] != null) {
+          updatedUserData[field] = userData[field];
+        }
+      }
+    }
+    
+    print('📤 Mise à jour des données utilisateur: $updatedUserData');
+    
+    // Mettre à jour avec les données complètes de l'utilisateur et le token original
+    authCubit.updateUser(updatedUserData, authState.token!);
+    
+    // Forcer la mise à jour de l'UI
+    if (mounted) {
+      setState(() {
+        _selectedImage = null; // Réinitialiser l'image sélectionnée
+      });
+    }
+  }
+
   @override
   void dispose() {
     // Annuler la subscription pour éviter les memory leaks
@@ -489,27 +605,37 @@ class _SettingScreenState extends State<SettingScreen>
       // Récupérer le token de l'utilisateur connecté
       final authState = context.read<AuthCubit>().state;
       if (authState is! AuthSuccess || authState.token == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Erreur: Utilisateur non connecté'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Erreur: Utilisateur non connecté'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
         return;
       }
 
+      print('📤 Début de l\'upload de l\'image de profil...');
+      
       // Utiliser ProfileCubit pour uploader l'image (utilise le bon endpoint)
       await _profileCubit.uploadProfileImage(
         token: authState.token!,
         imageFile: imageFile,
       );
       
-      // Recharger les données utilisateur après l'upload
-      _loadUserData();
-      _fetchUserMedia();
+      print('✅ Upload terminé, attente de la réponse du BlocListener...');
+      // Le BlocListener va gérer la mise à jour de l'utilisateur
+      // On attend un peu pour que le BlocListener traite la réponse
+      await Future.delayed(const Duration(milliseconds: 500));
+      
+      // Recharger les données utilisateur après l'upload pour s'assurer que tout est à jour
+      if (mounted) {
+        _fetchUserMedia();
+      }
       
     } catch (e) {
-      print('Erreur lors de l\'upload: $e');
+      print('❌ Erreur lors de l\'upload: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -619,44 +745,7 @@ class _SettingScreenState extends State<SettingScreen>
               );
               
               // Traiter toutes les mises à jour de profil (image et champs de formulaire)
-              final authCubit = context.read<AuthCubit>();
-              final authState = authCubit.state;
-              
-              if (authState is AuthSuccess && authState.user != null && state.data != null) {
-                // Préserver toutes les informations de l'utilisateur existant
-                Map<String, dynamic> updatedUserData = Map<String, dynamic>.from(authState.user!);
-                
-                // Structure des données - format unifié
-                // - Cas 1: { user: { firstName, lastName, etc. }, profileImage: "url" }
-                // - Cas 2: { firstName, lastName, etc. }
-                
-                // 1. Gérer la mise à jour du profileImage
-                if (state.data!['profileImage'] != null) {
-                  updatedUserData['profileImage'] = state.data!['profileImage'];
-                }
-                
-                // 2. Gérer les autres champs de l'utilisateur 
-                // Récupérer le bon niveau de données selon la structure retournée
-                Map<String, dynamic> userData = state.data!;
-                if (state.data!['user'] != null) {
-                  userData = state.data!['user'];
-                }
-                
-                // Mise à jour des champs utilisateur spécifiques sans écraser les autres
-                final fieldsToUpdate = ['firstName', 'lastName', 'email', 'phone', 'profileImage'];
-                
-                // Mettre à jour uniquement les champs qui existent dans la réponse
-                for (final field in fieldsToUpdate) {
-                  if (userData[field] != null) {
-                    updatedUserData[field] = userData[field];
-                  }
-                }
-                
-                print('Mise à jour des données utilisateur: $updatedUserData'); // Debug print
-                
-                // Mettre à jour avec les données complètes de l'utilisateur et le token original
-                authCubit.updateUser(updatedUserData, authState.token!);
-              }
+              _handleProfileUpdate(state);
             } else if (state is ProfileError) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(

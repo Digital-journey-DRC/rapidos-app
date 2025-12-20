@@ -76,16 +76,20 @@ class _AllMerchantsScreenState extends State<AllMerchantsScreen> {
                       ),
                     );
                   }
-                  return GridView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      mainAxisSpacing: 8,
-                      crossAxisSpacing: 8,
-                      childAspectRatio: 1.0,
-                    ),
-                    itemCount: merchants.length,
-                    itemBuilder: (context, index) {
+                  return RefreshIndicator(
+                    onRefresh: () async {
+                      context.read<MerchantCubit>().fetchMerchants(context);
+                    },
+                    child: GridView.builder(
+                      padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 2,
+                        mainAxisSpacing: 8,
+                        crossAxisSpacing: 8,
+                        childAspectRatio: 1.0,
+                      ),
+                      itemCount: merchants.length,
+                      itemBuilder: (context, index) {
                       final vendeur = merchants[index]['vendeur'];
                       final products = (merchants[index]['products'] as List).cast<Map<String, dynamic>>();
                       final media = merchants[index]['media'];
@@ -238,6 +242,7 @@ class _AllMerchantsScreenState extends State<AllMerchantsScreen> {
                         ),
                       );
                     },
+                    ),
                   );
                 }
                 if (state is MerchantError) {

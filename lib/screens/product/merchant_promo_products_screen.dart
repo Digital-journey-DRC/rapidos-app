@@ -125,19 +125,23 @@ class _MerchantPromoProductsScreenState extends State<MerchantPromoProductsScree
         child: const Icon(Icons.add, color: Colors.white),
         tooltip: 'Ajouter une promotion',
       ),
-      backgroundColor: const Color(0xFFF7F8FA),
+      backgroundColor: const Color(0xFFF5F5F5),
       body: Column(
         children: [
          // cons MerchantClosedBanner(),
           Padding(
-            padding: const EdgeInsets.all(12.0),
+            padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
             child: TextField(
               decoration: InputDecoration(
                 hintText: 'Rechercher un produit...',
-                prefixIcon: const Icon(Icons.search),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                prefixIcon: const Icon(Icons.search, size: 20),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide.none,
+                ),
                 filled: true,
                 fillColor: Colors.white,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               ),
               onChanged: (val) => setState(() => _search = val),
             ),
@@ -148,46 +152,38 @@ class _MerchantPromoProductsScreenState extends State<MerchantPromoProductsScree
               child: _isLoading
                   ? const Center(child: CircularProgressIndicator())
                   : filtered.isEmpty
-                      ? ListView(
-                          children: [
-                            SizedBox(
-                              height: MediaQuery.of(context).size.height * 0.5,
-                              child: Center(
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(Icons.local_offer_outlined, size: 64, color: Colors.grey.shade400),
-                                    const SizedBox(height: 16),
-                                    Text(
-                                      'Aucun produit en promotion',
-                                      style: TextStyle(
-                                        fontSize: 18,
-                                        color: Colors.grey.shade600,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      'Ajoutez des produits en promotion pour les voir ici',
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        color: Colors.grey.shade500,
-                                      ),
-                                      textAlign: TextAlign.center,
-                                    ),
-                                  ],
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.local_offer_outlined, size: 64, color: Colors.grey.shade400),
+                              const SizedBox(height: 16),
+                              Text(
+                                'Aucun produit en promotion',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: Colors.grey.shade600,
                                 ),
                               ),
-                            ),
-                          ],
+                              const SizedBox(height: 8),
+                              Text(
+                                'Ajoutez des produits en promotion pour les voir ici',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey.shade500,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                          ),
                         )
                       : GridView.builder(
-                    padding: const EdgeInsets.all(12.0),
+                    padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
                     gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: 2,
-                      crossAxisSpacing: 12,
-                      mainAxisSpacing: 12,
-                      childAspectRatio: 0.72,
+                      crossAxisSpacing: 8,
+                      mainAxisSpacing: 8,
+                      childAspectRatio: 0.68,
                     ),
                     itemCount: filtered.length,
                     itemBuilder: (context, index) {
@@ -261,7 +257,6 @@ class _PromoProductCard extends StatelessWidget {
     final product = promotion.product;
     final productName = product?.name ?? 'Produit';
     final productCategory = product?.category?.name ?? '';
-    final productStock = product?.stock ?? 0;
 
     return GestureDetector(
       onTap: () {
@@ -279,160 +274,195 @@ class _PromoProductCard extends StatelessWidget {
           }
         });
       },
-      child: Card(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        elevation: 2,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: Colors.grey.shade200,
+            width: 0.5,
+          ),
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            ClipRRect(
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(16),
-                topRight: Radius.circular(16),
-              ),
-              child: Stack(
-                children: [
-                  Image.network(
-                    promotion.image,
-                    width: double.infinity,
-                    height: 90,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) => Container(
+            // Image du produit
+            Expanded(
+              flex: 3,
+              child: ClipRRect(
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(8),
+                  topRight: Radius.circular(8),
+                ),
+                child: Stack(
+                  children: [
+                    Container(
                       width: double.infinity,
-                      height: 90,
-                      decoration: BoxDecoration(
-                        color: Colors.grey[200],
-                        borderRadius: BorderRadius.circular(16),
+                      color: Colors.grey.shade50,
+                      child: Image.network(
+                        promotion.image,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => Container(
+                          width: double.infinity,
+                          color: Colors.grey.shade100,
+                          child: Icon(
+                            Icons.image_not_supported,
+                            color: Colors.grey.shade400,
+                            size: 32,
+                          ),
+                        ),
+                        loadingBuilder: (context, child, loadingProgress) {
+                          if (loadingProgress == null) return child;
+                          return Container(
+                            color: Colors.grey.shade100,
+                            child: Center(
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                value: loadingProgress.expectedTotalBytes != null
+                                    ? loadingProgress.cumulativeBytesLoaded /
+                                        loadingProgress.expectedTotalBytes!
+                                    : null,
+                              ),
+                            ),
+                          );
+                        },
                       ),
-                      child: const Icon(Icons.image_not_supported, color: Colors.grey, size: 30),
                     ),
-                  ),
-                  Positioned(
-                    top: 6,
-                    left: 6,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary,
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: const Text(
-                        'PROMO',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 9,
-                          fontWeight: FontWeight.bold,
+                    Positioned(
+                      top: 4,
+                      left: 4,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.red.shade600,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Text(
+                          'PROMO',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 8,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                  Positioned(
-                    top: 6,
-                    right: 6,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withOpacity(0.9),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        '-${promotion.discountPercentage.toStringAsFixed(0)}%',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 9,
-                          fontWeight: FontWeight.bold,
+                    Positioned(
+                      top: 4,
+                      right: 4,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          '-${promotion.discountPercentage.toStringAsFixed(0)}%',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 8,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Flexible(
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: AppColors.primary,
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            productCategory.isNotEmpty ? productCategory : 'Promotion',
-                            style: const TextStyle(color: Colors.white, fontSize: 8),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
+            // Contenu de la carte
+            Expanded(
+              flex: 2,
+              child: Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    // Catégorie
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        productCategory.isNotEmpty ? productCategory : 'Promotion',
+                        style: TextStyle(
+                          color: AppColors.primary,
+                          fontSize: 8,
+                          fontWeight: FontWeight.w600,
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      const SizedBox(width: 4),
-                      Icon(Icons.star, color: AppColors.primary, size: 12),
-                      Text(
-                        _calculateRating().toStringAsFixed(1),
-                        style: const TextStyle(fontSize: 10),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    productName,
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  if (promotion.libelle.isNotEmpty) ...[
-                    const SizedBox(height: 2),
+                    ),
+                    const SizedBox(height: 4),
+                    // Nom du produit
                     Text(
-                      promotion.libelle,
-                      style: TextStyle(
-                        color: Colors.grey.shade700,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w500,
+                      productName,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                        height: 1.2,
+                        color: Color(0xFF1A1A1A),
                       ),
-                      maxLines: 1,
+                      maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
-                  ],
-                  const SizedBox(height: 3),
-                  Row(
-                    children: [
-                      Text(
-                        '${promotion.nouveauPrix.toStringAsFixed(0)} FC',
-                        style: const TextStyle(
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12,
+                    const SizedBox(height: 6),
+                    // Prix et note
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Text(
+                              '${promotion.nouveauPrix.toStringAsFixed(0)} FC',
+                              style: const TextStyle(
+                                color: Color(0xFF147C3C),
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              '${promotion.ancienPrix.toStringAsFixed(0)} FC',
+                              style: TextStyle(
+                                color: Colors.grey.shade500,
+                                fontSize: 10,
+                                decoration: TextDecoration.lineThrough,
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        '${promotion.ancienPrix.toStringAsFixed(0)} FC',
-                        style: TextStyle(
-                          color: Colors.grey.shade500,
-                          fontSize: 9,
-                          decoration: TextDecoration.lineThrough,
+                        const SizedBox(height: 2),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.star_rounded,
+                              size: 11,
+                              color: Colors.amber.shade700,
+                            ),
+                            const SizedBox(width: 2),
+                            Text(
+                              _calculateRating().toStringAsFixed(1),
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w500,
+                                color: Colors.grey.shade600,
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                    ],
-                  ),
-                  if (productStock > 0) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      'Stock: $productStock',
-                      style: TextStyle(
-                        color: Colors.grey.shade600,
-                        fontSize: 9,
-                      ),
+                      ],
                     ),
                   ],
-                ],
+                ),
               ),
             ),
           ],

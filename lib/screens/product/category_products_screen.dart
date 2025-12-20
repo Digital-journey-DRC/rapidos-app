@@ -60,7 +60,11 @@ class _CategoryProductsScreenState extends State<CategoryProductsScreen> {
             child: BlocBuilder<CategoryProductsCubit, CategoryProductsState>(
               builder: (context, state) {
                 if (state is CategoryProductsLoading) {
-                  return GridView.builder(
+                  return RefreshIndicator(
+                    onRefresh: () async {
+                      context.read<CategoryProductsCubit>().fetchProductsByCategory(widget.category.id);
+                    },
+                    child: GridView.builder(
                     padding: const EdgeInsets.all(12.0),
                     gridDelegate:
                         const SliverGridDelegateWithFixedCrossAxisCount(
@@ -111,6 +115,7 @@ class _CategoryProductsScreenState extends State<CategoryProductsScreen> {
                         ),
                       );
                     },
+                    ),
                   );
                 }
 
@@ -183,30 +188,45 @@ class _CategoryProductsScreenState extends State<CategoryProductsScreen> {
                       .toList();
 
                   if (filtered.isEmpty) {
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.search_off,
-                              size: 64, color: Colors.grey.shade400),
-                          const SizedBox(height: 16),
-                          Text(
-                            _search.isEmpty
-                                ? 'Aucun produit dans cette catégorie'
-                                : 'Aucun produit trouvé',
-                            style: TextStyle(
-                              color: Colors.grey.shade600,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w500,
+                    return RefreshIndicator(
+                      onRefresh: () async {
+                        context.read<CategoryProductsCubit>().fetchProductsByCategory(widget.category.id);
+                      },
+                      child: SingleChildScrollView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        child: SizedBox(
+                          height: MediaQuery.of(context).size.height * 0.5,
+                          child: Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.search_off,
+                                    size: 64, color: Colors.grey.shade400),
+                                const SizedBox(height: 16),
+                                Text(
+                                  _search.isEmpty
+                                      ? 'Aucun produit dans cette catégorie'
+                                      : 'Aucun produit trouvé',
+                                  style: TextStyle(
+                                    color: Colors.grey.shade600,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ],
                             ),
-                            textAlign: TextAlign.center,
                           ),
-                        ],
+                        ),
                       ),
                     );
                   }
 
-                  return GridView.builder(
+                  return RefreshIndicator(
+                    onRefresh: () async {
+                      context.read<CategoryProductsCubit>().fetchProductsByCategory(widget.category.id);
+                    },
+                    child: GridView.builder(
                     padding: const EdgeInsets.all(12.0),
                     gridDelegate:
                         const SliverGridDelegateWithFixedCrossAxisCount(
@@ -220,6 +240,7 @@ class _CategoryProductsScreenState extends State<CategoryProductsScreen> {
                       final product = filtered[index];
                       return _TwitterStyleProductCard(product: product);
                     },
+                    ),
                   );
                 }
 

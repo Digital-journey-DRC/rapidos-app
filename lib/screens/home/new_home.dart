@@ -494,8 +494,14 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      body: CustomScrollView(
-        slivers: [
+      body: RefreshIndicator(
+        onRefresh: () async {
+          context.read<FeaturedProductCubit>().fetchFeaturedProducts();
+          context.read<CategoryCubit>().fetchCategories();
+          context.read<MerchantCubit>().fetchMerchants(context);
+        },
+        child: CustomScrollView(
+          slivers: [
           // Header compact avec personnalité
           SliverAppBar(
             floating: true,
@@ -1230,6 +1236,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
           ),
           ),
         ],
+        ),
       ),
     );
   }

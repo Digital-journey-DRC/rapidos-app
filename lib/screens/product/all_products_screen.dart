@@ -67,19 +67,26 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
                       ],
                     ),
                   )
-                : GridView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      crossAxisSpacing: 8,
-                      mainAxisSpacing: 8,
-                      childAspectRatio: 0.68,
-                    ),
-                    itemCount: filtered.length,
-                    itemBuilder: (context, index) {
-                      final product = filtered[index];
-                      return _TwitterStyleProductCard(product: product);
+                : RefreshIndicator(
+                    onRefresh: () async {
+                      // Les produits sont passés depuis l'écran parent
+                      // On peut juste rafraîchir l'état local
+                      setState(() {});
                     },
+                    child: GridView.builder(
+                      padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 2,
+                        crossAxisSpacing: 8,
+                        mainAxisSpacing: 8,
+                        childAspectRatio: 0.68,
+                      ),
+                      itemCount: filtered.length,
+                      itemBuilder: (context, index) {
+                        final product = filtered[index];
+                        return _TwitterStyleProductCard(product: product);
+                      },
+                    ),
                   ),
           ),
         ],

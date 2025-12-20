@@ -38,10 +38,14 @@ class FavorisScreen extends StatelessWidget {
                 ),
               );
             }
-            return ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              itemCount: favoris.length,
-              itemBuilder: (context, index) {
+            return RefreshIndicator(
+              onRefresh: () async {
+                context.read<FavoritesCubit>().loadFavorites();
+              },
+              child: ListView.builder(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                itemCount: favoris.length,
+                itemBuilder: (context, index) {
                 final product = favoris[index];
                 // Gérer le nouveau format (image) et l'ancien format (media.mediaUrl)
                 String imageUrl = 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=200&h=200&fit=crop';
@@ -262,6 +266,7 @@ class FavorisScreen extends StatelessWidget {
                   ),
                 );
               },
+            ),
             );
           }
           return const SizedBox.shrink();
