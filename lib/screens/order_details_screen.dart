@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:immo/cubit/auth_cubit.dart';
 import 'package:immo/services/invoice_service.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class OrderDetailsScreen extends StatelessWidget {
   final Map<String, dynamic> orderData;
@@ -16,23 +17,6 @@ class OrderDetailsScreen extends StatelessWidget {
     required this.orderData,
     required this.orderId,
   }) : super(key: key);
-
-  Color _statusColor(String status) {
-    switch (status.toLowerCase()) {
-      case 'pending':
-        return AppColors.buttonColor2;
-      case 'delivered':
-        return Colors.green;
-      case 'cancelled':
-        return Colors.red;
-      case 'en route pour livraison':
-        return Colors.green;
-      case 'a la recherche du livreur':
-        return Colors.blue;
-      default:
-        return Colors.grey;
-    }
-  }
 
   String _translateStatus(String status) {
     switch (status.toLowerCase()) {
@@ -55,18 +39,6 @@ class OrderDetailsScreen extends StatelessWidget {
     if (timestamp == null) return '';
     final date = timestamp.toDate();
     return DateFormat('dd/MM/yyyy HH:mm').format(date);
-  }
-
-  Future<void> _makePhoneCall(String phoneNumber) async {
-    final Uri launchUri = Uri(
-      scheme: 'tel',
-      path: phoneNumber,
-    );
-    if (await canLaunchUrl(launchUri)) {
-      await launchUrl(launchUri);
-    } else {
-      throw 'Could not launch $launchUri';
-    }
   }
 
   Future<void> _generateInvoice(BuildContext context, dynamic authState) async {
@@ -252,18 +224,141 @@ class OrderDetailsScreen extends StatelessWidget {
                           label: 'Téléphone',
                           value: phone,
                           trailing: userRole != null && userRole != 'acheteur'
-                              ? ElevatedButton.icon(
-                                  onPressed: () => _makePhoneCall(phone),
-                                  icon: const Icon(Icons.phone, size: 14, color: Colors.white),
-                                  label: const Text('Appeler', style: TextStyle(fontSize: 12)),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: AppColors.primary,
-                                    foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(8),
+                              ? OutlinedButton.icon(
+                                  onPressed: () {
+                                    showDialog(
+                                      context: context,
+                                      builder: (BuildContext context) {
+                                        return Dialog(
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(16),
+                                          ),
+                                          child: Container(
+                                            padding: const EdgeInsets.all(20),
+                                            child: Column(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                const Text(
+                                                  'Contacter le client',
+                                                  style: TextStyle(
+                                                    fontSize: 18,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 8),
+                                                Text(
+                                                  clientName,
+                                                  style: const TextStyle(
+                                                    fontSize: 16,
+                                                    color: AppColors.primary,
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 20),
+                                                Row(
+                                                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                                  children: [
+                                                    ElevatedButton(
+                                                      onPressed: () {
+                                                        if (phone.isNotEmpty) {
+                                                          launchUrl(Uri.parse('tel:$phone'));
+                                                        } else {
+                                                          ScaffoldMessenger.of(context).showSnackBar(
+                                                            const SnackBar(
+                                                              content: Text(
+                                                                  'Numéro de téléphone non disponible'),
+                                                              backgroundColor: Colors.red,
+                                                            ),
+                                                          );
+                                                        }
+                                                        Navigator.pop(context);
+                                                      },
+                                                      style: ElevatedButton.styleFrom(
+                                                        backgroundColor: AppColors.primary,
+                                                        shape: RoundedRectangleBorder(
+                                                          borderRadius: BorderRadius.circular(8),
+                                                        ),
+                                                        padding: const EdgeInsets.symmetric(
+                                                            horizontal: 20, vertical: 12),
+                                                      ),
+                                                      child: const Row(
+                                                        mainAxisSize: MainAxisSize.min,
+                                                        children: [
+                                                          Icon(Icons.phone, color: Colors.white),
+                                                          SizedBox(width: 8),
+                                                          Text('Appeler',
+                                                              style: TextStyle(color: Colors.white)),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                    ElevatedButton(
+                                                      onPressed: () {
+                                                        if (phone.isNotEmpty) {
+                                                          final whatsappUrl = 'https://wa.me/$phone';
+                                                          launchUrl(Uri.parse(whatsappUrl));
+                                                        } else {
+                                                          ScaffoldMessenger.of(context).showSnackBar(
+                                                            const SnackBar(
+                                                              content: Text(
+                                                                  'Numéro de téléphone non disponible'),
+                                                              backgroundColor: Colors.red,
+                                                            ),
+                                                          );
+                                                        }
+                                                        Navigator.pop(context);
+                                                      },
+                                                      style: ElevatedButton.styleFrom(
+                                                        backgroundColor: Colors.green,
+                                                        shape: RoundedRectangleBorder(
+                                                          borderRadius: BorderRadius.circular(8),
+                                                        ),
+                                                        padding: const EdgeInsets.symmetric(
+                                                            horizontal: 20, vertical: 12),
+                                                      ),
+                                                      child: const Row(
+                                                        mainAxisSize: MainAxisSize.min,
+                                                        children: [
+                                                          Icon(Icons.message, color: Colors.white),
+                                                          SizedBox(width: 8),
+                                                          Text('WhatsApp',
+                                                              style: TextStyle(color: Colors.white)),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                                const SizedBox(height: 16),
+                                                TextButton(
+                                                  onPressed: () => Navigator.pop(context),
+                                                  child: const Text(
+                                                    'ANNULER',
+                                                    style: TextStyle(color: Colors.grey),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                    );
+                                  },
+                                  icon: Icon(Icons.phone_in_talk, color: Colors.green.shade600, size: 14),
+                                  label: const Text(
+                                    'Contacter',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
                                     ),
-                                    elevation: 2,
+                                  ),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: Colors.green.shade600,
+                                    side: BorderSide(
+                                      color: Colors.green.shade600,
+                                      width: 1,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                                   ),
                                 )
                               : null,
@@ -524,8 +619,327 @@ class OrderDetailsScreen extends StatelessWidget {
 
                   const SizedBox(height: 12),
 
-                  // Bouton d'annulation (si pending)
-                  if (status.toLowerCase() == 'pending')
+                  // Boutons d'action pour les marchands
+                  if (userRole == 'vendeur') ...[
+                    // Boutons Accepter/Rejeter (si pending)
+                    if (status.toLowerCase() == 'pending')
+                      Container(
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: Colors.grey.shade200,
+                            width: 0.5,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.03),
+                              blurRadius: 6,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        padding: const EdgeInsets.all(10),
+                        child: Column(
+                          children: [
+                            // Titre de la section
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(5),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.primary.withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(5),
+                                  ),
+                                  child: Icon(
+                                    Icons.touch_app_outlined,
+                                    size: 14,
+                                    color: AppColors.primary,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                const Text(
+                                  'Actions rapides',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.black87,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            // Boutons Accepter/Rejeter
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: OutlinedButton(
+                                    onPressed: () async {
+                                      try {
+                                        await FirebaseFirestore.instance
+                                            .collection('carts')
+                                            .doc(orderId)
+                                            .update({
+                                          'status': 'colis en cours de préparation',
+                                          'timestamp': FieldValue.serverTimestamp(),
+                                        });
+                                        if (context.mounted) {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            const SnackBar(
+                                              content: Text('Commande acceptée avec succès'),
+                                              backgroundColor: Colors.green,
+                                              behavior: SnackBarBehavior.floating,
+                                            ),
+                                          );
+                                          Navigator.pop(context);
+                                        }
+                                      } catch (e) {
+                                        if (context.mounted) {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(
+                                              content: Text('Erreur: $e'),
+                                              backgroundColor: Colors.red,
+                                              behavior: SnackBarBehavior.floating,
+                                            ),
+                                          );
+                                        }
+                                      }
+                                    },
+                                    style: OutlinedButton.styleFrom(
+                                      foregroundColor: AppColors.primary,
+                                      side: BorderSide(
+                                        color: AppColors.primary,
+                                        width: 1,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      padding: const EdgeInsets.symmetric(vertical: 8),
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Icon(
+                                          Icons.check_circle_outline,
+                                          color: AppColors.primary,
+                                          size: 14,
+                                        ),
+                                        const SizedBox(width: 5),
+                                        const Text(
+                                          'Accepter',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: OutlinedButton(
+                                    onPressed: () async {
+                                      final TextEditingController reasonController =
+                                          TextEditingController();
+                                      bool? confirmed = await showDialog<bool>(
+                                        context: context,
+                                        builder: (BuildContext context) {
+                                          return StatefulBuilder(
+                                            builder: (context, setState) {
+                                              return AlertDialog(
+                                                shape: RoundedRectangleBorder(
+                                                  borderRadius: BorderRadius.circular(16),
+                                                ),
+                                                title: const Row(
+                                                  children: [
+                                                    Icon(Icons.warning_amber_rounded,
+                                                        color: Colors.red),
+                                                    SizedBox(width: 8),
+                                                    Text(
+                                                      'Rejeter la commande',
+                                                      style: TextStyle(
+                                                        fontSize: 18,
+                                                        fontWeight: FontWeight.bold,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                                content: Column(
+                                                  mainAxisSize: MainAxisSize.min,
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  children: [
+                                                    const Text(
+                                                      'Veuillez indiquer la raison du rejet de cette commande.',
+                                                      style: TextStyle(
+                                                        color: Colors.grey,
+                                                        fontSize: 14,
+                                                      ),
+                                                    ),
+                                                    const SizedBox(height: 16),
+                                                    TextField(
+                                                      controller: reasonController,
+                                                      decoration: InputDecoration(
+                                                        hintText: 'Entrez la raison du rejet',
+                                                        border: OutlineInputBorder(
+                                                          borderRadius: BorderRadius.circular(8),
+                                                        ),
+                                                        filled: true,
+                                                        fillColor: Colors.grey.shade50,
+                                                        prefixIcon: const Icon(Icons.edit_note,
+                                                            color: Colors.grey),
+                                                      ),
+                                                      maxLines: 3,
+                                                      onChanged: (value) => setState(() {}),
+                                                    ),
+                                                  ],
+                                                ),
+                                                actions: [
+                                                  TextButton(
+                                                    onPressed: () => Navigator.pop(context, false),
+                                                    child: const Text(
+                                                      'ANNULER',
+                                                      style: TextStyle(color: Colors.grey),
+                                                    ),
+                                                  ),
+                                                  ElevatedButton(
+                                                    onPressed: reasonController.text.trim().isEmpty
+                                                        ? null
+                                                        : () => Navigator.pop(context, true),
+                                                    style: ElevatedButton.styleFrom(
+                                                      backgroundColor: Colors.red,
+                                                      disabledBackgroundColor:
+                                                          Colors.red.withOpacity(0.5),
+                                                      shape: RoundedRectangleBorder(
+                                                        borderRadius: BorderRadius.circular(8),
+                                                      ),
+                                                    ),
+                                                    child: const Text(
+                                                      'REJETER',
+                                                      style: TextStyle(color: Colors.white),
+                                                    ),
+                                                  ),
+                                                ],
+                                              );
+                                            },
+                                          );
+                                        },
+                                      );
+                                      if (confirmed == true && reasonController.text.trim().isNotEmpty) {
+                                        try {
+                                          await FirebaseFirestore.instance
+                                              .collection('carts')
+                                              .doc(orderId)
+                                              .update({
+                                            'status': 'rejected',
+                                            'rejectionReason': reasonController.text.trim(),
+                                            'timestamp': FieldValue.serverTimestamp(),
+                                          });
+                                          if (context.mounted) {
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              const SnackBar(
+                                                content: Text('Commande rejetée'),
+                                                backgroundColor: Colors.red,
+                                                behavior: SnackBarBehavior.floating,
+                                              ),
+                                            );
+                                            Navigator.pop(context);
+                                          }
+                                        } catch (e) {
+                                          if (context.mounted) {
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              SnackBar(
+                                                content: Text('Erreur: $e'),
+                                                backgroundColor: Colors.red,
+                                                behavior: SnackBarBehavior.floating,
+                                              ),
+                                            );
+                                          }
+                                        }
+                                      }
+                                    },
+                                    style: OutlinedButton.styleFrom(
+                                      foregroundColor: Colors.red.shade600,
+                                      side: BorderSide(
+                                        color: Colors.red.shade600,
+                                        width: 1,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      padding: const EdgeInsets.symmetric(vertical: 8),
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Icon(
+                                          Icons.cancel_outlined,
+                                          color: Colors.red.shade600,
+                                          size: 14,
+                                        ),
+                                        const SizedBox(width: 5),
+                                        const Text(
+                                          'Rejeter',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    // Bouton Expédier (si colis en cours de préparation)
+                    if (status == 'colis en cours de préparation')
+                      Container(
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(14),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.05),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        padding: const EdgeInsets.all(14),
+                        child: ElevatedButton(
+                          onPressed: () {
+                            // TODO: Implémenter _showExpeditionDialog
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Fonctionnalité d\'expédition à venir'),
+                                backgroundColor: Colors.orange,
+                              ),
+                            );
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                          ),
+                          child: const Text(
+                            'Expédier',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ] else if (status.toLowerCase() == 'pending')
+                    // Bouton d'annulation pour les clients
                     Container(
                       width: double.infinity,
                       decoration: BoxDecoration(

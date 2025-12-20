@@ -618,7 +618,77 @@ class _OrderScreenState extends State<OrderScreen> {
             )
           else if (authState.user!['role'] == 'vendeur')
             Expanded(
-              child: _buildVendeurOrders(),
+              child: Column(
+                children: [
+                  // Barre de recherche et filtre
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    color: Colors.white,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // Barre de recherche
+                        TextField(
+                          controller: _searchController,
+                          decoration: InputDecoration(
+                            hintText: 'Rechercher une commande...',
+                            prefixIcon: Icon(Icons.search, color: Colors.grey.shade600),
+                            suffixIcon: _hasSearchText
+                                ? IconButton(
+                                    icon: Icon(Icons.clear, color: Colors.grey.shade600),
+                                    onPressed: () {
+                                      setState(() {
+                                        _searchController.clear();
+                                        _hasSearchText = false;
+                                      });
+                                    },
+                                  )
+                                : null,
+                            filled: true,
+                            fillColor: Colors.grey.shade50,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide.none,
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          ),
+                          onChanged: (value) {
+                            setState(() {
+                              _hasSearchText = value.isNotEmpty;
+                            });
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        // Filtres par statut
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            children: [
+                              _buildStatusFilterChip('Tous', 'Tous'),
+                              const SizedBox(width: 8),
+                              _buildStatusFilterChip('En attente', 'pending'),
+                              const SizedBox(width: 8),
+                              _buildStatusFilterChip('En préparation', 'colis en cours de préparation'),
+                              const SizedBox(width: 8),
+                              _buildStatusFilterChip('Prêt à expédier', 'prêt à expédier'),
+                              const SizedBox(width: 8),
+                              _buildStatusFilterChip('En route', 'en route pour livraison'),
+                              const SizedBox(width: 8),
+                              _buildStatusFilterChip('Livré', 'delivered'),
+                              const SizedBox(width: 8),
+                              _buildStatusFilterChip('Rejeté', 'rejected'),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: _buildVendeurOrders(),
+                  ),
+                ],
+              ),
             )
           else
             Expanded(
@@ -1778,8 +1848,8 @@ class _OrderScreenState extends State<OrderScreen> {
           );
         }
 
-        // Filtrer les commandes côté client
-        final filteredDocs = snapshot.data!.docs.where((doc) {
+        // Filtrer les commandes par vendeur
+        var filteredDocs = snapshot.data!.docs.where((doc) {
           final data = doc.data() as Map<String, dynamic>;
           if (data['items'] == null) return false;
 
@@ -1792,6 +1862,38 @@ class _OrderScreenState extends State<OrderScreen> {
           });
         }).toList();
 
+        // Filtrer par statut
+        if (_selectedStatusFilter != 'Tous') {
+          filteredDocs = filteredDocs.where((doc) {
+            final data = doc.data() as Map<String, dynamic>;
+            final status = data['status']?.toString().toLowerCase() ?? '';
+            return status == _selectedStatusFilter.toLowerCase();
+          }).toList();
+        }
+
+        // Filtrer par recherche
+        final searchQuery = _searchController.text.toLowerCase().trim();
+        if (searchQuery.isNotEmpty) {
+          filteredDocs = filteredDocs.where((doc) {
+            final data = doc.data() as Map<String, dynamic>;
+            final clientName = (data['client']?.toString() ?? '').toLowerCase();
+            final shortCode = (data['shortCode']?.toString() ?? '').toLowerCase();
+            final orderId = doc.id.toLowerCase();
+            final items = data['items'] as List? ?? [];
+            final productNames = items.map((item) {
+              if (item is Map) {
+                return (item['name']?.toString() ?? '').toLowerCase();
+              }
+              return '';
+            }).join(' ');
+
+            return clientName.contains(searchQuery) ||
+                shortCode.contains(searchQuery) ||
+                orderId.contains(searchQuery) ||
+                productNames.contains(searchQuery);
+          }).toList();
+        }
+
         if (filteredDocs.isEmpty) {
           return Padding(
             padding: const EdgeInsets.all(32.0),
@@ -1801,9 +1903,11 @@ class _OrderScreenState extends State<OrderScreen> {
                 Icon(Icons.inbox,
                     size: 80, color: AppColors.buttonColor.withOpacity(0.3)),
                 const SizedBox(height: 18),
-                const Text(
-                  'Aucune commande reçue',
-                  style: TextStyle(
+                Text(
+                  searchQuery.isNotEmpty || _selectedStatusFilter != 'Tous'
+                      ? 'Aucune commande trouvée'
+                      : 'Aucune commande reçue',
+                  style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
                       color: AppColors.primary),
@@ -1828,9 +1932,8 @@ class _OrderScreenState extends State<OrderScreen> {
           return bTimestamp.compareTo(aTimestamp); // Tri décroissant
         });
 
-        return ListView.separated(
-          padding: const EdgeInsets.all(16),
-          separatorBuilder: (_, __) => const SizedBox(height: 8),
+        return ListView.builder(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           itemCount: filteredDocs.length,
           itemBuilder: (context, index) {
             try {
@@ -1842,722 +1945,187 @@ class _OrderScreenState extends State<OrderScreen> {
                   data['adresse']?.toString() ?? 'Adresse non spécifiée';
 
               return Container(
-                margin: const EdgeInsets.only(bottom: 10),
+                margin: const EdgeInsets.only(bottom: 8),
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(18),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: Colors.grey.shade200,
+                    width: 0.5,
+                  ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.06),
-                      blurRadius: 10,
-                      offset: const Offset(0, 2),
+                      color: Colors.black.withOpacity(0.02),
+                      blurRadius: 4,
+                      offset: const Offset(0, 1),
+                      spreadRadius: 0,
                     ),
                   ],
                 ),
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(18),
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => OrderDetailsScreen(
-                          orderData: data,
-                          orderId: doc.id,
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(10),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => OrderDetailsScreen(
+                            orderData: data,
+                            orderId: doc.id,
+                          ),
                         ),
-                      ),
-                    );
-                  },
-                  child: Column(
-                    children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Timeline
-                          Container(
-                            width: 6,
-                            height: 110,
-                            margin: const EdgeInsets.only(
-                                right: 10, top: 10, bottom: 10),
-                            decoration: BoxDecoration(
-                              color: _statusColor(status),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                          // Image produit
-                          Padding(
-                            padding: const EdgeInsets.only(
-                                top: 16, left: 0, right: 10),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(14),
-                              child: data['items'] != null &&
-                                      (data['items'] as List).isNotEmpty
-                                  ? Image.network(
-                                      (data['items'] as List)[0]['imagePath'] ??
-                                          'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=200&h=200&fit=crop',
-                                      width: 70,
-                                      height: 70,
-                                      fit: BoxFit.cover,
-                                      errorBuilder:
-                                          (context, error, stackTrace) {
-                                        return Container(
-                                          width: 70,
-                                          height: 70,
-                                          color: Colors.grey.shade200,
-                                          child: const Icon(Icons.image,
-                                              color: Colors.grey),
-                                        );
-                                      },
-                                    )
-                                  : Container(
-                                      width: 70,
-                                      height: 70,
-                                      color: Colors.grey.shade200,
-                                      child: const Icon(Icons.image,
-                                          color: Colors.grey),
-                                    ),
-                            ),
-                          ),
-                          // Détails commande
-                          Expanded(
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                  vertical: 16, horizontal: 0),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        child: Text(
-                                          data['items'] != null &&
-                                                  (data['items'] as List)
-                                                      .isNotEmpty
-                                              ? (data['items'] as List)[0]
-                                                      ['name'] ??
-                                                  'Produit'
-                                              : 'Produit',
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 16,
-                                          ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 12, vertical: 4),
-                                        decoration: BoxDecoration(
-                                          color: _statusColor(status)
-                                              .withOpacity(0.1),
-                                          borderRadius:
-                                              BorderRadius.circular(8),
-                                        ),
-                                        child: Text(
-                                          _translateStatus(status),
-                                          style: TextStyle(
-                                            color: _statusColor(status),
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                          textAlign: TextAlign.center,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    adresse,
-                                    style: TextStyle(
-                                      color: Colors.grey.shade600,
-                                      fontSize: 14,
-                                    ),
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  const SizedBox(height: 12),
-                                  Row(
-                                    children: [
-                                      const Icon(Icons.calendar_today,
-                                          size: 14, color: AppColors.primary),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        _formatDate(timestamp),
-                                        style: const TextStyle(fontSize: 13),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      const Icon(Icons.shopping_cart,
-                                          size: 14, color: AppColors.primary),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        '${(data['items'] as List?)?.length ?? 0} article${((data['items'] as List?)?.length ?? 0) > 1 ? 's' : ''}',
-                                        style: const TextStyle(fontSize: 13),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      // Contenu existant
-                      if (status == 'prêt à expédier' &&
-                          data['packagePhoto'] != null)
+                      );
+                    },
+                    child: Column(
+                      children: [
                         Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                          padding: const EdgeInsets.all(10),
+                          child: Row(
                             children: [
-                              const Text(
-                                'Photo du colis:',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppColors.primary,
+                              // Icône de commande avec gradient
+                              Container(
+                                width: 36,
+                                height: 36,
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      AppColors.primary,
+                                      AppColors.primary.withOpacity(0.7),
+                                    ],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  ),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Icon(
+                                  Icons.shopping_bag_outlined,
+                                  color: Colors.white,
+                                  size: 18,
                                 ),
                               ),
-                              const SizedBox(height: 8),
-                              GestureDetector(
-                                onTap: () {
-                                  showDialog(
-                                    context: context,
-                                    builder: (BuildContext context) {
-                                      return Dialog(
-                                        insetPadding: EdgeInsets.zero,
-                                        child: Stack(
-                                          children: [
-                                            InteractiveViewer(
-                                              minScale: 0.5,
-                                              maxScale: 4.0,
-                                              child: Image.network(
-                                                data['packagePhoto'],
-                                                fit: BoxFit.contain,
-                                                width: MediaQuery.of(context)
-                                                    .size
-                                                    .width,
-                                                height: MediaQuery.of(context)
-                                                    .size
-                                                    .height,
+                              const SizedBox(width: 10),
+                              // Informations principales
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                data['items'] != null &&
+                                                        (data['items'] as List)
+                                                            .isNotEmpty
+                                                    ? (data['items'] as List)[0]
+                                                            ['name'] ??
+                                                        'Produit'
+                                                    : 'Produit',
+                                                style: TextStyle(
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: Colors.grey.shade700,
+                                                ),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
                                               ),
+                                              const SizedBox(height: 3),
+                                              Row(
+                                                children: [
+                                                  Icon(
+                                                    Icons.calendar_today,
+                                                    size: 10,
+                                                    color: Colors.grey.shade500,
+                                                  ),
+                                                  const SizedBox(width: 3),
+                                                  Text(
+                                                    _formatDate(timestamp),
+                                                    style: TextStyle(
+                                                      fontSize: 10,
+                                                      color: Colors.grey.shade600,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 6,
+                                            vertical: 3,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: _statusColor(status).withOpacity(0.15),
+                                            borderRadius: BorderRadius.circular(6),
+                                            border: Border.all(
+                                              color: _statusColor(status).withOpacity(0.3),
+                                              width: 0.5,
                                             ),
-                                            Positioned(
-                                              top: 10,
-                                              right: 10,
-                                              child: IconButton(
-                                                icon: const Icon(Icons.close,
-                                                    color: Colors.white),
-                                                onPressed: () =>
-                                                    Navigator.pop(context),
+                                          ),
+                                          child: Text(
+                                            _translateStatus(status),
+                                            style: TextStyle(
+                                              color: _statusColor(status),
+                                              fontSize: 9,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            Icon(
+                                              Icons.inventory_2_outlined,
+                                              size: 12,
+                                              color: Colors.grey.shade600,
+                                            ),
+                                            const SizedBox(width: 3),
+                                            Text(
+                                              '${(data['items'] as List?)?.length ?? 0} ${((data['items'] as List?)?.length ?? 0) > 1 ? 'produits' : 'produit'}',
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w600,
+                                                color: Colors.grey.shade700,
                                               ),
                                             ),
                                           ],
                                         ),
-                                      );
-                                    },
-                                  );
-                                },
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(8),
-                                  child: Image.network(
-                                    data['packagePhoto'],
-                                    width: double.infinity,
-                                    height: 150,
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (context, error, stackTrace) {
-                                      return Container(
-                                        width: double.infinity,
-                                        height: 150,
-                                        color: Colors.grey.shade200,
-                                        child: const Icon(Icons.image,
-                                            color: Colors.grey),
-                                      );
-                                    },
-                                  ),
+                                        Container(
+                                          padding: const EdgeInsets.all(6),
+                                          decoration: BoxDecoration(
+                                            color: AppColors.primary.withOpacity(0.1),
+                                            borderRadius: BorderRadius.circular(6),
+                                            border: Border.all(
+                                              color: AppColors.primary.withOpacity(0.2),
+                                              width: 0.5,
+                                            ),
+                                          ),
+                                          child: Icon(
+                                            Icons.arrow_forward_ios,
+                                            size: 14,
+                                            color: AppColors.primary,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
                                 ),
                               ),
                             ],
                           ),
                         ),
-                      // Bouton pour accepter la livraison
-                      Padding(
-                        padding: const EdgeInsets.all(8.0),
-                        child: Column(
-                          children: [
-                            if (status.toLowerCase() == 'pending') ...[
-                              Padding(
-                                padding: const EdgeInsets.all(8.0),
-                                child: Row(
-                                  children: [
-                                    Expanded(
-                                      child: ElevatedButton(
-                                        onPressed: () async {
-                                          try {
-                                            await FirebaseFirestore.instance
-                                                .collection('carts')
-                                                .doc(doc.id)
-                                                .update({
-                                              'status':
-                                                  'colis en cours de préparation',
-                                              'timestamp':
-                                                  FieldValue.serverTimestamp(),
-                                            });
-
-                                            if (mounted) {
-                                              ScaffoldMessenger.of(context)
-                                                  .showSnackBar(
-                                                const SnackBar(
-                                                  content: Text(
-                                                      'Commande acceptée avec succès'),
-                                                  backgroundColor: Colors.green,
-                                                ),
-                                              );
-                                            }
-                                          } catch (e) {
-                                            if (mounted) {
-                                              ScaffoldMessenger.of(context)
-                                                  .showSnackBar(
-                                                SnackBar(
-                                                  content: Text('Erreur: $e'),
-                                                  backgroundColor: Colors.red,
-                                                ),
-                                              );
-                                            }
-                                          }
-                                        },
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: AppColors.primary,
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius:
-                                                BorderRadius.circular(8),
-                                          ),
-                                          minimumSize:
-                                              const Size(double.infinity, 40),
-                                        ),
-                                        child: const Text(
-                                          'Accepter',
-                                          style: TextStyle(color: Colors.white),
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: ElevatedButton(
-                                        onPressed: () async {
-                                          // Afficher la boîte de dialogue pour la raison du rejet
-                                          final TextEditingController
-                                              reasonController =
-                                              TextEditingController();
-                                          bool? confirmed =
-                                              await showDialog<bool>(
-                                            context: context,
-                                            builder: (BuildContext context) {
-                                              return StatefulBuilder(
-                                                builder: (context, setState) {
-                                                  return AlertDialog(
-                                                    shape:
-                                                        RoundedRectangleBorder(
-                                                      borderRadius:
-                                                          BorderRadius.circular(
-                                                              16),
-                                                    ),
-                                                    title: Row(
-                                                      children: [
-                                                        const Icon(
-                                                            Icons
-                                                                .warning_amber_rounded,
-                                                            color: Colors.red),
-                                                        const SizedBox(
-                                                            width: 8),
-                                                        const Text(
-                                                          'Rejeter la commande',
-                                                          style: TextStyle(
-                                                            fontSize: 18,
-                                                            fontWeight:
-                                                                FontWeight.bold,
-                                                          ),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                    content: Column(
-                                                      mainAxisSize:
-                                                          MainAxisSize.min,
-                                                      crossAxisAlignment:
-                                                          CrossAxisAlignment
-                                                              .start,
-                                                      children: [
-                                                        const Text(
-                                                          'Veuillez indiquer la raison du rejet de cette commande.',
-                                                          style: TextStyle(
-                                                            color: Colors.grey,
-                                                            fontSize: 14,
-                                                          ),
-                                                        ),
-                                                        const SizedBox(
-                                                            height: 16),
-                                                        TextField(
-                                                          controller:
-                                                              reasonController,
-                                                          decoration:
-                                                              InputDecoration(
-                                                            hintText:
-                                                                'Entrez la raison du rejet',
-                                                            border:
-                                                                OutlineInputBorder(
-                                                              borderRadius:
-                                                                  BorderRadius
-                                                                      .circular(
-                                                                          8),
-                                                            ),
-                                                            filled: true,
-                                                            fillColor: Colors
-                                                                .grey.shade50,
-                                                            prefixIcon: const Icon(
-                                                                Icons.edit_note,
-                                                                color: Colors
-                                                                    .grey),
-                                                            errorText:
-                                                                reasonController
-                                                                        .text
-                                                                        .isEmpty
-                                                                    ? 'Ce champ est obligatoire'
-                                                                    : null,
-                                                          ),
-                                                          maxLines: 3,
-                                                          onChanged: (value) {
-                                                            setState(
-                                                                () {}); // Pour mettre à jour la validation en temps réel
-                                                          },
-                                                        ),
-                                                      ],
-                                                    ),
-                                                    actions: [
-                                                      TextButton(
-                                                        onPressed: () =>
-                                                            Navigator.pop(
-                                                                context, false),
-                                                        child: const Text(
-                                                          'ANNULER',
-                                                          style: TextStyle(
-                                                              color:
-                                                                  Colors.grey),
-                                                        ),
-                                                      ),
-                                                      ElevatedButton(
-                                                        onPressed:
-                                                            reasonController
-                                                                    .text
-                                                                    .trim()
-                                                                    .isEmpty
-                                                                ? null
-                                                                : () {
-                                                                    Navigator.pop(
-                                                                        context,
-                                                                        true);
-                                                                  },
-                                                        style: ElevatedButton
-                                                            .styleFrom(
-                                                          backgroundColor:
-                                                              Colors.red,
-                                                          disabledBackgroundColor:
-                                                              Colors.red
-                                                                  .withOpacity(
-                                                                      0.5),
-                                                          shape:
-                                                              RoundedRectangleBorder(
-                                                            borderRadius:
-                                                                BorderRadius
-                                                                    .circular(
-                                                                        8),
-                                                          ),
-                                                        ),
-                                                        child: const Text(
-                                                          'REJETER',
-                                                          style: TextStyle(
-                                                              color:
-                                                                  Colors.white),
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  );
-                                                },
-                                              );
-                                            },
-                                          );
-
-                                          if (confirmed == true &&
-                                              reasonController.text
-                                                  .trim()
-                                                  .isNotEmpty) {
-                                            try {
-                                              await FirebaseFirestore.instance
-                                                  .collection('carts')
-                                                  .doc(doc.id)
-                                                  .update({
-                                                'status': 'rejected',
-                                                'rejectionReason':
-                                                    reasonController.text
-                                                        .trim(),
-                                                'timestamp': FieldValue
-                                                    .serverTimestamp(),
-                                              });
-
-                                              if (mounted) {
-                                                ScaffoldMessenger.of(context)
-                                                    .showSnackBar(
-                                                  const SnackBar(
-                                                    content: Text(
-                                                        'Commande rejetée'),
-                                                    backgroundColor: Colors.red,
-                                                  ),
-                                                );
-                                              }
-                                            } catch (e) {
-                                              if (mounted) {
-                                                ScaffoldMessenger.of(context)
-                                                    .showSnackBar(
-                                                  SnackBar(
-                                                    content: Text('Erreur: $e'),
-                                                    backgroundColor: Colors.red,
-                                                  ),
-                                                );
-                                              }
-                                            }
-                                          }
-                                        },
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: Colors.red,
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius:
-                                                BorderRadius.circular(8),
-                                          ),
-                                          minimumSize:
-                                              const Size(double.infinity, 40),
-                                        ),
-                                        child: const Text(
-                                          'REJETER',
-                                          style: TextStyle(color: Colors.white),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              Padding(
-                                padding:
-                                    const EdgeInsets.symmetric(horizontal: 8.0),
-                                child: ElevatedButton(
-                                  onPressed: () {
-                                    // Afficher le popup de contact
-                                    showDialog(
-                                      context: context,
-                                      builder: (BuildContext context) {
-                                        return Dialog(
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius:
-                                                BorderRadius.circular(16),
-                                          ),
-                                          child: Container(
-                                            padding: const EdgeInsets.all(20),
-                                            child: Column(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                const Text(
-                                                  'Contacter le client',
-                                                  style: TextStyle(
-                                                    fontSize: 18,
-                                                    fontWeight: FontWeight.bold,
-                                                  ),
-                                                ),
-                                                const SizedBox(height: 8),
-                                                Text(
-                                                  data['client'] ?? 'Client',
-                                                  style: const TextStyle(
-                                                    fontSize: 16,
-                                                    color: AppColors.primary,
-                                                  ),
-                                                ),
-                                                const SizedBox(height: 20),
-                                                Row(
-                                                  mainAxisAlignment:
-                                                      MainAxisAlignment
-                                                          .spaceEvenly,
-                                                  children: [
-                                                    // Bouton Appel normal
-                                                    ElevatedButton(
-                                                      onPressed: () {
-                                                        final phoneNumber =
-                                                            data['phone'] ?? '';
-                                                        if (phoneNumber
-                                                            .isNotEmpty) {
-                                                          launchUrl(Uri.parse(
-                                                              'tel:$phoneNumber'));
-                                                        } else {
-                                                          ScaffoldMessenger.of(
-                                                                  context)
-                                                              .showSnackBar(
-                                                            const SnackBar(
-                                                              content: Text(
-                                                                  'Numéro de téléphone non disponible'),
-                                                              backgroundColor:
-                                                                  Colors.red,
-                                                            ),
-                                                          );
-                                                        }
-                                                        Navigator.pop(context);
-                                                      },
-                                                      style: ElevatedButton
-                                                          .styleFrom(
-                                                        backgroundColor:
-                                                            AppColors.primary,
-                                                        shape:
-                                                            RoundedRectangleBorder(
-                                                          borderRadius:
-                                                              BorderRadius
-                                                                  .circular(8),
-                                                        ),
-                                                        padding:
-                                                            const EdgeInsets
-                                                                .symmetric(
-                                                                horizontal: 20,
-                                                                vertical: 12),
-                                                      ),
-                                                      child: const Row(
-                                                        mainAxisSize:
-                                                            MainAxisSize.min,
-                                                        children: [
-                                                          Icon(Icons.phone,
-                                                              color:
-                                                                  Colors.white),
-                                                          SizedBox(width: 8),
-                                                          Text(
-                                                            'Appeler',
-                                                            style: TextStyle(
-                                                                color: Colors
-                                                                    .white),
-                                                          ),
-                                                        ],
-                                                      ),
-                                                    ),
-                                                    // Bouton WhatsApp
-                                                    ElevatedButton(
-                                                      onPressed: () {
-                                                        final phoneNumber =
-                                                            data['phone'] ?? '';
-                                                        if (phoneNumber
-                                                            .isNotEmpty) {
-                                                          final whatsappUrl =
-                                                              'https://wa.me/$phoneNumber';
-                                                          launchUrl(Uri.parse(
-                                                              whatsappUrl));
-                                                        } else {
-                                                          ScaffoldMessenger.of(
-                                                                  context)
-                                                              .showSnackBar(
-                                                            const SnackBar(
-                                                              content: Text(
-                                                                  'Numéro de téléphone non disponible'),
-                                                              backgroundColor:
-                                                                  Colors.red,
-                                                            ),
-                                                          );
-                                                        }
-                                                        Navigator.pop(context);
-                                                      },
-                                                      style: ElevatedButton
-                                                          .styleFrom(
-                                                        backgroundColor:
-                                                            Colors.green,
-                                                        shape:
-                                                            RoundedRectangleBorder(
-                                                          borderRadius:
-                                                              BorderRadius
-                                                                  .circular(8),
-                                                        ),
-                                                        padding:
-                                                            const EdgeInsets
-                                                                .symmetric(
-                                                                horizontal: 20,
-                                                                vertical: 12),
-                                                      ),
-                                                      child: const Row(
-                                                        mainAxisSize:
-                                                            MainAxisSize.min,
-                                                        children: [
-                                                          Icon(Icons.message,
-                                                              color:
-                                                                  Colors.white),
-                                                          SizedBox(width: 8),
-                                                          Text(
-                                                            'WhatsApp',
-                                                            style: TextStyle(
-                                                                color: Colors
-                                                                    .white),
-                                                          ),
-                                                        ],
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                                const SizedBox(height: 16),
-                                                TextButton(
-                                                  onPressed: () =>
-                                                      Navigator.pop(context),
-                                                  child: const Text(
-                                                    'ANNULER',
-                                                    style: TextStyle(
-                                                        color: Colors.grey),
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        );
-                                      },
-                                    );
-                                  },
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.green,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    minimumSize:
-                                        const Size(double.infinity, 40),
-                                  ),
-                                  child: const Text(
-                                    'Contacter',
-                                    style: TextStyle(color: Colors.white),
-                                  ),
-                                ),
-                              ),
-                            ],
-                            if (status == 'colis en cours de préparation') ...[
-                              Padding(
-                                padding: const EdgeInsets.all(8.0),
-                                child: ElevatedButton(
-                                  onPressed: () {
-                                    _showExpeditionDialog(context, doc.id);
-                                  },
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: AppColors.primary,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    minimumSize:
-                                        const Size(double.infinity, 40),
-                                  ),
-                                  child: const Text(
-                                    'Expédier',
-                                    style: TextStyle(color: Colors.white),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               );

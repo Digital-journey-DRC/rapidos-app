@@ -868,6 +868,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                                       price: product.price,
                                       imagePath: product.getMainImage(),
                                       product: product, // Passer le produit complet pour le print
+                                      heroTagSuffix: 'featured_$index', // Tag unique pour éviter les conflits Hero
                                     );
                                   },
                                 ),
@@ -1244,6 +1245,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
     required double price,
     required String imagePath,
     Product? product, // Produit complet optionnel pour le print
+    String? heroTagSuffix, // Suffixe optionnel pour rendre le tag Hero unique
   }) {
     return Builder(
       builder: (context) {
@@ -1350,7 +1352,9 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                   children: [
                     // Product image
                     Hero(
-                      tag: 'product_${id}_${imagePath}',
+                      tag: heroTagSuffix != null 
+                          ? 'product_${id}_${imagePath}_$heroTagSuffix'
+                          : 'product_${id}_${imagePath}',
                       child: ClipRRect(
                         borderRadius: const BorderRadius.only(
                           topLeft: Radius.circular(4),

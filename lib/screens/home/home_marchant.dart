@@ -787,39 +787,40 @@ class _ProductCardState extends State<_ProductCard> with SingleTickerProviderSta
                       Expanded(
                         child: Padding(
                           padding: const EdgeInsets.symmetric(
-                              vertical: 8, horizontal: 4),
+                              vertical: 6, horizontal: 4),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             mainAxisAlignment: MainAxisAlignment.center,
+                            mainAxisSize: MainAxisSize.min,
                             children: [
                               Text(
                                 widget.name,
                                 style: const TextStyle(
                                   fontWeight: FontWeight.bold,
-                                  fontSize: 13,
+                                  fontSize: 12,
                                 ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
-                              const SizedBox(height: 2),
+                              const SizedBox(height: 1),
                               Text(
                                 "Stock: ${widget.stock}",
                                 style: TextStyle(
                                   color: Colors.grey[600],
-                                  fontSize: 10,
+                                  fontSize: 9,
                                 ),
                               ),
-                              const SizedBox(height: 2),
+                              const SizedBox(height: 1),
                               Text(
                                 "${widget.price} FC",
                                 style: TextStyle(
                                   color:
                                       widget.isPromo ? Colors.red : Colors.green,
                                   fontWeight: FontWeight.bold,
-                                  fontSize: 11,
+                                  fontSize: 10,
                                 ),
                               ),
-                              const SizedBox(height: 2),
+                              const SizedBox(height: 1),
                               FutureBuilder<double>(
                                 future: ReviewService().getCachedAverageRating(widget.productId),
                                 builder: (context, snapshot) {
@@ -830,14 +831,14 @@ class _ProductCardState extends State<_ProductCard> with SingleTickerProviderSta
                                       children: [
                                         Icon(
                                           Icons.star_rounded,
-                                          size: 10,
+                                          size: 9,
                                           color: Colors.amber.shade700,
                                         ),
                                         const SizedBox(width: 2),
                                         Text(
                                           rating.toStringAsFixed(1),
                                           style: TextStyle(
-                                            fontSize: 9,
+                                            fontSize: 8,
                                             fontWeight: FontWeight.w600,
                                             color: Colors.grey.shade700,
                                           ),
