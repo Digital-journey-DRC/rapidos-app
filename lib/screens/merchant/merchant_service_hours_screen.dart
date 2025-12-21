@@ -20,6 +20,8 @@ class _MerchantServiceHoursScreenState extends State<MerchantServiceHoursScreen>
   final Map<String, bool> _existingHoraires = {};
   // Sauvegarder l'état précédent des jours avant désactivation
   List<MerchantHours>? _previousHoursState;
+  // Map pour suivre les jours en cours de chargement (par jour)
+  final Map<String, bool> _loadingDays = {};
 
   @override
   void initState() {
@@ -270,7 +272,9 @@ class _MerchantServiceHoursScreenState extends State<MerchantServiceHoursScreen>
     }
 
     if (!mounted) return;
-    setState(() => _isLoading = true);
+    setState(() {
+      _loadingDays[dayHours.jourApi] = true;
+    });
 
     try {
       Map<String, dynamic> result;
@@ -293,7 +297,9 @@ class _MerchantServiceHoursScreenState extends State<MerchantServiceHoursScreen>
       }
 
       if (mounted) {
-        setState(() => _isLoading = false);
+        setState(() {
+          _loadingDays[dayHours.jourApi] = false;
+        });
         
         if (result['success'] == true) {
           // Marquer comme existant après création/mise à jour réussie
@@ -316,7 +322,9 @@ class _MerchantServiceHoursScreenState extends State<MerchantServiceHoursScreen>
       }
     } catch (e) {
       if (mounted) {
-        setState(() => _isLoading = false);
+        setState(() {
+          _loadingDays[dayHours.jourApi] = false;
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Erreur: $e'),
@@ -327,8 +335,8 @@ class _MerchantServiceHoursScreenState extends State<MerchantServiceHoursScreen>
     }
   }
 
-  /// Supprime un horaire pour un jour spécifique
-  Future<void> _deleteHoraire(MerchantHours dayHours) async {
+  /// Supprime un horaire pour un jour spécifique (sans confirmation)
+  Future<void> _deleteHoraire(MerchantHours dayHours, {bool showConfirmation = false}) async {
     if (_existingHoraires[dayHours.jourApi] != true) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -341,35 +349,41 @@ class _MerchantServiceHoursScreenState extends State<MerchantServiceHoursScreen>
       return;
     }
 
-    // Demander confirmation
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Supprimer l\'horaire'),
-        content: Text('Êtes-vous sûr de vouloir supprimer l\'horaire du ${dayHours.day} ?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Annuler'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Supprimer'),
-          ),
-        ],
-      ),
-    );
+    // Demander confirmation seulement si demandé explicitement
+    if (showConfirmation) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Supprimer l\'horaire'),
+          content: Text('Êtes-vous sûr de vouloir supprimer l\'horaire du ${dayHours.day} ?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Annuler'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: TextButton.styleFrom(foregroundColor: Colors.red),
+              child: const Text('Supprimer'),
+            ),
+          ],
+        ),
+      );
 
-    if (confirmed != true || !mounted) return;
+      if (confirmed != true || !mounted) return;
+    }
 
-    setState(() => _isLoading = true);
+    setState(() {
+      _loadingDays[dayHours.jourApi] = true;
+    });
 
     try {
       final result = await _hoursService.deleteHoraire(dayHours.jourApi);
 
       if (mounted) {
-        setState(() => _isLoading = false);
+        setState(() {
+          _loadingDays[dayHours.jourApi] = false;
+        });
         
         if (result['success'] == true) {
           // Retirer de la map des horaires existants
@@ -404,7 +418,9 @@ class _MerchantServiceHoursScreenState extends State<MerchantServiceHoursScreen>
       }
     } catch (e) {
       if (mounted) {
-        setState(() => _isLoading = false);
+        setState(() {
+          _loadingDays[dayHours.jourApi] = false;
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Erreur: $e'),
@@ -698,7 +714,7 @@ class _MerchantServiceHoursScreenState extends State<MerchantServiceHoursScreen>
         elevation: 0,
       ),
       backgroundColor: const Color(0xFFF7F8FA),
-      body: _isLoading
+      body: _isLoading && _loadingDays.isEmpty
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
               onRefresh: _loadConfig,
@@ -886,23 +902,32 @@ class _MerchantServiceHoursScreenState extends State<MerchantServiceHoursScreen>
                   ..._config.hours.map((dayHours) {
                     final isValid = _validateHours(dayHours);
                     final hasExistingHoraire = _existingHoraires[dayHours.jourApi] == true;
+                    final isLoading = _loadingDays[dayHours.jourApi] == true;
                     return _DayHoursCard(
                       dayHours: dayHours,
                       hasExistingHoraire: hasExistingHoraire,
-                      onEnabledChanged: (enabled) {
-                        setState(() {
-                          final index = _config.hours.indexWhere((h) => h.day == dayHours.day);
-                          if (index != -1) {
-                            final updatedHours = List<MerchantHours>.from(_config.hours);
-                            updatedHours[index] = updatedHours[index].copyWith(isEnabled: enabled);
-                            _config = _config.copyWith(hours: updatedHours);
-                          }
-                        });
+                      isLoading: isLoading,
+                      onEnabledChanged: (enabled) async {
+                        // Si on désactive un horaire qui existe déjà, exécuter la même action que delete (sans confirmation)
+                        if (!enabled && hasExistingHoraire) {
+                          await _deleteHoraire(dayHours, showConfirmation: false);
+                        } else {
+                          // Sinon, juste mettre à jour l'état local
+                          setState(() {
+                            final index = _config.hours.indexWhere((h) => h.day == dayHours.day);
+                            if (index != -1) {
+                              final updatedHours = List<MerchantHours>.from(_config.hours);
+                              updatedHours[index] = updatedHours[index].copyWith(isEnabled: enabled);
+                              _config = _config.copyWith(hours: updatedHours);
+                            }
+                          });
+                        }
                       },
                       onOpenTimeTap: () => _selectTime(context, dayHours, true),
                       onCloseTimeTap: () => _selectTime(context, dayHours, false),
                       onSave: () => _saveSingleHoraire(dayHours),
-                      onDelete: () => _deleteHoraire(dayHours),
+                      // onDelete: () => _deleteHoraire(dayHours), // Commenté : la désactivation fait la même action
+                      onDelete: null, // Désactivé car la désactivation fait la même action
                       onRefresh: () => _loadSingleHoraire(dayHours.jourApi),
                       isValid: isValid,
                     );
@@ -953,6 +978,7 @@ class _DayHoursCard extends StatelessWidget {
   final VoidCallback? onRefresh;
   final bool isValid;
   final bool hasExistingHoraire;
+  final bool isLoading;
 
   const _DayHoursCard({
     required this.dayHours,
@@ -964,6 +990,7 @@ class _DayHoursCard extends StatelessWidget {
     this.onRefresh,
     required this.isValid,
     required this.hasExistingHoraire,
+    this.isLoading = false,
   });
 
   @override
@@ -979,170 +1006,200 @@ class _DayHoursCard extends StatelessWidget {
           width: isValid ? 1 : 1.5,
         ),
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
+      child: Stack(
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Row(
+          Opacity(
+            opacity: isLoading ? 0.6 : 1.0,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
                   children: [
-                    Text(
-                      dayHours.day,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Text(
+                            dayHours.day,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          if (hasExistingHoraire) ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: AppColors.success.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: const Text(
+                                'Enregistré',
+                                style: TextStyle(
+                                  fontSize: 8,
+                                  color: AppColors.success,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                     ),
-                    if (hasExistingHoraire) ...[
-                      const SizedBox(width: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: AppColors.success.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(4),
+                    if (onRefresh != null && !isLoading)
+                      IconButton(
+                        icon: const Icon(Icons.refresh, size: 16),
+                        color: AppColors.primary,
+                        onPressed: onRefresh,
+                        tooltip: 'Recharger',
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                      ),
+                    Transform.scale(
+                      scale: 0.85,
+                      child: Switch(
+                        value: dayHours.isEnabled,
+                        onChanged: isLoading ? null : onEnabledChanged,
+                        activeColor: AppColors.primary,
+                      ),
+                    ),
+                  ],
+                ),
+                if (dayHours.isEnabled) ...[
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _TimeButton(
+                          label: 'Ouverture',
+                          time: dayHours.openTime ?? '08:00',
+                          onTap: isLoading ? () {} : onOpenTimeTap,
+                          icon: Icons.access_time,
+                          enabled: !isLoading,
                         ),
-                        child: const Text(
-                          'Enregistré',
-                          style: TextStyle(
-                            fontSize: 8,
-                            color: AppColors.success,
-                            fontWeight: FontWeight.w600,
-                          ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _TimeButton(
+                          label: 'Fermeture',
+                          time: dayHours.closeTime ?? '18:00',
+                          onTap: isLoading ? () {} : onCloseTimeTap,
+                          icon: Icons.access_time,
+                          enabled: !isLoading,
                         ),
                       ),
                     ],
-                  ],
-                ),
-              ),
-              if (onRefresh != null)
-                IconButton(
-                  icon: const Icon(Icons.refresh, size: 16),
-                  color: AppColors.primary,
-                  onPressed: onRefresh,
-                  tooltip: 'Recharger',
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                ),
-              Transform.scale(
-                scale: 0.85,
-                child: Switch(
-                  value: dayHours.isEnabled,
-                  onChanged: onEnabledChanged,
-                  activeColor: AppColors.primary,
-                ),
-              ),
-            ],
-          ),
-          if (dayHours.isEnabled) ...[
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: _TimeButton(
-                    label: 'Ouverture',
-                    time: dayHours.openTime ?? '08:00',
-                    onTap: onOpenTimeTap,
-                    icon: Icons.access_time,
                   ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _TimeButton(
-                    label: 'Fermeture',
-                    time: dayHours.closeTime ?? '18:00',
-                    onTap: onCloseTimeTap,
-                    icon: Icons.access_time,
-                  ),
-                ),
-              ],
-            ),
-            if (!isValid) ...[
-              const SizedBox(height: 5),
-              Row(
-                children: [
-                  Icon(Icons.error_outline, color: Colors.red.shade600, size: 12),
-                  const SizedBox(width: 4),
-                  Expanded(
-                    child: Text(
-                      'L\'heure d\'ouverture doit être avant l\'heure de fermeture',
-                      style: TextStyle(
-                        color: Colors.red.shade700,
-                        fontSize: 10,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-            // Boutons d'action (Save/Delete)
-            if (dayHours.isEnabled) ...[
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  if (onSave != null)
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: onSave,
-                        icon: Icon(Icons.save, size: 14, color: AppColors.primary.withOpacity(0.7)),
-                        label: Text(
-                          'Enregistrer',
-                          style: TextStyle(fontSize: 11, color: AppColors.primary.withOpacity(0.8)),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.white,
-                          foregroundColor: AppColors.primary,
-                          padding: const EdgeInsets.symmetric(vertical: 6),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(6),
-                            side: BorderSide(
-                              color: AppColors.primary.withOpacity(0.3),
-                              width: 1,
+                  if (!isValid) ...[
+                    const SizedBox(height: 5),
+                    Row(
+                      children: [
+                        Icon(Icons.error_outline, color: Colors.red.shade600, size: 12),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            'L\'heure d\'ouverture doit être avant l\'heure de fermeture',
+                            style: TextStyle(
+                              color: Colors.red.shade700,
+                              fontSize: 10,
                             ),
                           ),
-                          elevation: 0,
                         ),
-                      ),
-                    ),
-                  if (onDelete != null && hasExistingHoraire) ...[
-                    const SizedBox(width: 6),
-                    IconButton(
-                      icon: const Icon(Icons.delete_outline, size: 18),
-                      color: Colors.red,
-                      onPressed: onDelete,
-                      tooltip: 'Supprimer',
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
+                      ],
                     ),
                   ],
+                  // Boutons d'action (Save/Delete)
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      if (onSave != null)
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: isLoading ? null : onSave,
+                            icon: isLoading
+                                ? SizedBox(
+                                    width: 14,
+                                    height: 14,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        AppColors.primary.withOpacity(0.7),
+                                      ),
+                                    ),
+                                  )
+                                : Icon(Icons.save, size: 14, color: AppColors.primary.withOpacity(0.7)),
+                            label: Text(
+                              isLoading ? 'Enregistrement...' : 'Enregistrer',
+                              style: TextStyle(fontSize: 11, color: AppColors.primary.withOpacity(0.8)),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.white,
+                              foregroundColor: AppColors.primary,
+                              padding: const EdgeInsets.symmetric(vertical: 6),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(6),
+                                side: BorderSide(
+                                  color: AppColors.primary.withOpacity(0.3),
+                                  width: 1,
+                                ),
+                              ),
+                              elevation: 0,
+                            ),
+                          ),
+                        ),
+                      // Bouton delete commenté : la désactivation fait la même action
+                      // if (onDelete != null && hasExistingHoraire) ...[
+                      //   const SizedBox(width: 6),
+                      //   IconButton(
+                      //     icon: const Icon(Icons.delete_outline, size: 18),
+                      //     color: Colors.red,
+                      //     onPressed: onDelete,
+                      //     tooltip: 'Supprimer',
+                      //     padding: EdgeInsets.zero,
+                      //     constraints: const BoxConstraints(),
+                      //   ),
+                      // ],
+                    ],
+                  ),
+                ] else ...[
+                  const SizedBox(height: 4),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Fermé ce jour',
+                        style: TextStyle(
+                          color: Colors.grey.shade600,
+                          fontSize: 11,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                      // Bouton delete commenté : la désactivation fait la même action
+                      // if (onDelete != null && hasExistingHoraire)
+                      //   IconButton(
+                      //     icon: const Icon(Icons.delete_outline, size: 18),
+                      //     color: Colors.red,
+                      //     onPressed: onDelete,
+                      //     tooltip: 'Supprimer l\'horaire',
+                      //     padding: EdgeInsets.zero,
+                      //     constraints: const BoxConstraints(),
+                      //   ),
+                    ],
+                  ),
                 ],
-              ),
-            ],
-          ] else ...[
-            const SizedBox(height: 4),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Fermé ce jour',
-                  style: TextStyle(
-                    color: Colors.grey.shade600,
-                    fontSize: 11,
-                    fontStyle: FontStyle.italic,
-                  ),
-                ),
-                if (onDelete != null && hasExistingHoraire)
-                  IconButton(
-                    icon: const Icon(Icons.delete_outline, size: 18),
-                    color: Colors.red,
-                    onPressed: onDelete,
-                    tooltip: 'Supprimer l\'horaire',
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                  ),
               ],
             ),
-          ],
+          ),
+          // Indicateur de chargement
+          if (isLoading)
+            Positioned.fill(
+              child: Center(
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -1154,58 +1211,63 @@ class _TimeButton extends StatelessWidget {
   final String time;
   final VoidCallback onTap;
   final IconData icon;
+  final bool enabled;
 
   const _TimeButton({
     required this.label,
     required this.time,
     required this.onTap,
     required this.icon,
+    this.enabled = true,
   });
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 7),
-        decoration: BoxDecoration(
-          color: AppColors.primary.withOpacity(0.08),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: AppColors.primary.withOpacity(0.2), width: 1),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(icon, size: 12, color: AppColors.primary),
-                const SizedBox(width: 3),
-                Flexible(
-                  child: Text(
-                    label,
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: Colors.grey.shade600,
-                      fontWeight: FontWeight.w500,
+      onTap: enabled ? onTap : null,
+      child: Opacity(
+        opacity: enabled ? 1.0 : 0.5,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 7),
+          decoration: BoxDecoration(
+            color: AppColors.primary.withOpacity(0.08),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: AppColors.primary.withOpacity(0.2), width: 1),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(icon, size: 12, color: AppColors.primary),
+                  const SizedBox(width: 3),
+                  Flexible(
+                    child: Text(
+                      label,
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: Colors.grey.shade600,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 3),
-            Text(
-              time,
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.bold,
-                color: AppColors.primary,
+                ],
               ),
-            ),
-          ],
+              const SizedBox(height: 3),
+              Text(
+                time,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.primary,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
