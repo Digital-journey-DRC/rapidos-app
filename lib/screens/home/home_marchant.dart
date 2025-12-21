@@ -22,6 +22,7 @@ import 'package:immo/models/product.dart';
 import 'package:immo/services/review_service.dart';
 import 'package:immo/services/sales_statistics_service.dart';
 import 'package:immo/screens/statistics/sales_statistics_detail_screen.dart';
+import 'package:immo/widgets/ecommerce_loading.dart';
 
 class HomeMarchantScreen extends StatefulWidget {
   const HomeMarchantScreen({Key? key}) : super(key: key);
@@ -372,7 +373,7 @@ void saveCommande() async {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const SizedBox(
                     height: 90,
-                    child: Center(child: CircularProgressIndicator()),
+                    child: Center(child: EcommerceLoading.simple(size: 40)),
                   );
                 }
 
@@ -464,7 +465,7 @@ void saveCommande() async {
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(16),
                 child: _isLoading
-                    ? const Center(child: CircularProgressIndicator())
+                    ? const Center(child: EcommerceLoading.simple(size: 50))
                     : _currentPosition == null
                         ? Center(
                             child: Column(
@@ -1316,7 +1317,7 @@ class _SalesStatisticsWidgetState extends State<_SalesStatisticsWidget> {
                   border: Border.all(color: Colors.grey.shade200, width: 0.5),
                 ),
                 child: const Center(
-                  child: CircularProgressIndicator(color: AppColors.primary),
+                  child: EcommerceLoading.simple(size: 50, color: AppColors.primary),
                 ),
               )
             : _statistics == null

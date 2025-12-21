@@ -3,6 +3,7 @@ import 'package:immo/constants.dart';
 import 'package:immo/screens/home/all_merchants_screen.dart';
 import 'package:immo/screens/navigation_example.dart';
 import 'package:immo/screens/product/product_detail_screen.dart';
+import 'package:immo/widgets/ecommerce_loading.dart';
 import '../merchant/vendeur_detail_screen.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:immo/cubit/auth_cubit.dart';
@@ -12,6 +13,7 @@ import 'package:immo/screens/product/all_products_screen.dart';
 import 'package:immo/screens/product/category_products_screen.dart';
 import 'package:immo/screens/product/promo_products_section.dart';
 import 'package:immo/screens/product/recommended_products_section.dart';
+import 'package:immo/screens/product/chosen_products_screen.dart';
 import 'package:immo/cubit/category_cubit.dart';
 import 'package:immo/widgets/shimmer_loading.dart';
 import 'package:immo/cubit/merchant_cubit.dart';
@@ -814,7 +816,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                             const Padding(
                               padding: EdgeInsets.only(left: 16),
                               child: Text(
-                                'Produits',
+                                'Tous les produits',
                                 style: TextStyle(
                                     fontSize: 18,
                                     fontWeight: FontWeight.bold,
@@ -915,13 +917,32 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'Produit choisi pour vous',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black,
-                          ),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'Produits choisis pour vous',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black,
+                              ),
+                            ),
+                            TextButton(
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => const ChosenProductsScreen(),
+                                  ),
+                                );
+                              },
+                              child: const Text(
+                                'Voir plus',
+                                style: TextStyle(color: AppColors.primary),
+                              ),
+                            ),
+                          ],
                         ),
                         const SizedBox(height: 12),
                         FutureBuilder<Map<String, dynamic>>(
@@ -944,7 +965,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                                         borderRadius: BorderRadius.circular(16),
                                       ),
                                       child: const Center(
-                                        child: CircularProgressIndicator(),
+                                        child: EcommerceLoading.simple(size: 40),
                                       ),
                                     );
                                   },

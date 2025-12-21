@@ -12,6 +12,7 @@ import '../../models/product.dart';
 import '../../models/vendeur.dart';
 import '../../services/review_service.dart';
 import '../../services/event_service.dart';
+import '../../widgets/ecommerce_loading.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 
@@ -523,18 +524,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                SizedBox(
-                                  width: 40,
-                                  height: 40,
-                                  child: CircularProgressIndicator(
-                                    value: loadingProgress.expectedTotalBytes != null
-                                        ? loadingProgress.cumulativeBytesLoaded /
-                                            loadingProgress.expectedTotalBytes!
-                                        : null,
-                                    color: AppColors.primary,
-                                    strokeWidth: 3,
-                                  ),
-                                ),
+                                const EcommerceImageLoading(size: 40),
                                 const SizedBox(height: 12),
                                 Text(
                                   'Chargement...',
