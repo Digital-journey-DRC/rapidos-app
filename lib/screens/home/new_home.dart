@@ -27,6 +27,7 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:immo/models/product.dart';
 import 'package:immo/services/review_service.dart';
 import 'package:immo/services/product_service.dart';
+import 'package:immo/services/event_service.dart';
 
 class NewHomeScreen extends StatefulWidget {
   const NewHomeScreen({Key? key}) : super(key: key);
@@ -1577,6 +1578,19 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                             }
                             return;
                           }
+                          
+                          // Track add to cart event in background
+                          final authState = context.read<AuthCubit>().state;
+                          if (authState is AuthSuccess && authState.user != null) {
+                            final userId = authState.user!['id'];
+                            if (userId != null) {
+                              EventService().trackAddToCart(
+                                productId: id,
+                                userId: userId is int ? userId : int.tryParse(userId.toString()) ?? 0,
+                              );
+                            }
+                          }
+                          
                           if (mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(

@@ -11,6 +11,7 @@ import '../auth/login_screen.dart';
 import '../../models/product.dart';
 import '../../models/vendeur.dart';
 import '../../services/review_service.dart';
+import '../../services/event_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 
@@ -64,6 +65,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   final TextEditingController _commentController = TextEditingController();
   double _averageRating = 0.0;
   bool _showAllReviews = false; // Afficher tous les commentaires ou seulement 5
+  final EventService _eventService = EventService();
 
   @override
   void initState() {
@@ -74,6 +76,22 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     // Initialiser l'image principale : utiliser getMainImage() si product est disponible, sinon widget.imagePath
     _currentMainImage = widget.product?.getMainImage() ?? widget.imagePath;
     _loadRatingData();
+    // Track product view event
+    _trackProductView();
+  }
+
+  /// Track product view event in background
+  void _trackProductView() {
+    final authState = context.read<AuthCubit>().state;
+    if (authState is AuthSuccess && authState.user != null) {
+      final userId = authState.user!['id'];
+      if (userId != null) {
+        _eventService.trackProductView(
+          productId: widget.id,
+          userId: userId is int ? userId : int.tryParse(userId.toString()) ?? 0,
+        );
+      }
+    }
   }
 
   @override

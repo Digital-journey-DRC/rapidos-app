@@ -10,6 +10,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:immo/cubit/cart_cubit.dart';
 import 'package:immo/cubit/order_cubit.dart';
 import 'package:immo/cubit/auth_cubit.dart';
+import 'package:immo/services/event_service.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:http/http.dart' as http;
@@ -647,6 +648,24 @@ class _CartScreenState extends State<CartScreen> {
             return BlocConsumer<OrderCubit, OrderState>(
               listener: (context, state) {
                 if (state.success) {
+                  // Track purchase events for all products in background
+                  final authState = context.read<AuthCubit>().state;
+                  if (authState is AuthSuccess && authState.user != null) {
+                    final userId = authState.user!['id'];
+                    if (userId != null) {
+                      final eventService = EventService();
+                      for (var item in cartItems) {
+                        final productId = item['id'];
+                        if (productId != null) {
+                          eventService.trackPurchase(
+                            productId: productId is int ? productId : int.tryParse(productId.toString()) ?? 0,
+                            userId: userId is int ? userId : int.tryParse(userId.toString()) ?? 0,
+                          );
+                        }
+                      }
+                    }
+                  }
+                  
                   Navigator.pop(context);
                   context.read<CartCubit>().clearCart();
                   ScaffoldMessenger.of(context).showSnackBar(

@@ -98,6 +98,8 @@ class OrderCubit extends Cubit<OrderState> {
       print('RESPONSE: $responseBody');
 
       if (response.statusCode == 200 || response.statusCode == 201) {
+        // Purchase events are tracked in cart_screen.dart after successful order creation
+        // to have access to AuthCubit and cartItems
         emit(state.copyWith(isLoading: false, success: true));
       } else {
         emit(state.copyWith(

@@ -4,6 +4,9 @@ import 'package:immo/widgets/app_logo.dart';
 import 'package:immo/models/product.dart';
 import 'package:immo/screens/product/product_detail_screen.dart';
 import 'package:immo/services/review_service.dart';
+import 'package:immo/services/event_service.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:immo/cubit/auth_cubit.dart';
 
 class AllProductsScreen extends StatefulWidget {
   final List<Product> products;
@@ -46,7 +49,22 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
                 fillColor: Colors.white,
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               ),
-              onChanged: (val) => setState(() => _search = val),
+              onChanged: (val) {
+                setState(() => _search = val);
+              },
+              onSubmitted: (val) {
+                // Track search event in background
+                final authState = context.read<AuthCubit>().state;
+                if (authState is AuthSuccess && authState.user != null && val.isNotEmpty) {
+                  final userId = authState.user!['id'];
+                  if (userId != null) {
+                    EventService().trackSearch(
+                      searchQuery: val,
+                      userId: userId is int ? userId : int.tryParse(userId.toString()) ?? 0,
+                    );
+                  }
+                }
+              },
             ),
           ),
           Expanded(
