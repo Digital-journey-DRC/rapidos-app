@@ -168,9 +168,11 @@ void saveCommande() async {
           // Recharger les statistiques si nécessaire
         },
         child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
             // const SizedBox(height: 30),
             // Navigation rapide
@@ -663,7 +665,7 @@ class _ProductCardState extends State<_ProductCard> with SingleTickerProviderSta
   @override
   Widget build(BuildContext context) {
     final String displayImageUrl = (widget.imageUrl.isEmpty || widget.imageUrl == 'null')
-        ? 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&h=400&fit=crop'
+        ? 'https://images.unsplash.com/photo-1556912172-45b7abe8b7e4?w=400&h=400&fit=crop'
         : widget.imageUrl.startsWith('http')
             ? widget.imageUrl
             : 'http://24.144.87.127:3333/$widget.imageUrl';

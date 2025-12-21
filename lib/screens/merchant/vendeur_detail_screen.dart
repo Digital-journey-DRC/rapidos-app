@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../constants.dart';
 import '../../services/merchant_service.dart';
+import '../../services/product_service.dart';
 import '../../models/vendeur.dart';
 import '../../models/product.dart';
 import '../product/product_detail_screen.dart';
@@ -24,6 +25,7 @@ class _VendeurDetailScreenState extends State<VendeurDetailScreen> {
   bool _isLoading = true;
   String? _errorMessage;
   final MerchantService _merchantService = MerchantService();
+  final ProductService _productService = ProductService();
   String _search = '';
 
   @override
@@ -189,6 +191,7 @@ class _VendeurDetailScreenState extends State<VendeurDetailScreen> {
                   : RefreshIndicator(
                       onRefresh: _loadVendeurData,
                       child: CustomScrollView(
+                        physics: const AlwaysScrollableScrollPhysics(),
                         slivers: [
                         // App Bar discret
                         SliverAppBar(
@@ -347,6 +350,12 @@ class _VendeurDetailScreenState extends State<VendeurDetailScreen> {
 
                         // Grille de produits
                         _buildProductsSliverGrid(),
+                        // Padding en bas pour permettre de scroller jusqu'à la fin
+                        SliverToBoxAdapter(
+                          child: SizedBox(
+                            height: MediaQuery.of(context).padding.bottom + 20,
+                          ),
+                        ),
                       ],
                       ),
                     ),
@@ -456,25 +465,118 @@ class _VendeurDetailScreenState extends State<VendeurDetailScreen> {
     final productImages = product.getAllImages();
 
     return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => ProductDetailScreen(
-              description: product.description,
-              idVendeur: product.vendeurId.toString(),
-              id: product.id,
-              tag: product.category?.name ?? 'PRODUIT',
-              category: product.category?.name ?? '',
-              stock: product.stock,
-              name: product.name,
-              price: product.price,
-              imagePath: imageUrl,
-              productImages: productImages.isNotEmpty ? productImages : null,
-              product: product,
-            ),
+      onTap: () async {
+        // Afficher un indicateur de chargement
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => const Center(
+            child: CircularProgressIndicator(),
           ),
         );
+
+        try {
+          // Récupérer les détails complets du produit avec l'endpoint spécifique
+          final result = await _productService.getProductById(product.id);
+          
+          if (mounted) {
+            Navigator.pop(context); // Fermer le dialog de chargement
+            
+            if (result['success'] == true) {
+              final productData = result['product'];
+              
+              // Créer un objet Product complet avec toutes les données
+              final fullProduct = Product.fromJson(productData);
+              
+              // Extraire les images
+              final images = productData['images'] as List<dynamic>? ?? [];
+              final imageList = images.map((img) => img.toString()).toList();
+              final mainImage = productData['image']?.toString() ?? imageUrl;
+              
+              // Si mainImage n'est pas dans la liste, l'ajouter en premier
+              final allImages = imageList.contains(mainImage) 
+                  ? imageList 
+                  : [mainImage, ...imageList];
+              
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ProductDetailScreen(
+                    description: fullProduct.description,
+                    idVendeur: fullProduct.vendeurId.toString(),
+                    id: fullProduct.id,
+                    tag: fullProduct.category?.name ?? 'PRODUIT',
+                    category: fullProduct.category?.name ?? '',
+                    stock: fullProduct.stock,
+                    name: fullProduct.name,
+                    price: fullProduct.price,
+                    imagePath: mainImage,
+                    productImages: allImages.isNotEmpty ? allImages : null,
+                    product: fullProduct,
+                  ),
+                ),
+              );
+            } else {
+              // En cas d'erreur, naviguer quand même avec les données disponibles
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(result['error']?.toString() ?? 'Erreur lors du chargement des détails'),
+                  backgroundColor: Colors.orange,
+                ),
+              );
+              
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ProductDetailScreen(
+                    description: product.description,
+                    idVendeur: product.vendeurId.toString(),
+                    id: product.id,
+                    tag: product.category?.name ?? 'PRODUIT',
+                    category: product.category?.name ?? '',
+                    stock: product.stock,
+                    name: product.name,
+                    price: product.price,
+                    imagePath: imageUrl,
+                    productImages: productImages.isNotEmpty ? productImages : null,
+                    product: product,
+                  ),
+                ),
+              );
+            }
+          }
+        } catch (e) {
+          if (mounted) {
+            Navigator.pop(context); // Fermer le dialog de chargement
+            
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Erreur: $e'),
+                backgroundColor: Colors.red,
+              ),
+            );
+            
+            // Naviguer quand même avec les données disponibles
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => ProductDetailScreen(
+                  description: product.description,
+                  idVendeur: product.vendeurId.toString(),
+                  id: product.id,
+                  tag: product.category?.name ?? 'PRODUIT',
+                  category: product.category?.name ?? '',
+                  stock: product.stock,
+                  name: product.name,
+                  price: product.price,
+                  imagePath: imageUrl,
+                  productImages: productImages.isNotEmpty ? productImages : null,
+                  product: product,
+                ),
+              ),
+            );
+          }
+        }
       },
       child: Container(
         decoration: BoxDecoration(
@@ -506,11 +608,17 @@ class _VendeurDetailScreenState extends State<VendeurDetailScreen> {
                     fit: BoxFit.cover,
                     errorBuilder: (context, error, stackTrace) => Container(
                       width: double.infinity,
-                      color: Colors.grey.shade100,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade100,
+                        borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(8),
+                          topRight: Radius.circular(8),
+                        ),
+                      ),
                       child: Icon(
-                        Icons.image_not_supported,
+                        Icons.shopping_bag_outlined,
                         color: Colors.grey.shade400,
-                        size: 32,
+                        size: 40,
                       ),
                     ),
                     loadingBuilder: (context, child, loadingProgress) {
@@ -637,8 +745,8 @@ class _VendeurDetailScreenState extends State<VendeurDetailScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.75,
+      builder: (bottomSheetContext) => Container(
+        height: MediaQuery.of(bottomSheetContext).size.height * 0.75,
         decoration: const BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -677,7 +785,7 @@ class _VendeurDetailScreenState extends State<VendeurDetailScreen> {
                   const Spacer(),
                   IconButton(
                     icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.pop(context),
+                    onPressed: () => Navigator.pop(bottomSheetContext),
                     color: Colors.grey.shade600,
                   ),
                 ],
@@ -687,9 +795,11 @@ class _VendeurDetailScreenState extends State<VendeurDetailScreen> {
             // Contenu scrollable
             Expanded(
               child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.all(20),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     // Identité
                     _buildSectionTitle('Identité'),
@@ -785,6 +895,8 @@ class _VendeurDetailScreenState extends State<VendeurDetailScreen> {
                         ),
                       ),
                     ],
+                    // Padding en bas pour permettre de scroller jusqu'à la fin
+                    SizedBox(height: MediaQuery.of(bottomSheetContext).padding.bottom + 20),
                   ],
                 ),
               ),

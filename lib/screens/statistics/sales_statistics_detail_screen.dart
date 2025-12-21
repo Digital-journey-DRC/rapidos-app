@@ -1063,7 +1063,13 @@ class _SalesStatisticsDetailScreenState extends State<SalesStatisticsDetailScree
                                 ),
                               )
                             : ListView.builder(
-                                padding: const EdgeInsets.symmetric(horizontal: 10),
+                                physics: const AlwaysScrollableScrollPhysics(),
+                                padding: EdgeInsets.only(
+                                  left: 10,
+                                  right: 10,
+                                  top: 10,
+                                  bottom: MediaQuery.of(context).padding.bottom + 20,
+                                ),
                                 itemCount: (_statistics!['sales'] as List).length,
                                 itemBuilder: (context, index) {
                                   final sale = (_statistics!['sales'] as List)[index] as Map<String, dynamic>;

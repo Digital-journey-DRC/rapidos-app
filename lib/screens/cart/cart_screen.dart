@@ -374,6 +374,7 @@ class _CartScreenState extends State<CartScreen> {
                 expand: false,
                 builder: (context, scrollController) {
                   return SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
                     controller: scrollController,
                     child: Column(
                       mainAxisSize: MainAxisSize.min,

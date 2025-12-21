@@ -57,7 +57,8 @@ class Product {
     
     // Si aucune image n'est présente, fournir une image par défaut
     if (allImages.isEmpty) {
-      allImages.add('https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&h=400&fit=crop');
+      // Image par défaut pour produit : panier de courses
+      allImages.add('https://images.unsplash.com/photo-1556912172-45b7abe8b7e4?w=400&h=400&fit=crop');
       print('📸 Product.getAllImages - Aucune image, utilisation de l\'image par défaut');
     }
     
@@ -72,7 +73,8 @@ class Product {
     if (media != null && media!.mediaUrl.isNotEmpty) {
       return media!.mediaUrl;
     }
-    return 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&h=400&fit=crop';
+    // Image par défaut pour produit : panier de courses
+    return 'https://images.unsplash.com/photo-1556912172-45b7abe8b7e4?w=400&h=400&fit=crop';
   }
 
   factory Product.fromJson(Map<String, dynamic> json) {

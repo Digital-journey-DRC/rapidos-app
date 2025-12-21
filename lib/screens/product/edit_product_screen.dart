@@ -175,7 +175,7 @@ class _EditProductScreenState extends State<EditProductScreen> {
 
   String _getImageUrl(String imagePath) {
     if (imagePath.isEmpty || imagePath == 'null') {
-      return 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=600&h=400&fit=crop';
+      return 'https://images.unsplash.com/photo-1556912172-45b7abe8b7e4?w=600&h=400&fit=crop';
     }
     if (imagePath.startsWith('http')) {
       return imagePath;
@@ -291,7 +291,13 @@ class _EditProductScreenState extends State<EditProductScreen> {
       ),
       backgroundColor: const Color(0xFFF7F8FA),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(12, 12, 12, 20),
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: EdgeInsets.only(
+          left: 12,
+          right: 12,
+          top: 12,
+          bottom: MediaQuery.of(context).padding.bottom + 20,
+        ),
         child: Form(
           key: _formKey,
           child: Column(

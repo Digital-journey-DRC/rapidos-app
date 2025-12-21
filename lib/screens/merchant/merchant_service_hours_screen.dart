@@ -703,9 +703,16 @@ class _MerchantServiceHoursScreenState extends State<MerchantServiceHoursScreen>
           : RefreshIndicator(
               onRefresh: _loadConfig,
               child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: EdgeInsets.only(
+                  left: 12,
+                  right: 12,
+                  top: 12,
+                  bottom: MediaQuery.of(context).padding.bottom + 20,
+                ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   // Statut de la boutique
                   // Container(

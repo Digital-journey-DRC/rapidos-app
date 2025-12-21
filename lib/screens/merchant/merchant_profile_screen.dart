@@ -714,7 +714,7 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> with Sing
       itemBuilder: (context, index) {
         final product = products[index];
         // Safe access to image: nouveau format (image) ou ancien format (media.mediaUrl)
-        String imagePath = 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&h=400&fit=crop';
+        String imagePath = 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=400&h=400&fit=crop';
         
         // Priorité 1: Nouveau format avec 'image' (string)
         if (product['image'] != null && product['image'].toString().isNotEmpty) {

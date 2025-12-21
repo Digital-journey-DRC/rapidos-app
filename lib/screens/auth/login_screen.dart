@@ -56,10 +56,16 @@ class _LoginScreenState extends State<LoginScreen> {
       body: SafeArea(
         child: Container(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0),
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: EdgeInsets.only(
+              left: 24.0,
+              right: 24.0,
+              bottom: MediaQuery.of(context).padding.bottom + 20,
+            ),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.start,
               crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
               children: [  
                 const SizedBox(height: 50),
                 Image.asset(AppAssets.newLogo, width: 200, height: 200),

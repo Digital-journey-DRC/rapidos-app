@@ -587,7 +587,13 @@ class _ExpressLivreurState extends State<ExpressLivreur> with SingleTickerProvid
             _loadExpressOrders();
           },
           child: ListView.builder(
-            padding: const EdgeInsets.all(16),
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: EdgeInsets.only(
+              left: 16,
+              right: 16,
+              top: 16,
+              bottom: MediaQuery.of(context).padding.bottom + 20,
+            ),
             itemCount: orders.length,
             itemBuilder: (context, index) {
               final order = orders[index];
@@ -971,7 +977,13 @@ class _ExpressLivreurState extends State<ExpressLivreur> with SingleTickerProvid
             _loadExpressOrders();
           },
           child: ListView.builder(
-            padding: const EdgeInsets.all(16),
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: EdgeInsets.only(
+              left: 16,
+              right: 16,
+              top: 16,
+              bottom: MediaQuery.of(context).padding.bottom + 20,
+            ),
             itemCount: orders.length,
             itemBuilder: (context, index) {
               final order = orders[index];

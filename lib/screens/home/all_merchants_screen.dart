@@ -95,7 +95,7 @@ class _AllMerchantsScreenState extends State<AllMerchantsScreen> {
                       final media = merchants[index]['media'];
                       final image = media != null && media['mediaUrl'] != null
                           ? media['mediaUrl']
-                          : 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&h=400&fit=crop';
+                          : 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=400&h=400&fit=crop';
                       final name = '${vendeur['firstName']} ${vendeur['lastName']}';
                       final vendeurId = vendeur['id'] is int 
                           ? vendeur['id'] 
@@ -158,7 +158,7 @@ class _AllMerchantsScreenState extends State<AllMerchantsScreen> {
                                           borderRadius: BorderRadius.circular(30),
                                         ),
                                         child: Icon(
-                                          Icons.store,
+                                          Icons.store_outlined,
                                           color: Colors.grey.shade400,
                                           size: 24,
                                         ),

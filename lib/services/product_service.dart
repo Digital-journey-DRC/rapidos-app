@@ -224,4 +224,142 @@ class ProductService {
       };
     }
   }
+
+  /// Récupère des produits aléatoires
+  /// Endpoint: GET /products/random
+  /// Accessible à: Clients authentifiés
+  Future<Map<String, dynamic>> getRandomProducts() async {
+    try {
+      print('🔍 product_service.getRandomProducts - Récupération des produits aléatoires');
+      print('🔍 product_service.getRandomProducts - URL: $baseUrl/products/random');
+      
+      final token = await StorageService().getToken();
+      
+      if (token == null) {
+        throw Exception('Token d\'authentification manquant');
+      }
+
+      final response = await http.get(
+        Uri.parse('$baseUrl/products/random'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      ).timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          throw Exception('Timeout: La connexion au serveur a pris trop de temps');
+        },
+      );
+
+      print('🔍 product_service.getRandomProducts - Status code: ${response.statusCode}');
+      final responseData = jsonDecode(response.body);
+      print('🔍 product_service.getRandomProducts - Response keys: ${responseData.keys.toList()}');
+
+      if (response.statusCode == 200) {
+        final List<dynamic> productsJson = responseData['products'] ?? responseData['data'] ?? [];
+        List<Product> products = [];
+        
+        print('🔍 product_service.getRandomProducts - Nombre de produits reçus: ${productsJson.length}');
+        
+        for (var json in productsJson) {
+          try {
+            final productId = json['id']?.toString() ?? 'unknown';
+            print('🔍 product_service.getRandomProducts - Parsing product ID: $productId');
+            final product = Product.fromJson(json);
+            products.add(product);
+            print('🔍 product_service.getRandomProducts - Product $productId parsé avec succès');
+          } catch (e, stackTrace) {
+            print('🔍 product_service.getRandomProducts - Erreur parsing product: $e');
+            print('🔍 product_service.getRandomProducts - Stack trace: $stackTrace');
+            print('🔍 product_service.getRandomProducts - JSON: $json');
+            // Continuer avec les autres produits même si un échoue
+          }
+        }
+        
+        print('🔍 product_service.getRandomProducts - Nombre de produits parsés avec succès: ${products.length}');
+        
+        return {
+          'success': true,
+          'products': products,
+        };
+      } else {
+        throw Exception(
+          responseData['message'] ?? 
+          'Erreur lors de la récupération des produits aléatoires: ${response.statusCode}'
+        );
+      }
+    } on http.ClientException catch (e) {
+      print('🔍 product_service.getRandomProducts - ClientException: $e');
+      return {
+        'success': false,
+        'error': 'Impossible de se connecter au serveur. Vérifiez votre connexion internet.',
+        'products': <Product>[],
+      };
+    } catch (e) {
+      print('🔍 product_service.getRandomProducts - Exception: $e');
+      return {
+        'success': false,
+        'error': e.toString(),
+        'products': <Product>[],
+      };
+    }
+  }
+
+  /// Récupère un produit par son ID avec toutes les informations détaillées
+  /// Endpoint: GET /products/get-products/:productId
+  /// Retourne: product avec id, name, description, price, stock, category, image, images, vendeur, commandes
+  Future<Map<String, dynamic>> getProductById(int productId) async {
+    try {
+      print('🔍 ProductService.getProductById - Récupération du produit ID: $productId');
+      
+      final token = await StorageService().getToken();
+      
+      final response = await http.get(
+        Uri.parse('$baseUrl/products/get-products/$productId'),
+        headers: {
+          'Authorization': token != null ? 'Bearer $token' : '',
+          'Content-Type': 'application/json',
+        },
+      ).timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          throw Exception('Timeout: La connexion au serveur a pris trop de temps');
+        },
+      );
+
+      print('🔍 ProductService.getProductById - Status code: ${response.statusCode}');
+      print('🔍 ProductService.getProductById - Response body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(response.body);
+        final productData = responseData['product'] ?? responseData;
+        
+        print('✅ ProductService.getProductById - Produit récupéré avec succès');
+        
+        return {
+          'success': true,
+          'product': productData,
+        };
+      } else {
+        final errorData = jsonDecode(response.body);
+        throw Exception(
+          errorData['message'] ?? 
+          'Erreur lors de la récupération du produit: ${response.statusCode}'
+        );
+      }
+    } on http.ClientException catch (e) {
+      print('❌ ProductService.getProductById - ClientException: $e');
+      return {
+        'success': false,
+        'error': 'Impossible de se connecter au serveur. Vérifiez votre connexion internet.',
+      };
+    } catch (e) {
+      print('❌ ProductService.getProductById - Exception: $e');
+      return {
+        'success': false,
+        'error': e.toString(),
+      };
+    }
+  }
 } 

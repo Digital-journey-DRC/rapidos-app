@@ -411,9 +411,16 @@ class _HomeLivreurScreenState extends State<HomeLivreurScreen> {
         iconTheme: const IconThemeData(color: AppColors.primary),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: EdgeInsets.only(
+          left: 16,
+          right: 16,
+          top: 10,
+          bottom: MediaQuery.of(context).padding.bottom + 20,
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
             // Header profil
             BlocBuilder<AuthCubit, AuthState>(

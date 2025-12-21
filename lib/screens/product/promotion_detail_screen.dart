@@ -35,7 +35,7 @@ class _PromotionDetailScreenState extends State<PromotionDetailScreen> {
 
   String _getImageUrl(String imagePath) {
     if (imagePath.isEmpty || imagePath == 'null') {
-      return 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=600&h=400&fit=crop';
+      return 'https://images.unsplash.com/photo-1556912172-45b7abe8b7e4?w=600&h=400&fit=crop';
     }
     if (imagePath.startsWith('http')) {
       return imagePath;

@@ -152,7 +152,13 @@ class _MerchantAllProductsScreenState extends State<MerchantAllProductsScreen> {
                       await context.read<ProductCubit>().fetchProducts();
                     },
                     child: ListView.builder(
-                      padding: const EdgeInsets.all(12.0),
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: EdgeInsets.only(
+                        left: 12.0,
+                        right: 12.0,
+                        top: 12.0,
+                        bottom: MediaQuery.of(context).padding.bottom + 20,
+                      ),
                       itemCount: filtered.length,
                       itemBuilder: (context, index) {
                         final product = filtered[index];

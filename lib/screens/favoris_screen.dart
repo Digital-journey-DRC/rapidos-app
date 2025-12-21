@@ -43,12 +43,18 @@ class FavorisScreen extends StatelessWidget {
                 context.read<FavoritesCubit>().loadFavorites();
               },
               child: ListView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: EdgeInsets.only(
+                  left: 12,
+                  right: 12,
+                  top: 8,
+                  bottom: MediaQuery.of(context).padding.bottom + 20,
+                ),
                 itemCount: favoris.length,
                 itemBuilder: (context, index) {
                 final product = favoris[index];
                 // Gérer le nouveau format (image) et l'ancien format (media.mediaUrl)
-                String imageUrl = 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=200&h=200&fit=crop';
+                String imageUrl = 'https://images.unsplash.com/photo-1556912172-45b7abe8b7e4?w=200&h=200&fit=crop';
                 if (product['image'] != null && product['image'].toString().isNotEmpty) {
                   imageUrl = product['image'].toString();
                 } else if (product['media'] != null && product['media'] is Map) {
@@ -116,11 +122,14 @@ class FavorisScreen extends StatelessWidget {
                                   return Container(
                                     width: 70,
                                     height: 70,
-                                    color: Colors.grey.shade100,
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey.shade100,
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
                                     child: Icon(
-                                      Icons.image_not_supported,
+                                      Icons.shopping_bag_outlined,
                                       color: Colors.grey.shade400,
-                                      size: 28,
+                                      size: 32,
                                     ),
                                   );
                                 },

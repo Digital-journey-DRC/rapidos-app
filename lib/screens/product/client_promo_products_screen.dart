@@ -73,6 +73,7 @@ class _ClientPromoProductsScreenState extends State<ClientPromoProductsScreen> {
       body: RefreshIndicator(
         onRefresh: _loadPromotions,
         child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
           slivers: [
           // Header compact et professionnel
           SliverAppBar(
@@ -177,6 +178,12 @@ class _ClientPromoProductsScreenState extends State<ClientPromoProductsScreen> {
                         ),
                       ),
                     ),
+                  // Padding en bas pour permettre de scroller jusqu'à la fin
+                  SliverToBoxAdapter(
+                    child: SizedBox(
+                      height: MediaQuery.of(context).padding.bottom + 20,
+                    ),
+                  ),
           ],
         ),
       ),

@@ -468,7 +468,13 @@ class _CreatePromotionScreenState extends State<CreatePromotionScreen> {
       ),
       backgroundColor: const Color(0xFFF7F8FA),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(12, 12, 12, 20),
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: EdgeInsets.only(
+          left: 12,
+          right: 12,
+          top: 12,
+          bottom: MediaQuery.of(context).padding.bottom + 20,
+        ),
         child: Form(
           key: _formKey,
           child: Column(

@@ -3,7 +3,6 @@ import 'package:immo/constants.dart';
 import 'package:immo/screens/home/all_merchants_screen.dart';
 import 'package:immo/screens/navigation_example.dart';
 import 'package:immo/screens/product/product_detail_screen.dart';
-import '../merchant/merchant_profile_screen.dart';
 import '../merchant/vendeur_detail_screen.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:immo/cubit/auth_cubit.dart';
@@ -27,6 +26,7 @@ import 'dart:math' as math;
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:immo/models/product.dart';
 import 'package:immo/services/review_service.dart';
+import 'package:immo/services/product_service.dart';
 
 class NewHomeScreen extends StatefulWidget {
   const NewHomeScreen({Key? key}) : super(key: key);
@@ -40,6 +40,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
   bool _isLoading = false;
   List<dynamic> _commandes = [];
   http.Client? _httpClient;
+  Future<Map<String, dynamic>>? _randomProductsFuture;
 
   /// Retourne le widget icône approprié pour une catégorie, ou Icons.category par défaut
   Widget _getCategoryIconWidget(String categoryName, Color color, double size) {
@@ -304,6 +305,12 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
       context.read<MerchantCubit>().fetchMerchants(context);
       _fetchOrdersAndLocation();
       _fetchUserMedia();
+      // Charger les produits aléatoires
+      if (mounted) {
+        setState(() {
+          _randomProductsFuture = ProductService().getRandomProducts();
+        });
+      }
     } catch (e) {
       // Erreur silencieuse pour la production
     }
@@ -499,8 +506,15 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
           context.read<FeaturedProductCubit>().fetchFeaturedProducts();
           context.read<CategoryCubit>().fetchCategories();
           context.read<MerchantCubit>().fetchMerchants(context);
+          // Recharger les produits aléatoires
+          if (mounted) {
+            setState(() {
+              _randomProductsFuture = ProductService().getRandomProducts();
+            });
+          }
         },
         child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
           slivers: [
           // Header compact avec personnalité
           SliverAppBar(
@@ -893,6 +907,110 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                   // Produits recommandés section
                   const RecommendedProductsSection(),
 
+                  // Produit choisi pour vous section
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16.0, vertical: 12.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Produit choisi pour vous',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        FutureBuilder<Map<String, dynamic>>(
+                          future: _randomProductsFuture ?? ProductService().getRandomProducts(),
+                          builder: (context, snapshot) {
+                            if (snapshot.connectionState == ConnectionState.waiting) {
+                              return SizedBox(
+                                height: 190,
+                                child: ListView.separated(
+                                  scrollDirection: Axis.horizontal,
+                                  physics: const AlwaysScrollableScrollPhysics(),
+                                  itemCount: 3,
+                                  separatorBuilder: (_, __) =>
+                                      const SizedBox(width: 12),
+                                  itemBuilder: (context, index) {
+                                    return Container(
+                                      width: 150,
+                                      decoration: BoxDecoration(
+                                        color: Colors.grey.shade200,
+                                        borderRadius: BorderRadius.circular(16),
+                                      ),
+                                      child: const Center(
+                                        child: CircularProgressIndicator(),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              );
+                            }
+                            
+                            if (snapshot.hasError) {
+                              return Container(
+                                height: 100,
+                                decoration: BoxDecoration(
+                                  color: Colors.grey.shade100,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    'Erreur de chargement',
+                                    style: TextStyle(
+                                      color: Colors.grey.shade600,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }
+                            
+                            if (snapshot.hasData && snapshot.data!['success'] == true) {
+                              final products = snapshot.data!['products'] as List<Product>;
+                              if (products.isEmpty) {
+                                return const SizedBox.shrink();
+                              }
+                              
+                              return SizedBox(
+                                height: 190,
+                                child: ListView.separated(
+                                  scrollDirection: Axis.horizontal,
+                                  physics: const AlwaysScrollableScrollPhysics(),
+                                  itemCount: products.length,
+                                  separatorBuilder: (_, __) =>
+                                      const SizedBox(width: 12),
+                                  itemBuilder: (context, index) {
+                                    final product = products[index];
+                                    return _buildProductCard(
+                                      idVendeur: product.vendeurId.toString(),
+                                      description: product.description,
+                                      stock: product.stock,
+                                      id: product.id,
+                                      tag: product.category?.name ?? '',
+                                      category: product.category?.name ?? '',
+                                      name: product.name,
+                                      price: product.price,
+                                      imagePath: product.getMainImage(),
+                                      product: product,
+                                      heroTagSuffix: 'random_$index',
+                                    );
+                                  },
+                                ),
+                              );
+                            }
+                            
+                            return const SizedBox.shrink();
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+
                   // Top Marchands section
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 8.0),
@@ -960,7 +1078,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                                     final image = media != null &&
                                             media['mediaUrl'] != null
                                         ? media['mediaUrl']
-                                        : 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&h=400&fit=crop';
+                                        : 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=400&h=400&fit=crop';
                                     final name =
                                         '${vendeur['firstName']} ${vendeur['lastName']}';
                                     return GestureDetector(
@@ -1376,9 +1494,18 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                             return Container(
                               height: 100,
                               width: 150,
-                              color: Colors.grey.shade300,
-                              child:
-                                  const Icon(Icons.image, color: Colors.grey),
+                              decoration: BoxDecoration(
+                                color: Colors.grey.shade200,
+                                borderRadius: const BorderRadius.only(
+                                  topLeft: Radius.circular(4),
+                                  topRight: Radius.circular(4),
+                                ),
+                              ),
+                              child: Icon(
+                                Icons.shopping_bag_outlined,
+                                color: Colors.grey.shade400,
+                                size: 40,
+                              ),
                             );
                           },
                         ),
@@ -1589,24 +1716,18 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
           }
           print('🏪 ===========================================');
           
-          // Permettre l'accès aux profils de marchands sans connexion
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => MerchantProfileScreen(
-                description: products.isNotEmpty
-                    ? products[0]['description'] ?? ''
-                    : '',
-                merchantId: id,
-                name: name,
-                rating: rating,
-                category: category,
-                  imagePath: imagePath,
-                  isVerified: isVerified,
-                  products: products,
+          // Naviguer vers VendeurDetailScreen pour utiliser le même endpoint que "tous les produits par marchand"
+          final vendeurId = int.tryParse(id);
+          if (vendeurId != null) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => VendeurDetailScreen(
+                  vendeurId: vendeurId,
                 ),
               ),
             );
+          }
         },
         child: Container(
           width: 180,
@@ -1638,8 +1759,18 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                     return Container(
                       width: 60,
                       height: 100,
-                      color: Colors.grey.shade200,
-                      child: Icon(Icons.store, color: Colors.grey.shade400),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade100,
+                        borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(8),
+                          bottomLeft: Radius.circular(8),
+                        ),
+                      ),
+                      child: Icon(
+                        Icons.store_outlined,
+                        color: Colors.grey.shade400,
+                        size: 32,
+                      ),
                     );
                   },
                 ),

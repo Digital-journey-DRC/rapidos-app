@@ -178,7 +178,13 @@ class _MerchantPromoProductsScreenState extends State<MerchantPromoProductsScree
                           ),
                         )
                       : GridView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: EdgeInsets.only(
+                      left: 8.0,
+                      right: 8.0,
+                      top: 4.0,
+                      bottom: MediaQuery.of(context).padding.bottom + 20,
+                    ),
                     gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: 2,
                       crossAxisSpacing: 8,

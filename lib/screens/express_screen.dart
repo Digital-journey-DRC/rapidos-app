@@ -1190,7 +1190,13 @@ class _ExpressScreenState extends State<ExpressScreen> with SingleTickerProvider
       },
       builder: (context, state) {
         return SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: EdgeInsets.only(
+            left: 12,
+            right: 12,
+            top: 8,
+            bottom: MediaQuery.of(context).padding.bottom + 20,
+          ),
           child: Form(
             key: _formKey,
             child: Column(

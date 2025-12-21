@@ -612,7 +612,13 @@ class _OrderScreenState extends State<OrderScreen> {
           if (authState.user!['role'] == 'livreur')
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: EdgeInsets.only(
+                  left: 16,
+                  right: 16,
+                  top: 16,
+                  bottom: MediaQuery.of(context).padding.bottom + 20,
+                ),
                 child: _buildLivreurOrders(),
               ),
             )

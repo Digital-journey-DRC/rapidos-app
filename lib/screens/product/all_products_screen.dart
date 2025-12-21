@@ -74,7 +74,13 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
                       setState(() {});
                     },
                     child: GridView.builder(
-                      padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: EdgeInsets.only(
+                        left: 8.0,
+                        right: 8.0,
+                        top: 4.0,
+                        bottom: MediaQuery.of(context).padding.bottom + 20,
+                      ),
                       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                         crossAxisCount: 2,
                         crossAxisSpacing: 8,
@@ -157,11 +163,17 @@ class _TwitterStyleProductCard extends StatelessWidget {
                     fit: BoxFit.cover,
                     errorBuilder: (context, error, stackTrace) => Container(
                       width: double.infinity,
-                      color: Colors.grey.shade100,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade100,
+                        borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(8),
+                          topRight: Radius.circular(8),
+                        ),
+                      ),
                       child: Icon(
-                        Icons.image_not_supported,
+                        Icons.shopping_bag_outlined,
                         color: Colors.grey.shade400,
-                        size: 32,
+                        size: 40,
                       ),
                     ),
                     loadingBuilder: (context, child, loadingProgress) {

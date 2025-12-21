@@ -33,7 +33,7 @@ class RecommendedProductsSection extends StatelessWidget {
         'name': 'Casque Sans Fil',
         'category': 'Électronique',
         'tag': 'RECOMMANDÉ',
-        'imagePath': 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&h=400&fit=crop',
+        'imagePath': 'https://images.unsplash.com/photo-1556912172-45b7abe8b7e4?w=400&h=400&fit=crop',
         'originalPrice': 75000.0,
         'promoPrice': 55000.0,
         'discount': 27,

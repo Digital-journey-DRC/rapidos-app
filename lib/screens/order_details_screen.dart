@@ -7,8 +7,12 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:immo/cubit/auth_cubit.dart';
 import 'package:immo/services/invoice_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'dart:io';
+import 'package:camera/camera.dart';
+import 'order_screen.dart'; // Pour accéder à CameraColisScreen
 
-class OrderDetailsScreen extends StatelessWidget {
+class OrderDetailsScreen extends StatefulWidget {
   final Map<String, dynamic> orderData;
   final String orderId;
 
@@ -17,6 +21,27 @@ class OrderDetailsScreen extends StatelessWidget {
     required this.orderData,
     required this.orderId,
   }) : super(key: key);
+
+  @override
+  State<OrderDetailsScreen> createState() => _OrderDetailsScreenState();
+}
+
+class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
+  List<CameraDescription>? cameras;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeCameras();
+  }
+
+  Future<void> _initializeCameras() async {
+    try {
+      cameras = await availableCameras();
+    } catch (e) {
+      print('❌ Error initializing cameras: $e');
+    }
+  }
 
   String _translateStatus(String status) {
     switch (status.toLowerCase()) {
@@ -65,9 +90,9 @@ class OrderDetailsScreen extends StatelessWidget {
 
     // Informations du client
     final clientInfo = {
-      'name': orderData['client']?.toString() ?? 'Client',
-      'phone': orderData['phone']?.toString() ?? '',
-      'address': orderData['adresse']?.toString() ?? 'Adresse non spécifiée',
+      'name': widget.orderData['client']?.toString() ?? 'Client',
+      'phone': widget.orderData['phone']?.toString() ?? '',
+      'address': widget.orderData['adresse']?.toString() ?? 'Adresse non spécifiée',
     };
 
     // Afficher un indicateur de chargement
@@ -82,8 +107,8 @@ class OrderDetailsScreen extends StatelessWidget {
     try {
       await InvoiceService.generateInvoice(
         context: context,
-        orderData: orderData,
-        orderId: orderId,
+        orderData: widget.orderData,
+        orderId: widget.orderId,
         merchantInfo: merchantInfo,
         clientInfo: clientInfo,
       );
@@ -94,17 +119,244 @@ class OrderDetailsScreen extends StatelessWidget {
     }
   }
 
+  void _showExpeditionDialog(BuildContext context, String docId) {
+    bool isChecked = false;
+    String? photoPath;
+    bool isUploading = false;
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setState) => Dialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Container(
+              width: MediaQuery.of(context).size.width * 0.9,
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Confirmation d\'expédition',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Row(
+                    children: [
+                      Checkbox(
+                        value: isChecked,
+                        onChanged: (value) {
+                          setState(() {
+                            isChecked = value ?? false;
+                          });
+                        },
+                      ),
+                      const Expanded(
+                        child: Text(
+                          'J\'ai inscrit le numéro de la commande, le nom et l\'adresse de livraison dans le colis',
+                          style: TextStyle(fontSize: 14),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  const Text(
+                    'Photo du colis',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Container(
+                    width: double.infinity,
+                    height: 200,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.grey.shade300),
+                    ),
+                    child: photoPath == null
+                        ? Center(
+                            child: isUploading
+                                ? const CircularProgressIndicator()
+                                : IconButton(
+                                    icon: const Icon(Icons.camera_alt,
+                                        size: 40, color: Colors.grey),
+                                    onPressed: () async {
+                                      if (cameras == null || cameras!.isEmpty) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(
+                                            content: Text('Caméra non disponible'),
+                                            backgroundColor: Colors.red,
+                                          ),
+                                        );
+                                        return;
+                                      }
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) =>
+                                              CameraColisScreen(
+                                            onPictureTaken: (imagePath) async {
+                                              setState(() {
+                                                isUploading = true;
+                                              });
+                                              try {
+                                                final file = File(imagePath);
+                                                final fileName =
+                                                    'colis_${DateTime.now().millisecondsSinceEpoch}.jpg';
+                                                final ref = FirebaseStorage
+                                                    .instance
+                                                    .ref()
+                                                    .child('colis_photos')
+                                                    .child(fileName);
+                                                await ref.putFile(file);
+                                                final downloadUrl =
+                                                    await ref.getDownloadURL();
+                                                setState(() {
+                                                  photoPath = downloadUrl;
+                                                  isUploading = false;
+                                                });
+                                              } catch (e) {
+                                                setState(() {
+                                                  isUploading = false;
+                                                });
+                                                if (context.mounted) {
+                                                  ScaffoldMessenger.of(context)
+                                                      .showSnackBar(
+                                                    SnackBar(
+                                                      content: Text(
+                                                          'Erreur lors de l\'upload : $e'),
+                                                      backgroundColor: Colors.red,
+                                                    ),
+                                                  );
+                                                }
+                                              }
+                                            },
+                                            cameras: cameras ?? [],
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                          )
+                        : Stack(
+                            children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: Image.network(
+                                  photoPath!,
+                                  width: double.infinity,
+                                  height: 200,
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
+                              Positioned(
+                                top: 8,
+                                right: 8,
+                                child: IconButton(
+                                  icon: const Icon(Icons.close,
+                                      color: Colors.white),
+                                  onPressed: () {
+                                    setState(() {
+                                      photoPath = null;
+                                    });
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+                  ),
+                  const SizedBox(height: 24),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text(
+                          'ANNULER',
+                          style: TextStyle(color: Colors.grey),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      ElevatedButton(
+                        onPressed: isChecked &&
+                                photoPath != null &&
+                                !isUploading
+                            ? () async {
+                                try {
+                                  await FirebaseFirestore.instance
+                                      .collection('carts')
+                                      .doc(docId)
+                                      .update({
+                                    'status': 'prêt à expédier',
+                                    'timestamp': FieldValue.serverTimestamp(),
+                                    'packagePhoto': photoPath,
+                                  });
+
+                                  if (context.mounted) {
+                                    Navigator.pop(context);
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                            'Commande expédiée avec succès'),
+                                        backgroundColor: Colors.green,
+                                      ),
+                                    );
+                                  }
+                                } catch (e) {
+                                  if (context.mounted) {
+                                    Navigator.pop(context);
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text('Erreur: $e'),
+                                        backgroundColor: Colors.red,
+                                      ),
+                                    );
+                                  }
+                                }
+                              }
+                            : null,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 24, vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        child: const Text('CONFIRMER'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final authState = context.read<AuthCubit>().state;
     final String? userRole = (authState is AuthSuccess) ? authState.user != null ? authState.user!['role'] : null : null;
-    final items = orderData['items'] as List? ?? [];
-    final status = orderData['status']?.toString() ?? 'pending';
-    final timestamp = orderData['timestamp'];
-    final adresse = orderData['adresse']?.toString() ?? 'Adresse non spécifiée';
-    final phone = orderData['phone']?.toString() ?? '';
-    final clientName = orderData['client']?.toString() ?? 'Client';
-    final shortCode = orderData['shortCode']?.toString() ?? '';
+    final items = widget.orderData['items'] as List? ?? [];
+    final status = widget.orderData['status']?.toString() ?? 'pending';
+    final timestamp = widget.orderData['timestamp'];
+    final adresse = widget.orderData['adresse']?.toString() ?? 'Adresse non spécifiée';
+    final phone = widget.orderData['phone']?.toString() ?? '';
+    final clientName = widget.orderData['client']?.toString() ?? 'Client';
+    final shortCode = widget.orderData['shortCode']?.toString() ?? '';
     
     // Calculer le total
     double total = 0.0;
@@ -127,8 +379,13 @@ class OrderDetailsScreen extends StatelessWidget {
         centerTitle: true,
       ),
       body: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).padding.bottom + 20,
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
             // En-tête compact avec gradient
             Container(
@@ -153,7 +410,7 @@ class OrderDetailsScreen extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          shortCode.isNotEmpty ? '#$shortCode' : '#${orderId.substring(0, 8)}',
+                          shortCode.isNotEmpty ? '#$shortCode' : '#${widget.orderId.substring(0, 8)}',
                           style: const TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
@@ -503,7 +760,7 @@ class OrderDetailsScreen extends StatelessWidget {
                   const SizedBox(height: 12),
 
                   // Photo du colis (si disponible)
-                  if (orderData['packagePhoto'] != null &&
+                  if (widget.orderData['packagePhoto'] != null &&
                       (status.toLowerCase() == 'prêt à expédier' ||
                           status.toLowerCase() == 'en route pour livraison' ||
                           status.toLowerCase() == 'delivered'))
@@ -523,7 +780,7 @@ class OrderDetailsScreen extends StatelessWidget {
                                       minScale: 0.5,
                                       maxScale: 4.0,
                                       child: Image.network(
-                                        orderData['packagePhoto'],
+                                        widget.orderData['packagePhoto'],
                                         fit: BoxFit.contain,
                                         width: MediaQuery.of(context).size.width,
                                         height: MediaQuery.of(context).size.height,
@@ -557,7 +814,7 @@ class OrderDetailsScreen extends StatelessWidget {
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(10),
                           child: Image.network(
-                            orderData['packagePhoto'],
+                            widget.orderData['packagePhoto'],
                             width: double.infinity,
                             height: 160,
                             fit: BoxFit.cover,
@@ -679,7 +936,7 @@ class OrderDetailsScreen extends StatelessWidget {
                                       try {
                                         await FirebaseFirestore.instance
                                             .collection('carts')
-                                            .doc(orderId)
+                                            .doc(widget.orderId)
                                             .update({
                                           'status': 'colis en cours de préparation',
                                           'timestamp': FieldValue.serverTimestamp(),
@@ -830,7 +1087,7 @@ class OrderDetailsScreen extends StatelessWidget {
                                         try {
                                           await FirebaseFirestore.instance
                                               .collection('carts')
-                                              .doc(orderId)
+                                              .doc(widget.orderId)
                                               .update({
                                             'status': 'rejected',
                                             'rejectionReason': reasonController.text.trim(),
@@ -913,13 +1170,7 @@ class OrderDetailsScreen extends StatelessWidget {
                         padding: const EdgeInsets.all(14),
                         child: ElevatedButton(
                           onPressed: () {
-                            // TODO: Implémenter _showExpeditionDialog
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Fonctionnalité d\'expédition à venir'),
-                                backgroundColor: Colors.orange,
-                              ),
-                            );
+                            _showExpeditionDialog(context, widget.orderId);
                           },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.primary,

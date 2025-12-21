@@ -292,7 +292,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         'description': 'Un produit similaire de qualité',
         'stock': 15,
         'category': widget.category,
-        'media': {'mediaUrl': 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&h=400&fit=crop'},
+        'media': {'mediaUrl': 'https://images.unsplash.com/photo-1556912172-45b7abe8b7e4?w=400&h=400&fit=crop'},
       },
       {
         'id': widget.id + 2,
@@ -419,8 +419,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         ],
       ),
       body: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
           children: [
             // Image principale - Design élégant et moderne
             Hero(
@@ -1184,6 +1186,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 ),
               ),
             ),
+            // Padding en bas pour permettre de scroller jusqu'à la fin
+            SizedBox(height: MediaQuery.of(context).padding.bottom + 20),
           ],
         ),
       ),
