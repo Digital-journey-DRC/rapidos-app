@@ -60,14 +60,25 @@ class ProfileService {
     required String token,
     required File imageFile,
   }) async {
+    // print('📤 [PROFILE PHOTO] ProfileService.uploadProfileImage() appelée');
+    // print('📤 [PROFILE PHOTO] URL: $baseUrl/users/profile/image');
+    // print('📤 [PROFILE PHOTO] Chemin fichier: ${imageFile.path}');
+    // print('📤 [PROFILE PHOTO] Fichier existe: ${await imageFile.exists()}');
+    // if (await imageFile.exists()) {
+    //   print('📤 [PROFILE PHOTO] Taille fichier: ${await imageFile.length()} bytes');
+    // }
+    
     try {
       final uri = Uri.parse('$baseUrl/users/profile/image');
+      // print('📤 [PROFILE PHOTO] URI créée: $uri');
       
       var request = http.MultipartRequest('POST', uri);
       request.headers['Authorization'] = 'Bearer $token';
       request.headers['accept'] = '*/*';
+      // print('📤 [PROFILE PHOTO] Headers configurés');
       
       // Add image file as multipart form data
+      // print('📤 [PROFILE PHOTO] Création du MultipartFile...');
       var multipartFile = await http.MultipartFile.fromPath(
         'image',  // Using 'image' as the field name exactly as in the cURL command
         imageFile.path,
@@ -75,35 +86,55 @@ class ProfileService {
         contentType: MediaType('image', 'jpeg'),
       );
       request.files.add(multipartFile);
+      // print('✅ [PROFILE PHOTO] MultipartFile créé et ajouté à la requête');
       
       // Set timeout to avoid hanging indefinitely
+      // print('📤 [PROFILE PHOTO] Envoi de la requête (timeout: 30s)...');
       final streamedResponse = await request.send().timeout(
         const Duration(seconds: 30),
         onTimeout: () {
+          // print('❌ [PROFILE PHOTO] Timeout lors de l\'envoi de la requête');
           throw TimeoutException('The request timed out');
         },
       );
+      // print('✅ [PROFILE PHOTO] Requête envoyée, status code: ${streamedResponse.statusCode}');
       
       final response = await http.Response.fromStream(streamedResponse);
+      // print('📤 [PROFILE PHOTO] Réponse reçue');
+      // print('📤 [PROFILE PHOTO] Status code: ${response.statusCode}');
+      // print('📤 [PROFILE PHOTO] Response body: ${response.body}');
+      // print('📤 [PROFILE PHOTO] Response body length: ${response.body.length}');
       
       if (response.statusCode >= 200 && response.statusCode < 300) {
+        // print('✅ [PROFILE PHOTO] Upload réussi (status code: ${response.statusCode})');
         // Successfully uploaded
         if (response.body.isNotEmpty) {
-          return jsonDecode(response.body);
+          // print('📤 [PROFILE PHOTO] Parsing de la réponse JSON...');
+          final parsedResponse = jsonDecode(response.body);
+          // print('✅ [PROFILE PHOTO] Réponse parsée: $parsedResponse');
+          return parsedResponse;
         } else {
+          // print('⚠️ [PROFILE PHOTO] Réponse vide, retour de {\'success\': true}');
           // Some APIs return empty body on success
           return {'success': true};
         }
       } else {
+        // print('❌ [PROFILE PHOTO] Échec de l\'upload - Status code: ${response.statusCode}');
+        // print('❌ [PROFILE PHOTO] Response body: ${response.body}');
         throw Exception('Failed to upload profile image. Status code: ${response.statusCode}, Response: ${response.body}');
       }
-    } on TimeoutException {
+    } on TimeoutException catch (e) {
+      // print('❌ [PROFILE PHOTO] TimeoutException: $e');
       throw Exception('Request timed out while uploading profile image');
-    } on SocketException {
+    } on SocketException catch (e) {
+      // print('❌ [PROFILE PHOTO] SocketException: $e');
       throw Exception('No internet connection while uploading profile image');
-    } on HttpException {
+    } on HttpException catch (e) {
+      // print('❌ [PROFILE PHOTO] HttpException: $e');
       throw Exception('HTTP error while uploading profile image');
-    } catch (e) {
+    } catch (e, stackTrace) {
+      // print('❌ [PROFILE PHOTO] Erreur inattendue: $e');
+      // print('❌ [PROFILE PHOTO] Stack trace: $stackTrace');
       throw Exception('Error uploading profile image: $e');
     }
   }

@@ -127,24 +127,42 @@ class ProfileCubit extends Cubit<ProfileState> {
     required String token,
     required File imageFile,
   }) async {
+    // print('📤 [PROFILE PHOTO] ProfileCubit.uploadProfileImage() appelée');
+    // print('📤 [PROFILE PHOTO] Token: ${token.substring(0, 20)}...');
+    // print('📤 [PROFILE PHOTO] Chemin fichier: ${imageFile.path}');
+    // print('📤 [PROFILE PHOTO] Fichier existe: ${await imageFile.exists()}');
+    
     try {
+      // print('📤 [PROFILE PHOTO] Émission de ProfileLoading()...');
       emit(ProfileLoading());
+      
+      // print('📤 [PROFILE PHOTO] Appel de _profileService.uploadProfileImage()...');
       final response = await _profileService.uploadProfileImage(
         token: token,
         imageFile: imageFile,
       );
       
+      // print('📤 [PROFILE PHOTO] Réponse reçue: $response');
+      // print('📤 [PROFILE PHOTO] response[\'success\']: ${response['success']}');
+      // print('📤 [PROFILE PHOTO] response[\'data\']: ${response['data']}');
+      
       // Check if data contains updated user info
       if (response['success'] == true && response['data'] != null) {
+        // print('✅ [PROFILE PHOTO] Données disponibles, émission ProfileSuccess avec data');
         // Pass the complete response data to the ProfileSuccess state
         emit(ProfileSuccess(
           'Photo de profil mise à jour avec succès',
           data: response['data']
         ));
+        // print('✅ [PROFILE PHOTO] ProfileSuccess émis avec data: ${response['data']}');
       } else {
+        // print('⚠️ [PROFILE PHOTO] Pas de données dans la réponse, émission ProfileSuccess sans data');
         emit(ProfileSuccess('Photo de profil mise à jour avec succès'));
+        // print('✅ [PROFILE PHOTO] ProfileSuccess émis sans data');
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
+      // print('❌ [PROFILE PHOTO] Erreur dans uploadProfileImage: $e');
+      // print('❌ [PROFILE PHOTO] Stack trace: $stackTrace');
       emit(ProfileError(e.toString()));
     }
   }

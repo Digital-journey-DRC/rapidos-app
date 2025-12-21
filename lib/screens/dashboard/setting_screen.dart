@@ -262,16 +262,28 @@ class _SettingScreenState extends State<SettingScreen>
 
   // Méthode pour gérer la mise à jour du profil après upload d'image
   Future<void> _handleProfileUpdate(ProfileSuccess state) async {
+    // print('📥 [PROFILE PHOTO] _handleProfileUpdate() appelée');
+    // print('📥 [PROFILE PHOTO] Récupération de AuthCubit...');
     final authCubit = context.read<AuthCubit>();
     final authState = authCubit.state;
     
-    if (authState is! AuthSuccess || authState.user == null) return;
+    // print('📥 [PROFILE PHOTO] authState type: ${authState.runtimeType}');
+    // print('📥 [PROFILE PHOTO] authState is AuthSuccess: ${authState is AuthSuccess}');
+    
+    if (authState is! AuthSuccess || authState.user == null) {
+      // print('❌ [PROFILE PHOTO] Erreur: authState n\'est pas AuthSuccess ou user est null');
+      return;
+    }
+    
+    // print('📥 [PROFILE PHOTO] Utilisateur trouvé: ${authState.user!['firstName']} ${authState.user!['lastName']}');
+    // print('📥 [PROFILE PHOTO] Media actuel: ${authState.user!['media']}');
     
     // Préserver toutes les informations de l'utilisateur existant
     Map<String, dynamic> updatedUserData = Map<String, dynamic>.from(authState.user!);
     
-    print('📥 BlocListener: Réception ProfileSuccess');
-    print('📥 state.data: ${state.data}');
+    // print('📥 [PROFILE PHOTO] Réception ProfileSuccess');
+    // print('📥 [PROFILE PHOTO] state.data: ${state.data}');
+    // print('📥 [PROFILE PHOTO] state.data type: ${state.data?.runtimeType}');
     
     // Si state.data est null, on récupère les données depuis l'API
     if (state.data == null) {
@@ -363,7 +375,7 @@ class _SettingScreenState extends State<SettingScreen>
       }
     }
     
-    print('📤 Mise à jour des données utilisateur: $updatedUserData');
+    // print('📤 Mise à jour des données utilisateur: $updatedUserData');
     
     // Mettre à jour avec les données complètes de l'utilisateur et le token original
     authCubit.updateUser(updatedUserData, authState.token!);
@@ -601,10 +613,23 @@ class _SettingScreenState extends State<SettingScreen>
 
   // Méthode pour uploader l'image au serveur
   Future<void> _uploadImageToServer(File imageFile) async {
+    // print('📤 [PROFILE PHOTO] _uploadImageToServer() appelée');
+    // print('📤 [PROFILE PHOTO] Chemin du fichier: ${imageFile.path}');
+    // print('📤 [PROFILE PHOTO] Fichier existe: ${await imageFile.exists()}');
+    // if (await imageFile.exists()) {
+    //   print('📤 [PROFILE PHOTO] Taille du fichier: ${await imageFile.length()} bytes');
+    // }
+    
     try {
       // Récupérer le token de l'utilisateur connecté
+      // print('📤 [PROFILE PHOTO] Récupération de l\'état d\'authentification...');
       final authState = context.read<AuthCubit>().state;
+      // print('📤 [PROFILE PHOTO] Type d\'état: ${authState.runtimeType}');
+      
       if (authState is! AuthSuccess || authState.token == null) {
+        // print('❌ [PROFILE PHOTO] Erreur: Utilisateur non connecté ou token manquant');
+        // print('❌ [PROFILE PHOTO] authState is AuthSuccess: ${authState is AuthSuccess}');
+        // print('❌ [PROFILE PHOTO] token != null: ${authState is AuthSuccess ? (authState as AuthSuccess).token != null : "N/A"}');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -616,7 +641,8 @@ class _SettingScreenState extends State<SettingScreen>
         return;
       }
 
-      print('📤 Début de l\'upload de l\'image de profil...');
+      // print('📤 [PROFILE PHOTO] Token récupéré: ${authState.token!.substring(0, 20)}...');
+      // print('📤 [PROFILE PHOTO] Début de l\'upload via ProfileCubit...');
       
       // Utiliser ProfileCubit pour uploader l'image (utilise le bon endpoint)
       await _profileCubit.uploadProfileImage(
@@ -624,18 +650,24 @@ class _SettingScreenState extends State<SettingScreen>
         imageFile: imageFile,
       );
       
-      print('✅ Upload terminé, attente de la réponse du BlocListener...');
+      // print('✅ [PROFILE PHOTO] uploadProfileImage() appelée, attente de la réponse...');
+      // print('✅ [PROFILE PHOTO] Attente de 500ms pour que le BlocListener traite la réponse...');
       // Le BlocListener va gérer la mise à jour de l'utilisateur
       // On attend un peu pour que le BlocListener traite la réponse
       await Future.delayed(const Duration(milliseconds: 500));
       
+      // print('✅ [PROFILE PHOTO] Rechargement des données utilisateur...');
       // Recharger les données utilisateur après l'upload pour s'assurer que tout est à jour
       if (mounted) {
         _fetchUserMedia();
+        // print('✅ [PROFILE PHOTO] _fetchUserMedia() appelée');
+      } else {
+        // print('⚠️ [PROFILE PHOTO] Widget non monté, impossible de recharger les données');
       }
       
-    } catch (e) {
-      print('❌ Erreur lors de l\'upload: $e');
+    } catch (e, stackTrace) {
+      // print('❌ [PROFILE PHOTO] Erreur lors de l\'upload: $e');
+      // print('❌ [PROFILE PHOTO] Stack trace: $stackTrace');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -648,6 +680,8 @@ class _SettingScreenState extends State<SettingScreen>
   }
 
   void _showImageSourceDialog() {
+    // print('🖼️ [PROFILE PHOTO] _showImageSourceDialog() appelée');
+    // print('🖼️ [PROFILE PHOTO] Affichage du modal bottom sheet');
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -660,20 +694,31 @@ class _SettingScreenState extends State<SettingScreen>
           children: [
             GestureDetector(
               onTap: () async {
+                // print('🖼️ [PROFILE PHOTO] Option "Galerie" sélectionnée');
                 Navigator.pop(context);
+                // print('🖼️ [PROFILE PHOTO] Ouverture du sélecteur d\'image (galerie)...');
                 final XFile? image = await _picker.pickImage(
                   source: ImageSource.gallery,
                   imageQuality: 85,
                   maxWidth: 800,
                 );
+                // print('🖼️ [PROFILE PHOTO] Résultat du picker: ${image != null ? "Image sélectionnée: ${image.path}" : "Aucune image sélectionnée"}');
                 if (image != null && context.mounted) {
+                  // print('🖼️ [PROFILE PHOTO] Image sélectionnée, chemin: ${image.path}');
+                  // print('🖼️ [PROFILE PHOTO] Mise à jour de _selectedImage');
                   setState(() {
                     _selectedImage = File(image.path);
                   });
+                  // print('🖼️ [PROFILE PHOTO] _selectedImage mis à jour: ${_selectedImage?.path}');
                   // Uploader l'image au serveur
                   if (mounted) {
+                    // print('🖼️ [PROFILE PHOTO] Appel de _uploadImageToServer() avec le fichier: ${File(image.path).path}');
                     await _uploadImageToServer(File(image.path));
+                  } else {
+                    // print('⚠️ [PROFILE PHOTO] Widget non monté, impossible d\'uploader');
                   }
+                } else {
+                  // print('⚠️ [PROFILE PHOTO] Aucune image sélectionnée ou contexte non monté');
                 }
               },
               child: const Column(
@@ -687,20 +732,31 @@ class _SettingScreenState extends State<SettingScreen>
             ),
             GestureDetector(
               onTap: () async {
+                // print('🖼️ [PROFILE PHOTO] Option "Caméra" sélectionnée');
                 Navigator.pop(context);
+                // print('🖼️ [PROFILE PHOTO] Ouverture de la caméra...');
                 final XFile? photo = await _picker.pickImage(
                   source: ImageSource.camera,
                   imageQuality: 85,
                   maxWidth: 800,
                 );
+                // print('🖼️ [PROFILE PHOTO] Résultat de la caméra: ${photo != null ? "Photo prise: ${photo.path}" : "Aucune photo prise"}');
                 if (photo != null && context.mounted) {
+                  // print('🖼️ [PROFILE PHOTO] Photo prise, chemin: ${photo.path}');
+                  // print('🖼️ [PROFILE PHOTO] Mise à jour de _selectedImage');
                   setState(() {
                     _selectedImage = File(photo.path);
                   });
+                  // print('🖼️ [PROFILE PHOTO] _selectedImage mis à jour: ${_selectedImage?.path}');
                   // Uploader l'image au serveur
                   if (mounted) {
+                    // print('🖼️ [PROFILE PHOTO] Appel de _uploadImageToServer() avec le fichier: ${File(photo.path).path}');
                     await _uploadImageToServer(File(photo.path));
+                  } else {
+                    // print('⚠️ [PROFILE PHOTO] Widget non monté, impossible d\'uploader');
                   }
+                } else {
+                  // print('⚠️ [PROFILE PHOTO] Aucune photo prise ou contexte non monté');
                 }
               },
               child: const Column(
@@ -736,7 +792,14 @@ class _SettingScreenState extends State<SettingScreen>
         ),
         body: BlocConsumer<ProfileCubit, ProfileState>(
           listener: (context, state) {
+            // print('🔄 [PROFILE PHOTO] BlocListener: État reçu - ${state.runtimeType}');
+            
             if (state is ProfileSuccess) {
+              // print('✅ [PROFILE PHOTO] BlocListener: ProfileSuccess détecté');
+              // print('✅ [PROFILE PHOTO] Message: ${state.message}');
+              // print('✅ [PROFILE PHOTO] state.data: ${state.data}');
+              // print('✅ [PROFILE PHOTO] state.data type: ${state.data?.runtimeType}');
+              
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text(state.message),
@@ -745,8 +808,12 @@ class _SettingScreenState extends State<SettingScreen>
               );
               
               // Traiter toutes les mises à jour de profil (image et champs de formulaire)
+              // print('✅ [PROFILE PHOTO] Appel de _handleProfileUpdate()...');
               _handleProfileUpdate(state);
+              // print('✅ [PROFILE PHOTO] _handleProfileUpdate() terminé');
             } else if (state is ProfileError) {
+              // print('❌ [PROFILE PHOTO] BlocListener: ProfileError détecté');
+              // print('❌ [PROFILE PHOTO] Message d\'erreur: ${state.message}');
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text(state.message),
@@ -761,6 +828,8 @@ class _SettingScreenState extends State<SettingScreen>
               setState(() {
                 _incomeSummaryData = state.incomeSummaryData;
               });
+            } else {
+              // print('ℹ️ [PROFILE PHOTO] BlocListener: Autre état - ${state.runtimeType}');
             }
           },
           builder: (context, state) {
@@ -878,7 +947,11 @@ class _SettingScreenState extends State<SettingScreen>
                 ),
               ),
               GestureDetector(
-                onTap: _showImageSourceDialog,
+                onTap: () {
+                  // print('🖼️ [PROFILE PHOTO] Clic sur le bouton de modification de photo');
+                  // print('🖼️ [PROFILE PHOTO] Appel de _showImageSourceDialog()');
+                  _showImageSourceDialog();
+                },
                 child: Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
