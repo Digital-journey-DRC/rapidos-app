@@ -611,15 +611,70 @@ class _OrderScreenState extends State<OrderScreen> {
         children: [
           if (authState.user!['role'] == 'livreur')
             Expanded(
-              child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: EdgeInsets.only(
-                  left: 16,
-                  right: 16,
-                  top: 16,
-                  bottom: MediaQuery.of(context).padding.bottom + 20,
-                ),
-                child: _buildLivreurOrders(),
+              child: Column(
+                children: [
+                  // Barre de recherche et filtre
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    color: Colors.white,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // Barre de recherche
+                        TextField(
+                          controller: _searchController,
+                          decoration: InputDecoration(
+                            hintText: 'Rechercher une commande...',
+                            prefixIcon: Icon(Icons.search, color: Colors.grey.shade600),
+                            suffixIcon: _hasSearchText
+                                ? IconButton(
+                                    icon: Icon(Icons.clear, color: Colors.grey.shade600),
+                                    onPressed: () {
+                                      setState(() {
+                                        _searchController.clear();
+                                        _hasSearchText = false;
+                                      });
+                                    },
+                                  )
+                                : null,
+                            filled: true,
+                            fillColor: Colors.grey.shade50,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide.none,
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          ),
+                          onChanged: (value) {
+                            setState(() {
+                              _hasSearchText = value.isNotEmpty;
+                            });
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        // Filtres par statut
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            children: [
+                              _buildStatusFilterChip('Tous', 'Tous'),
+                              const SizedBox(width: 8),
+                              _buildStatusFilterChip('Prêt à expédier', 'prêt à expédier'),
+                              const SizedBox(width: 8),
+                              _buildStatusFilterChip('En route', 'en route pour livraison'),
+                              const SizedBox(width: 8),
+                              _buildStatusFilterChip('Livré', 'delivered'),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: _buildLivreurOrders(),
+                  ),
+                ],
               ),
             )
           else if (authState.user!['role'] == 'vendeur')
@@ -1461,36 +1516,119 @@ class _OrderScreenState extends State<OrderScreen> {
           );
         }
 
-        return Column(
-          mainAxisSize: MainAxisSize.min,
-          children: orders.map((doc) {
+        // Filtrer par statut
+        var filteredOrders = orders;
+        if (_selectedStatusFilter != 'Tous') {
+          filteredOrders = orders.where((doc) {
+            final data = doc.data() as Map<String, dynamic>;
+            final status = data['status']?.toString().toLowerCase() ?? '';
+            return status == _selectedStatusFilter.toLowerCase();
+          }).toList();
+        }
+
+        // Filtrer par recherche
+        final searchQuery = _searchController.text.toLowerCase().trim();
+        if (searchQuery.isNotEmpty) {
+          filteredOrders = filteredOrders.where((doc) {
+            final data = doc.data() as Map<String, dynamic>;
+            final clientName = (data['client']?.toString() ?? '').toLowerCase();
+            final shortCode = (data['shortCode']?.toString() ?? '').toLowerCase();
+            final orderId = doc.id.toLowerCase();
+            final items = data['items'] as List? ?? [];
+            final productNames = items.map((item) {
+              if (item is Map) {
+                return (item['name']?.toString() ?? '').toLowerCase();
+              }
+              return '';
+            }).join(' ');
+            final address = (data['adresse']?.toString() ?? '').toLowerCase();
+
+            return clientName.contains(searchQuery) ||
+                shortCode.contains(searchQuery) ||
+                orderId.contains(searchQuery) ||
+                productNames.contains(searchQuery) ||
+                address.contains(searchQuery);
+          }).toList();
+        }
+
+        if (filteredOrders.isEmpty) {
+          return Padding(
+            padding: const EdgeInsets.all(32.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.search_off,
+                    size: 80, color: AppColors.buttonColor.withOpacity(0.3)),
+                const SizedBox(height: 18),
+                Text(
+                  searchQuery.isNotEmpty || _selectedStatusFilter != 'Tous'
+                      ? 'Aucune commande trouvée'
+                      : 'Aucune commande en attente',
+                  style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.primary),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          );
+        }
+
+        return ListView.builder(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: EdgeInsets.only(
+            left: 12,
+            right: 12,
+            top: 8,
+            bottom: MediaQuery.of(context).padding.bottom + 20,
+          ),
+          itemCount: filteredOrders.length,
+          itemBuilder: (context, index) {
+            final doc = filteredOrders[index];
             final data = doc.data() as Map<String, dynamic>;
             final items = data['items'] as List? ?? [];
             final status = data['status']?.toString() ?? 'pending';
             final timestamp = data['timestamp'] as Timestamp?;
-            final date = timestamp?.toDate().toString().substring(0, 10) ?? '';
-            final address =
-                data['address']?.toString() ?? 'Adresse non spécifiée';
+            final clientName = data['client']?.toString() ?? 'Client';
+            
+            // Calculer le total
+            double total = 0.0;
+            for (var item in items) {
+              if (item is Map) {
+                final price = (item['price'] ?? 0.0) is double 
+                    ? item['price'] as double 
+                    : (item['price'] ?? 0).toDouble();
+                final quantity = (item['quantity'] ?? 1) is int 
+                    ? item['quantity'] as int 
+                    : int.tryParse(item['quantity']?.toString() ?? '1') ?? 1;
+                total += price * quantity;
+              }
+            }
 
             return Container(
-              margin: const EdgeInsets.only(bottom: 10),
+              margin: const EdgeInsets.only(bottom: 8),
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(18),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: Colors.grey.shade200,
+                  width: 0.5,
+                ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.06),
-                    blurRadius: 10,
+                    color: Colors.black.withOpacity(0.03),
+                    blurRadius: 4,
                     offset: const Offset(0, 2),
+                    spreadRadius: 0,
                   ),
                 ],
               ),
-              child: InkWell(
-                borderRadius: BorderRadius.circular(18),
-                onTap: () {
-                  if (authState.user!['role'] == 'acheteur') {
-                    print('acheteur');
-                  } else {
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(10),
+                  onTap: () {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -1500,291 +1638,174 @@ class _OrderScreenState extends State<OrderScreen> {
                         ),
                       ),
                     );
-                  }
-                },
-                child: Column(
-                  children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.all(10),
+                    child: Row(
                       children: [
-                        // Timeline
+                        // Icône de livraison
                         Container(
-                          width: 6,
-                          height: 110,
-                          margin: const EdgeInsets.only(
-                              right: 10, top: 10, bottom: 10),
+                          width: 40,
+                          height: 40,
                           decoration: BoxDecoration(
-                            color: _statusColor(status),
+                            color: AppColors.primary.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(8),
                           ),
-                        ),
-                        // Image produit
-                        Padding(
-                          padding: const EdgeInsets.only(
-                              top: 16, left: 0, right: 10),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(14),
-                            child: Image.network(
-                              items.isNotEmpty
-                                  ? (items[0]['imagePath'] ??
-                                      'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=200&h=200&fit=crop')
-                                  : 'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=200&h=200&fit=crop',
-                              width: 70,
-                              height: 70,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) {
-                                return Container(
-                                  width: 70,
-                                  height: 70,
-                                  color: Colors.grey.shade200,
-                                  child: const Icon(Icons.image,
-                                      color: Colors.grey),
-                                );
-                              },
-                            ),
+                          child: Icon(
+                            Icons.local_shipping_outlined,
+                            color: AppColors.primary,
+                            size: 20,
                           ),
                         ),
-                        // Détails commande
+                        const SizedBox(width: 12),
+                        // Informations principales
                         Expanded(
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                                vertical: 16, horizontal: 0),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Flexible(
-                                      child: Text(
-                                        items.isNotEmpty
-                                            ? (items[0]['name'] ?? 'Produit')
-                                            : 'Produit',
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 16,
-                                        ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 10, vertical: 4),
-                                      decoration: BoxDecoration(
-                                        color: _statusColor(status)
-                                            .withOpacity(0.15),
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      child: Text(
-                                        _translateStatus(status),
-                                        style: TextStyle(
-                                          color: _statusColor(status),
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 12,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 8),
-                                Row(
-                                  children: [
-                                    const Icon(Icons.location_on,
-                                        size: 14, color: AppColors.primary),
-                                    const SizedBox(width: 4),
-                                    Expanded(
-                                      child: Text(
-                                        data['adresse'] ??
-                                            'Adresse non spécifiée',
-                                        style: const TextStyle(
-                                          fontSize: 13,
-                                          color: Colors.black87,
-                                        ),
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 8),
-                                Row(
-                                  children: [
-                                    const Icon(Icons.shopping_cart,
-                                        size: 14, color: AppColors.primary),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      '${items.length} article${items.length > 1 ? 's' : ''}',
-                                      style: const TextStyle(fontSize: 13),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    const Icon(Icons.calendar_today,
-                                        size: 14, color: AppColors.primary),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      _formatDate(timestamp),
-                                      style: const TextStyle(fontSize: 13),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    // Bouton pour accepter la livraison
-                    Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: Column(
-                        children: [
-                          if (status == 'prêt à expédier' &&
-                              data['packagePhoto'] != null) ...[
-                            Padding(
-                              padding: const EdgeInsets.only(bottom: 16.0),
-                              child: Column(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Text(
-                                    'Photo du colis:',
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.bold,
-                                      color: AppColors.primary,
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(
+                                          clientName,
+                                          style: const TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w600,
+                                            color: Colors.black87,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Row(
+                                          children: [
+                                            Icon(
+                                              Icons.location_on_outlined,
+                                              size: 12,
+                                              color: Colors.grey.shade600,
+                                            ),
+                                            const SizedBox(width: 4),
+                                            Expanded(
+                                              child: Text(
+                                                data['adresse'] ?? 'Adresse non spécifiée',
+                                                style: TextStyle(
+                                                  fontSize: 11,
+                                                  color: Colors.grey.shade600,
+                                                ),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
                                     ),
                                   ),
-                                  const SizedBox(height: 8),
-                                  GestureDetector(
-                                    onTap: () {
-                                      showDialog(
-                                        context: context,
-                                        builder: (BuildContext context) {
-                                          return Dialog(
-                                            insetPadding: EdgeInsets.zero,
-                                            child: Stack(
-                                              children: [
-                                                InteractiveViewer(
-                                                  minScale: 0.5,
-                                                  maxScale: 4.0,
-                                                  child: Image.network(
-                                                    data['packagePhoto'],
-                                                    fit: BoxFit.contain,
-                                                    width: MediaQuery.of(context)
-                                                        .size
-                                                        .width,
-                                                    height: MediaQuery.of(context)
-                                                        .size
-                                                        .height,
-                                                  ),
-                                                ),
-                                                Positioned(
-                                                  top: 10,
-                                                  right: 10,
-                                                  child: IconButton(
-                                                    icon: const Icon(Icons.close,
-                                                        color: Colors.white),
-                                                    onPressed: () =>
-                                                        Navigator.pop(context),
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          );
-                                        },
-                                      );
-                                    },
-                                    child: ClipRRect(
-                                      borderRadius: BorderRadius.circular(8),
-                                      child: Image.network(
-                                        data['packagePhoto'],
-                                        width: double.infinity,
-                                        height: 150,
-                                        fit: BoxFit.cover,
-                                        errorBuilder: (context, error, stackTrace) {
-                                          return Container(
-                                            width: double.infinity,
-                                            height: 150,
-                                            color: Colors.grey.shade200,
-                                            child: const Icon(Icons.image,
-                                                color: Colors.grey),
-                                          );
-                                        },
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 6,
+                                      vertical: 3,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: _statusColor(status).withOpacity(0.15),
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(
+                                        color: _statusColor(status).withOpacity(0.3),
+                                        width: 0.5,
+                                      ),
+                                    ),
+                                    child: Text(
+                                      _translateStatus(status),
+                                      style: TextStyle(
+                                        color: _statusColor(status),
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.w600,
                                       ),
                                     ),
                                   ),
                                 ],
                               ),
-                            ),
-                          ],
-                          if (status != 'delivered') ...[
-                            ElevatedButton(
-                              onPressed: () async {
-                                if (status == 'prêt à expédier') {
-                                  _updateClientLocation(data['longitude'], data['latitude'], data['idClient']);
-                                  _saveCurrentLocation();
-                                  try {
-                                    await FirebaseFirestore.instance
-                                        .collection('carts')
-                                        .doc(doc.id)
-                                        .update({
-                                      'status': 'en route pour livraison',
-                                      'livreur': authState.user!['id'].toString(),
-                                      'shortCode': generate4DigitCode(),
-                                      'timestamp': FieldValue.serverTimestamp(),
-                                    });
-
-                                    if (mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(
-                                          content: Text('Colis reçu avec succès'),
-                                          backgroundColor: Colors.green,
-                                        ),
-                                      );
-                                    }
-                                  } catch (e) {
-                                    if (mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(
-                                          content: Text('Erreur: $e'),
-                                          backgroundColor: Colors.red,
-                                        ),
-                                      );
-                                    }
-                                  }
-                                } else if (status == 'en route pour livraison') {
-                                  final shortCode = data['shortCode']??"";
-                                  
-                                  _showCodeConfirmationDialog(
-                                    context,
-                                    doc.id,
-                                    shortCode,
-                                    authState.user!['id'].toString(),
-                                  );
-                                }
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.primary,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                minimumSize: const Size(double.infinity, 40),
+                              const SizedBox(height: 6),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Icon(
+                                            Icons.inventory_2_outlined,
+                                            size: 12,
+                                            color: Colors.grey.shade600,
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            '${items.length} ${items.length > 1 ? 'articles' : 'article'}',
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              color: Colors.grey.shade600,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Row(
+                                        children: [
+                                          Icon(
+                                            Icons.calendar_today,
+                                            size: 10,
+                                            color: Colors.grey.shade500,
+                                          ),
+                                          const SizedBox(width: 3),
+                                          Text(
+                                            _formatDate(timestamp),
+                                            style: TextStyle(
+                                              fontSize: 10,
+                                              color: Colors.grey.shade600,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.all(6),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.primary.withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(
+                                        color: AppColors.primary.withOpacity(0.2),
+                                        width: 0.5,
+                                      ),
+                                    ),
+                                    child: Icon(
+                                      Icons.arrow_forward_ios,
+                                      size: 12,
+                                      color: AppColors.primary,
+                                    ),
+                                  ),
+                                ],
                               ),
-                              child: Text(
-                                status == 'prêt à expédier'
-                                    ? 'Recevoir colis'
-                                    : 'Confirmer la livraison',
-                                style: const TextStyle(color: Colors.white),
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
               ),
             );
-          }).toList(),
+          },
         );
       },
     );
@@ -1939,7 +1960,13 @@ class _OrderScreenState extends State<OrderScreen> {
         });
 
         return ListView.builder(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: EdgeInsets.only(
+            left: 12,
+            right: 12,
+            top: 8,
+            bottom: MediaQuery.of(context).padding.bottom + 20,
+          ),
           itemCount: filteredDocs.length,
           itemBuilder: (context, index) {
             try {
@@ -1949,6 +1976,24 @@ class _OrderScreenState extends State<OrderScreen> {
               final timestamp = data['timestamp'] as Timestamp?;
               final adresse =
                   data['adresse']?.toString() ?? 'Adresse non spécifiée';
+
+              // Calculer le total
+              double total = 0.0;
+              final items = data['items'] as List? ?? [];
+              for (var item in items) {
+                if (item is Map) {
+                  final price = (item['price'] ?? 0.0) is double 
+                      ? item['price'] as double 
+                      : (item['price'] ?? 0).toDouble();
+                  final quantity = (item['quantity'] ?? 1) is int 
+                      ? item['quantity'] as int 
+                      : int.tryParse(item['quantity']?.toString() ?? '1') ?? 1;
+                  total += price * quantity;
+                }
+              }
+
+              final clientName = data['client']?.toString() ?? 'Client';
+              final productCount = items.length;
 
               return Container(
                 margin: const EdgeInsets.only(bottom: 8),
@@ -1961,9 +2006,9 @@ class _OrderScreenState extends State<OrderScreen> {
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.02),
+                      color: Colors.black.withOpacity(0.03),
                       blurRadius: 4,
-                      offset: const Offset(0, 1),
+                      offset: const Offset(0, 2),
                       spreadRadius: 0,
                     ),
                   ],
@@ -1983,154 +2028,155 @@ class _OrderScreenState extends State<OrderScreen> {
                         ),
                       );
                     },
-                    child: Column(
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.all(10),
-                          child: Row(
-                            children: [
-                              // Icône de commande avec gradient
-                              Container(
-                                width: 36,
-                                height: 36,
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    colors: [
-                                      AppColors.primary,
-                                      AppColors.primary.withOpacity(0.7),
-                                    ],
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                  ),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: const Icon(
-                                  Icons.shopping_bag_outlined,
-                                  color: Colors.white,
-                                  size: 18,
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              // Informations principales
-                              Expanded(
-                                child: Column(
+                    child: Padding(
+                      padding: const EdgeInsets.all(10),
+                      child: Row(
+                        children: [
+                          // Icône de commande
+                          Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: AppColors.primary.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Icon(
+                              Icons.shopping_bag_outlined,
+                              color: AppColors.primary,
+                              size: 20,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          // Informations principales
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            clientName,
+                                            style: const TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w600,
+                                              color: Colors.black87,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Row(
                                             children: [
+                                              Icon(
+                                                Icons.inventory_2_outlined,
+                                                size: 12,
+                                                color: Colors.grey.shade600,
+                                              ),
+                                              const SizedBox(width: 4),
                                               Text(
-                                                data['items'] != null &&
-                                                        (data['items'] as List)
-                                                            .isNotEmpty
-                                                    ? (data['items'] as List)[0]
-                                                            ['name'] ??
-                                                        'Produit'
-                                                    : 'Produit',
+                                                '$productCount ${productCount > 1 ? 'produits' : 'produit'}',
                                                 style: TextStyle(
                                                   fontSize: 11,
-                                                  fontWeight: FontWeight.w600,
-                                                  color: Colors.grey.shade700,
+                                                  color: Colors.grey.shade600,
                                                 ),
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                              const SizedBox(height: 3),
-                                              Row(
-                                                children: [
-                                                  Icon(
-                                                    Icons.calendar_today,
-                                                    size: 10,
-                                                    color: Colors.grey.shade500,
-                                                  ),
-                                                  const SizedBox(width: 3),
-                                                  Text(
-                                                    _formatDate(timestamp),
-                                                    style: TextStyle(
-                                                      fontSize: 10,
-                                                      color: Colors.grey.shade600,
-                                                    ),
-                                                  ),
-                                                ],
                                               ),
                                             ],
                                           ),
-                                        ),
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 6,
-                                            vertical: 3,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color: _statusColor(status).withOpacity(0.15),
-                                            borderRadius: BorderRadius.circular(6),
-                                            border: Border.all(
-                                              color: _statusColor(status).withOpacity(0.3),
-                                              width: 0.5,
-                                            ),
-                                          ),
-                                          child: Text(
-                                            _translateStatus(status),
-                                            style: TextStyle(
-                                              color: _statusColor(status),
-                                              fontSize: 9,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
+                                        ],
+                                      ),
                                     ),
-                                    const SizedBox(height: 6),
-                                    Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 6,
+                                        vertical: 3,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: _statusColor(status).withOpacity(0.15),
+                                        borderRadius: BorderRadius.circular(6),
+                                        border: Border.all(
+                                          color: _statusColor(status).withOpacity(0.3),
+                                          width: 0.5,
+                                        ),
+                                      ),
+                                      child: Text(
+                                        _translateStatus(status),
+                                        style: TextStyle(
+                                          color: _statusColor(status),
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 6),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      mainAxisSize: MainAxisSize.min,
                                       children: [
+                                        Text(
+                                          '${total.toStringAsFixed(0)} FC',
+                                          style: const TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.bold,
+                                            color: AppColors.primary,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
                                         Row(
                                           children: [
                                             Icon(
-                                              Icons.inventory_2_outlined,
-                                              size: 12,
-                                              color: Colors.grey.shade600,
+                                              Icons.calendar_today,
+                                              size: 10,
+                                              color: Colors.grey.shade500,
                                             ),
                                             const SizedBox(width: 3),
                                             Text(
-                                              '${(data['items'] as List?)?.length ?? 0} ${((data['items'] as List?)?.length ?? 0) > 1 ? 'produits' : 'produit'}',
+                                              _formatDate(timestamp),
                                               style: TextStyle(
-                                                fontSize: 11,
-                                                fontWeight: FontWeight.w600,
-                                                color: Colors.grey.shade700,
+                                                fontSize: 10,
+                                                color: Colors.grey.shade600,
                                               ),
                                             ),
                                           ],
                                         ),
-                                        Container(
-                                          padding: const EdgeInsets.all(6),
-                                          decoration: BoxDecoration(
-                                            color: AppColors.primary.withOpacity(0.1),
-                                            borderRadius: BorderRadius.circular(6),
-                                            border: Border.all(
-                                              color: AppColors.primary.withOpacity(0.2),
-                                              width: 0.5,
-                                            ),
-                                          ),
-                                          child: Icon(
-                                            Icons.arrow_forward_ios,
-                                            size: 14,
-                                            color: AppColors.primary,
-                                          ),
-                                        ),
                                       ],
+                                    ),
+                                    Container(
+                                      padding: const EdgeInsets.all(6),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.primary.withOpacity(0.1),
+                                        borderRadius: BorderRadius.circular(6),
+                                        border: Border.all(
+                                          color: AppColors.primary.withOpacity(0.2),
+                                          width: 0.5,
+                                        ),
+                                      ),
+                                      child: Icon(
+                                        Icons.arrow_forward_ios,
+                                        size: 12,
+                                        color: AppColors.primary,
+                                      ),
                                     ),
                                   ],
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),

@@ -9,6 +9,7 @@ import 'package:immo/services/invoice_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'dart:io';
+import 'dart:math';
 import 'package:camera/camera.dart';
 import 'order_screen.dart'; // Pour accéder à CameraColisScreen
 
@@ -64,6 +65,138 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     if (timestamp == null) return '';
     final date = timestamp.toDate();
     return DateFormat('dd/MM/yyyy HH:mm').format(date);
+  }
+
+  String _generate4DigitCode() {
+    final random = Random();
+    int code = 1000 + random.nextInt(9000); // Génère un nombre entre 1000 et 9999
+    return code.toString();
+  }
+
+  void _showCodeConfirmationDialog(BuildContext context, String docId, String shortCode, String livreurId) {
+    final TextEditingController codeController = TextEditingController();
+    bool isCodeValid = false;
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setState) => Dialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Container(
+              width: MediaQuery.of(context).size.width * 0.9,
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Confirmation de livraison',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  const Text(
+                    'Veuillez entrer le code de confirmation à 4 chiffres fourni par le client',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: codeController,
+                    keyboardType: TextInputType.number,
+                    maxLength: 4,
+                    decoration: InputDecoration(
+                      hintText: 'Entrez le code à 4 chiffres',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      filled: true,
+                      fillColor: Colors.grey.shade50,
+                      prefixIcon: const Icon(Icons.lock_outline, color: Colors.grey),
+                      errorText: isCodeValid ? 'Code incorrect' : null,
+                    ),
+                    onChanged: (value) {
+                      setState(() {
+                        isCodeValid = value.length == 4 && value != shortCode;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 24),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text(
+                          'ANNULER',
+                          style: TextStyle(color: Colors.grey),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      ElevatedButton(
+                        onPressed: codeController.text == shortCode
+                            ? () async {
+                                try {
+                                  await FirebaseFirestore.instance
+                                      .collection('carts')
+                                      .doc(docId)
+                                      .update({
+                                    'status': 'delivered',
+                                    'livreur': livreurId,
+                                    'timestamp': FieldValue.serverTimestamp(),
+                                  });
+
+                                  if (mounted) {
+                                    Navigator.pop(context);
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Colis livré avec succès'),
+                                        backgroundColor: Colors.green,
+                                        behavior: SnackBarBehavior.floating,
+                                      ),
+                                    );
+                                    Navigator.pop(context); // Retour à la liste
+                                  }
+                                } catch (e) {
+                                  if (mounted) {
+                                    Navigator.pop(context);
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text('Erreur: $e'),
+                                        backgroundColor: Colors.red,
+                                        behavior: SnackBarBehavior.floating,
+                                      ),
+                                    );
+                                  }
+                                }
+                              }
+                            : null,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        child: const Text('CONFIRMER'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _generateInvoice(BuildContext context, dynamic authState) async {
@@ -387,19 +520,26 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            // En-tête compact avec gradient
+            // En-tête élégant avec gradient
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.fromLTRB(16, 20, 16, 20),
+              padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [
                     AppColors.primary,
-                    AppColors.primary.withOpacity(0.85),
+                    AppColors.primary.withOpacity(0.9),
                   ],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.primary.withOpacity(0.3),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -409,25 +549,43 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          shortCode.isNotEmpty ? '#$shortCode' : '#${widget.orderId.substring(0, 8)}',
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
                         Row(
                           children: [
-                            const Icon(Icons.calendar_today, size: 13, color: Colors.white70),
-                            const SizedBox(width: 5),
+                            Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: const Icon(
+                                Icons.receipt_long,
+                                size: 16,
+                                color: Colors.white,
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Text(
+                              shortCode.isNotEmpty ? '#$shortCode' : '#${widget.orderId.substring(0, 8)}',
+                              style: const TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        Row(
+                          children: [
+                            Icon(Icons.calendar_today, size: 14, color: Colors.white.withOpacity(0.9)),
+                            const SizedBox(width: 6),
                             Text(
                               _formatDate(timestamp),
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: Colors.white70,
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Colors.white.withOpacity(0.9),
+                                fontWeight: FontWeight.w500,
                               ),
                             ),
                           ],
@@ -436,21 +594,29 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                     decoration: BoxDecoration(
                       color: Colors.white.withOpacity(0.25),
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: Colors.white.withOpacity(0.3),
-                        width: 1,
+                        color: Colors.white.withOpacity(0.4),
+                        width: 1.5,
                       ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
                     ),
                     child: Text(
                       _translateStatus(status),
                       style: const TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
-                        fontSize: 11,
+                        fontSize: 12,
+                        letterSpacing: 0.5,
                       ),
                     ),
                   ),
@@ -460,7 +626,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
 
             // Contenu principal
             Padding(
-              padding: const EdgeInsets.all(14),
+              padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -812,24 +978,47 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                           );
                         },
                         child: ClipRRect(
-                          borderRadius: BorderRadius.circular(10),
-                          child: Image.network(
-                            widget.orderData['packagePhoto'],
-                            width: double.infinity,
-                            height: 160,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) {
-                              return Container(
+                          borderRadius: BorderRadius.circular(12),
+                          child: Stack(
+                            children: [
+                              Image.network(
+                                widget.orderData['packagePhoto'],
                                 width: double.infinity,
-                                height: 160,
-                                color: Colors.grey.shade200,
-                                child: Icon(
-                                  Icons.image,
-                                  color: Colors.grey.shade400,
-                                  size: 40,
+                                height: 140,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return Container(
+                                    width: double.infinity,
+                                    height: 140,
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey.shade200,
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Icon(
+                                      Icons.image_not_supported,
+                                      color: Colors.grey.shade400,
+                                      size: 36,
+                                    ),
+                                  );
+                                },
+                              ),
+                              Positioned(
+                                top: 8,
+                                right: 8,
+                                child: Container(
+                                  padding: const EdgeInsets.all(6),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withOpacity(0.6),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: const Icon(
+                                    Icons.fullscreen,
+                                    color: Colors.white,
+                                    size: 18,
+                                  ),
                                 ),
-                              );
-                            },
+                              ),
+                            ],
                           ),
                         ),
                       ),
@@ -839,13 +1028,24 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
 
                   // Résumé de la commande
                   Container(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(14),
+                      gradient: LinearGradient(
+                        colors: [
+                          AppColors.primary.withOpacity(0.08),
+                          AppColors.primary.withOpacity(0.05),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: AppColors.primary.withOpacity(0.2),
+                        width: 1,
+                      ),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
+                          color: AppColors.primary.withOpacity(0.08),
                           blurRadius: 8,
                           offset: const Offset(0, 2),
                         ),
@@ -854,21 +1054,44 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          'Total',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.grey.shade700,
-                          ),
-                        ),
-                        Text(
-                          '$total FC',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.primary,
-                          ),
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: AppColors.primary.withOpacity(0.15),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(
+                                Icons.payments_outlined,
+                                color: AppColors.primary,
+                                size: 16,
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Total de la commande',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w500,
+                                    color: Colors.grey.shade700,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  '$total FC',
+                                  style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.primary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -884,49 +1107,49 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                         width: double.infinity,
                         decoration: BoxDecoration(
                           color: Colors.white,
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(16),
                           border: Border.all(
                             color: Colors.grey.shade200,
-                            width: 0.5,
+                            width: 1,
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.03),
-                              blurRadius: 6,
-                              offset: const Offset(0, 2),
+                              color: Colors.black.withOpacity(0.05),
+                              blurRadius: 10,
+                              offset: const Offset(0, 3),
                             ),
                           ],
                         ),
-                        padding: const EdgeInsets.all(10),
+                        padding: const EdgeInsets.all(16),
                         child: Column(
                           children: [
                             // Titre de la section
                             Row(
                               children: [
                                 Container(
-                                  padding: const EdgeInsets.all(5),
+                                  padding: const EdgeInsets.all(8),
                                   decoration: BoxDecoration(
                                     color: AppColors.primary.withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(5),
+                                    borderRadius: BorderRadius.circular(10),
                                   ),
                                   child: Icon(
                                     Icons.touch_app_outlined,
-                                    size: 14,
+                                    size: 16,
                                     color: AppColors.primary,
                                   ),
                                 ),
-                                const SizedBox(width: 6),
+                                const SizedBox(width: 10),
                                 const Text(
                                   'Actions rapides',
                                   style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold,
                                     color: Colors.black87,
                                   ),
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 10),
+                            const SizedBox(height: 16),
                             // Boutons Accepter/Rejeter
                             Row(
                               children: [
@@ -1157,34 +1380,197 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                       Container(
                         width: double.infinity,
                         decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(14),
+                          gradient: LinearGradient(
+                            colors: [
+                              AppColors.primary,
+                              AppColors.primary.withOpacity(0.9),
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(16),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.05),
-                              blurRadius: 8,
-                              offset: const Offset(0, 2),
+                              color: AppColors.primary.withOpacity(0.4),
+                              blurRadius: 12,
+                              offset: const Offset(0, 4),
                             ),
                           ],
                         ),
-                        padding: const EdgeInsets.all(14),
-                        child: ElevatedButton(
+                        padding: const EdgeInsets.all(16),
+                        child: ElevatedButton.icon(
                           onPressed: () {
                             _showExpeditionDialog(context, widget.orderId);
                           },
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary,
+                            backgroundColor: Colors.transparent,
+                            shadowColor: Colors.transparent,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                          ),
+                          icon: const Icon(
+                            Icons.local_shipping_outlined,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                          label: const Text(
+                            'Expédier la commande',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ] else if (userRole == 'livreur') ...[
+                    // Boutons d'action pour les livreurs
+                    if (status == 'prêt à expédier')
+                      Container(
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              AppColors.primary,
+                              AppColors.primary.withOpacity(0.9),
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(10),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.primary.withOpacity(0.3),
+                              blurRadius: 6,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        padding: const EdgeInsets.all(10),
+                        child: ElevatedButton.icon(
+                          onPressed: () async {
+                            final authState = context.read<AuthCubit>().state;
+                            if (authState is! AuthSuccess || authState.user == null) return;
+                            
+                            // Mettre à jour la localisation
+                            // _updateClientLocation et _saveCurrentLocation seraient appelés ici
+                            // mais ces méthodes sont dans order_screen.dart
+                            
+                            try {
+                              await FirebaseFirestore.instance
+                                  .collection('carts')
+                                  .doc(widget.orderId)
+                                  .update({
+                                'status': 'en route pour livraison',
+                                'livreur': authState.user!['id'].toString(),
+                                'shortCode': _generate4DigitCode(),
+                                'timestamp': FieldValue.serverTimestamp(),
+                              });
+
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Colis reçu avec succès'),
+                                    backgroundColor: Colors.green,
+                                    behavior: SnackBarBehavior.floating,
+                                  ),
+                                );
+                                Navigator.pop(context);
+                              }
+                            } catch (e) {
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Erreur: $e'),
+                                    backgroundColor: Colors.red,
+                                    behavior: SnackBarBehavior.floating,
+                                  ),
+                                );
+                              }
+                            }
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.transparent,
+                            shadowColor: Colors.transparent,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(8),
                             ),
-                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            padding: const EdgeInsets.symmetric(vertical: 10),
                           ),
-                          child: const Text(
-                            'Expédier',
+                          icon: const Icon(
+                            Icons.check_circle_outline,
+                            color: Colors.white,
+                            size: 16,
+                          ),
+                          label: const Text(
+                            'Recevoir colis',
                             style: TextStyle(
                               color: Colors.white,
-                              fontSize: 14,
+                              fontSize: 13,
                               fontWeight: FontWeight.w600,
+                              letterSpacing: 0.3,
+                            ),
+                          ),
+                        ),
+                      ),
+                    if (status == 'en route pour livraison')
+                      Container(
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              Colors.green.shade600,
+                              Colors.green.shade700,
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(10),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.green.withOpacity(0.3),
+                              blurRadius: 6,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        padding: const EdgeInsets.all(10),
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            final authState = context.read<AuthCubit>().state;
+                            if (authState is! AuthSuccess || authState.user == null) return;
+                            
+                            final shortCode = widget.orderData['shortCode']?.toString() ?? '';
+                            _showCodeConfirmationDialog(
+                              context,
+                              widget.orderId,
+                              shortCode,
+                              authState.user!['id'].toString(),
+                            );
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.transparent,
+                            shadowColor: Colors.transparent,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                          ),
+                          icon: const Icon(
+                            Icons.local_shipping_outlined,
+                            color: Colors.white,
+                            size: 16,
+                          ),
+                          label: const Text(
+                            'Confirmer la livraison',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 0.3,
                             ),
                           ),
                         ),
@@ -1256,15 +1642,21 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     required Widget child,
   }) {
     return Container(
-      padding: const EdgeInsets.all(14),
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: Colors.grey.shade100,
+          width: 1,
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withOpacity(0.05),
             blurRadius: 8,
             offset: const Offset(0, 2),
+            spreadRadius: 0,
           ),
         ],
       ),
@@ -1276,27 +1668,35 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
               Container(
                 padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withOpacity(0.1),
+                  gradient: LinearGradient(
+                    colors: [
+                      AppColors.primary.withOpacity(0.15),
+                      AppColors.primary.withOpacity(0.1),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(
                   icon,
                   color: AppColors.primary,
-                  size: 18,
+                  size: 16,
                 ),
               ),
               const SizedBox(width: 10),
               Text(
                 title,
                 style: const TextStyle(
-                  fontSize: 15,
+                  fontSize: 14,
                   fontWeight: FontWeight.bold,
                   color: Colors.black87,
+                  letterSpacing: 0.2,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
           child,
         ],
       ),

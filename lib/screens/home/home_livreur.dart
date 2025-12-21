@@ -8,9 +8,11 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:immo/screens/navigation_example.dart';
-import 'package:immo/screens/tracking_map_box.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:immo/screens/home/new_home.dart';
+import 'package:immo/services/delivery_statistics_service.dart';
+import 'package:immo/screens/statistics/delivery_statistics_detail_screen.dart';
+import 'package:intl/intl.dart';
 
 class HomeLivreurScreen extends StatefulWidget {
   const HomeLivreurScreen({Key? key}) : super(key: key);
@@ -454,9 +456,10 @@ class _HomeLivreurScreenState extends State<HomeLivreurScreen> {
                 );
               },
             ),
-            const SizedBox(height: 18),
-            // Livraison en cours
-            const SizedBox(height: 16),
+            const SizedBox(height: 20),
+            // Statistiques de livraison (en premier)
+            _DeliveryStatisticsWidget(),
+            const SizedBox(height: 20),
             // Carte de position livraison
             MouseRegion(
               cursor: SystemMouseCursors.click,
@@ -561,8 +564,7 @@ class _HomeLivreurScreenState extends State<HomeLivreurScreen> {
                 ),
               ),
             ),
-
-            const SizedBox(height: 18),
+            const SizedBox(height: 20),
             // Evaluations clients
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -590,25 +592,6 @@ class _HomeLivreurScreenState extends State<HomeLivreurScreen> {
                 ],
               ),
             ),
-            const SizedBox(height: 18),
-            // Performance du jour
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text('Performance du Jour', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                TextButton(
-                  onPressed: () {},
-                  child: const Text('Voir Détails', style: TextStyle(color: AppColors.primary)),
-                ),
-              ],
-            ),
-            Row(
-              children: const [
-                _StatCard(title: 'Livraisons Complétées', value: '10'),
-                SizedBox(width: 12),
-                _StatCard(title: 'Kilomètres parcourus', value: '50'),
-              ],
-            ),
             const SizedBox(height: 24),
           ],
         ),
@@ -617,37 +600,6 @@ class _HomeLivreurScreenState extends State<HomeLivreurScreen> {
   }
 }
 
-class _CommandeRow extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String heure;
-  final String status;
-  final Color statusColor;
-  const _CommandeRow({required this.icon, required this.title, required this.heure, required this.status, required this.statusColor});
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        children: [
-          Icon(icon, color: AppColors.primary, size: 28),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-                Text('Livraison prévue: $heure', style: const TextStyle(color: Colors.grey, fontSize: 13)),
-              ],
-            ),
-          ),
-          const Text('Status: ', style: TextStyle(color: Colors.black54)),
-          Text(status, style: TextStyle(color: statusColor, fontWeight: FontWeight.bold)),
-        ],
-      ),
-    );
-  }
-}
 
 class _ReviewCard extends StatelessWidget {
   final String client;
@@ -686,27 +638,265 @@ class _ReviewCard extends StatelessWidget {
   }
 }
 
-class _StatCard extends StatelessWidget {
-  final String title;
-  final String value;
-  const _StatCard({required this.title, required this.value});
+
+class _DeliveryStatisticsWidget extends StatefulWidget {
+  @override
+  State<_DeliveryStatisticsWidget> createState() => _DeliveryStatisticsWidgetState();
+}
+
+class _DeliveryStatisticsWidgetState extends State<_DeliveryStatisticsWidget> {
+  final DeliveryStatisticsService _statisticsService = DeliveryStatisticsService();
+  Map<String, dynamic>? _statistics;
+  bool _isLoading = true;
+  String? _livreurId;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLivreurId();
+  }
+
+  void _loadLivreurId() {
+    final authState = context.read<AuthCubit>().state;
+    if (authState is AuthSuccess && authState.user != null) {
+      final userId = authState.user!['id'];
+      if (userId != null) {
+        setState(() {
+          _livreurId = userId.toString();
+        });
+        _loadStatistics();
+      }
+    }
+  }
+
+  Future<void> _loadStatistics() async {
+    if (_livreurId == null) return;
+    
+    setState(() => _isLoading = true);
+    try {
+      final result = await _statisticsService.getDeliveryStatistics(_livreurId!);
+      if (result['success'] == true) {
+        setState(() {
+          _statistics = result;
+          _isLoading = false;
+        });
+      } else {
+        setState(() => _isLoading = false);
+      }
+    } catch (e) {
+      setState(() => _isLoading = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Expanded(
+    if (_livreurId == null) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // En-tête de section
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: const Icon(
+                    Icons.local_shipping,
+                    color: AppColors.primary,
+                    size: 18,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                const Text(
+                  'Statistiques de livraison',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
+                    color: Color(0xFF2B2D42),
+                  ),
+                ),
+              ],
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => DeliveryStatisticsDetailScreen(
+                      period: 'daily',
+                      livreurId: _livreurId!,
+                    ),
+                  ),
+                );
+              },
+              child: const Text(
+                'Voir plus',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        // Grille de statistiques
+        _isLoading
+            ? Container(
+                height: 100,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey.shade200, width: 0.5),
+                ),
+                child: const Center(
+                  child: CircularProgressIndicator(color: AppColors.primary),
+                ),
+              )
+            : _statistics == null
+                ? Container(
+                    height: 100,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.grey.shade200, width: 0.5),
+                    ),
+                    child: const Center(
+                      child: Text(
+                        'Aucune donnée disponible',
+                        style: TextStyle(color: Colors.grey),
+                      ),
+                    ),
+                  )
+                : Row(
+                    children: [
+                      Expanded(
+                        child: _buildStatCard(
+                          'Aujourd\'hui',
+                          _statistics!['daily']?['total'] ?? 0.0,
+                          _statistics!['daily']?['count'] ?? 0,
+                          Icons.today,
+                          'daily',
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _buildStatCard(
+                          'Semestre',
+                          _statistics!['semester']?['total'] ?? 0.0,
+                          _statistics!['semester']?['count'] ?? 0,
+                          Icons.calendar_view_month,
+                          'semester',
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _buildStatCard(
+                          'Ce mois',
+                          _statistics!['monthly']?['total'] ?? 0.0,
+                          _statistics!['monthly']?['count'] ?? 0,
+                          Icons.calendar_month,
+                          'monthly',
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _buildStatCard(
+                          'Cette année',
+                          _statistics!['yearly']?['total'] ?? 0.0,
+                          _statistics!['yearly']?['count'] ?? 0,
+                          Icons.calendar_today,
+                          'yearly',
+                        ),
+                      ),
+                    ],
+                  ),
+      ],
+    );
+  }
+
+  Widget _buildStatCard(String label, double total, int count, IconData icon, String period) {
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => DeliveryStatisticsDetailScreen(
+              period: period,
+              livreurId: _livreurId!,
+            ),
+          ),
+        );
+      },
       child: Container(
-        height: 70,
+        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.grey.shade300),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: Colors.grey.shade200, width: 0.5),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.withOpacity(0.05),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-            const Spacer(),
-            Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Icon(
+                icon,
+                color: AppColors.primary,
+                size: 16,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '${NumberFormat('#,###').format(total)} FC',
+              style: const TextStyle(
+                color: Color(0xFF147C3C),
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '$count livraisons',
+              style: TextStyle(
+                color: Colors.grey.shade600,
+                fontSize: 9,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: TextStyle(
+                color: Colors.grey.shade700,
+                fontSize: 10,
+                fontWeight: FontWeight.w500,
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
           ],
         ),
       ),

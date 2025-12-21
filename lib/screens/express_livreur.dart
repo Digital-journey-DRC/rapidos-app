@@ -7,7 +7,6 @@ import '../cubits/express/express_cubit.dart';
 import '../cubits/express/express_state.dart';
 import '../cubit/auth_cubit.dart';
 import '../constants.dart';
-import '../services/express_service.dart';
 import '../widgets/app_logo.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -997,14 +996,18 @@ class _ExpressLivreurState extends State<ExpressLivreur> with SingleTickerProvid
               final packageDescription = order['packageDescription']?.toString() ?? '';
 
               return Container(
-                margin: const EdgeInsets.only(bottom: 16),
+                margin: const EdgeInsets.only(bottom: 12),
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: Colors.grey.shade200,
+                    width: 0.5,
+                  ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
-                      blurRadius: 10,
+                      color: Colors.black.withOpacity(0.03),
+                      blurRadius: 6,
                       offset: const Offset(0, 2),
                     ),
                   ],
@@ -1013,63 +1016,80 @@ class _ExpressLivreurState extends State<ExpressLivreur> with SingleTickerProvid
                   children: [
                     // Header avec statut
                     Container(
-                      padding: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: _getStatusColor(status).withOpacity(0.1),
+                        color: Colors.grey.shade50,
                         borderRadius: const BorderRadius.only(
-                          topLeft: Radius.circular(16),
-                          topRight: Radius.circular(16),
+                          topLeft: Radius.circular(12),
+                          topRight: Radius.circular(12),
+                        ),
+                        border: Border(
+                          bottom: BorderSide(
+                            color: Colors.grey.shade200,
+                            width: 0.5,
+                          ),
                         ),
                       ),
                       child: Row(
                         children: [
                           Container(
-                            padding: const EdgeInsets.all(8),
+                            padding: const EdgeInsets.all(6),
                             decoration: BoxDecoration(
-                              color: _getStatusColor(status),
+                              color: AppColors.primary.withOpacity(0.1),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Icon(
-                              Icons.local_shipping,
-                              color: Colors.white,
-                              size: 20,
+                              Icons.local_shipping_outlined,
+                              color: AppColors.primary,
+                              size: 16,
                             ),
                           ),
-                          const SizedBox(width: 12),
+                          const SizedBox(width: 10),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
                                   'Ma livraison',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 16,
-                                    color: _getStatusColor(status),
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 14,
+                                    color: Colors.black87,
                                   ),
                                 ),
+                                const SizedBox(height: 2),
                                 Text(
                                   _formatDate(createdAt),
                                   style: TextStyle(
-                                    color: Colors.grey[600],
-                                    fontSize: 12,
+                                    color: Colors.grey.shade600,
+                                    fontSize: 11,
                                   ),
                                 ),
                               ],
                             ),
                           ),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                             decoration: BoxDecoration(
-                              color: _getStatusColor(status),
-                              borderRadius: BorderRadius.circular(20),
+                              color: status == 'delivered' 
+                                  ? Colors.green.shade50 
+                                  : AppColors.primary.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                color: status == 'delivered' 
+                                    ? Colors.green.shade300 
+                                    : AppColors.primary.withOpacity(0.3),
+                                width: 0.5,
+                              ),
                             ),
                             child: Text(
                               _getStatusText(status),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
+                              style: TextStyle(
+                                color: status == 'delivered' 
+                                    ? Colors.green.shade700 
+                                    : AppColors.primary,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
                           ),
@@ -1079,146 +1099,199 @@ class _ExpressLivreurState extends State<ExpressLivreur> with SingleTickerProvid
                     
                     // Contenu de la commande
                     Padding(
-                      padding: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.all(12),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           // Client
                           Row(
                             children: [
-                              Icon(Icons.person, color: Colors.grey[600], size: 16),
+                              Icon(Icons.person_outline, color: Colors.grey.shade600, size: 14),
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      'Client: $clientName',
+                                      clientName,
                                       style: const TextStyle(
-                                        fontWeight: FontWeight.w500,
-                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 13,
+                                        color: Colors.black87,
                                       ),
                                     ),
                                     if (clientPhone.isNotEmpty)
                                       Text(
-                                        'Tél: $clientPhone',
+                                        clientPhone,
                                         style: TextStyle(
-                                          color: Colors.grey[600],
-                                          fontSize: 12,
+                                          color: Colors.grey.shade600,
+                                          fontSize: 11,
                                         ),
                                       ),
                                   ],
                                 ),
                               ),
                               if (clientPhone.isNotEmpty)
-                                Container(
-                                  decoration: BoxDecoration(
-                                    color: Colors.green,
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: IconButton(
-                                    icon: const Icon(Icons.phone, color: Colors.white, size: 18),
-                                    onPressed: () => _showCallOptionsDialog(clientPhone, clientName),
-                                    padding: const EdgeInsets.all(8),
-                                    constraints: const BoxConstraints(
-                                      minWidth: 36,
-                                      minHeight: 36,
+                                OutlinedButton(
+                                  onPressed: () => _showCallOptionsDialog(clientPhone, clientName),
+                                  style: OutlinedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                    minimumSize: const Size(0, 32),
+                                    side: BorderSide(color: AppColors.primary.withOpacity(0.5)),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(6),
                                     ),
                                   ),
+                                  child: Icon(
+                                    Icons.phone_outlined,
+                                    color: AppColors.primary,
+                                    size: 14,
+                                  ),
                                 ),
                             ],
                           ),
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 10),
                           
                           // Valeur du colis
-                          Row(
-                            children: [
-                              Icon(Icons.attach_money, color: Colors.grey[600], size: 16),
-                              const SizedBox(width: 8),
-                              Text(
-                                'Valeur: $packageValue FC',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w500,
-                                  fontSize: 14,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          
-                          // Description du colis
-                          if (packageDescription.isNotEmpty) ...[
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade50,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(Icons.description, color: Colors.grey[600], size: 16),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    'Description: $packageDescription',
-                                    style: const TextStyle(fontSize: 14),
+                                Icon(Icons.attach_money, color: Colors.grey.shade600, size: 12),
+                                const SizedBox(width: 4),
+                                Text(
+                                  '$packageValue FC',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 12,
+                                    color: AppColors.primary,
                                   ),
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 12),
+                          ),
+                          if (packageDescription.isNotEmpty) ...[
+                            const SizedBox(height: 10),
+                            // Description du colis
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Colors.grey.shade50,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Icon(Icons.description_outlined, color: Colors.grey.shade600, size: 12),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: Text(
+                                      packageDescription,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.grey.shade700,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ],
+                          
+                          const SizedBox(height: 10),
                           
                           // Adresses
                           if (pickupAddress.isNotEmpty && pickupAddress != 'Non spécifié') ...[
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Icon(Icons.location_on, color: Colors.grey[600], size: 16),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'Ramassage:',
-                                        style: TextStyle(
-                                          color: Colors.grey[600],
-                                          fontSize: 12,
-                                        ),
-                                      ),
-                                      Text(
-                                        pickupAddress,
-                                        style: const TextStyle(fontSize: 14),
-                                      ),
-                                    ],
-                                  ),
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Colors.blue.shade50,
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(
+                                  color: Colors.blue.shade100,
+                                  width: 0.5,
                                 ),
-                              ],
+                              ),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Icon(Icons.location_on_outlined, color: Colors.blue.shade700, size: 14),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'Ramassage',
+                                          style: TextStyle(
+                                            color: Colors.blue.shade700,
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          pickupAddress,
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: Colors.grey.shade700,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                             const SizedBox(height: 8),
                           ],
                           
                           if (deliveryAddress.isNotEmpty && deliveryAddress != 'Non spécifié') ...[
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Icon(Icons.location_on, color: Colors.grey[600], size: 16),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'Livraison:',
-                                        style: TextStyle(
-                                          color: Colors.grey[600],
-                                          fontSize: 12,
-                                        ),
-                                      ),
-                                      Text(
-                                        deliveryAddress,
-                                        style: const TextStyle(fontSize: 14),
-                                      ),
-                                    ],
-                                  ),
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Colors.green.shade50,
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(
+                                  color: Colors.green.shade100,
+                                  width: 0.5,
                                 ),
-                              ],
+                              ),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Icon(Icons.location_on_outlined, color: Colors.green.shade700, size: 14),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'Livraison',
+                                          style: TextStyle(
+                                            color: Colors.green.shade700,
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          deliveryAddress,
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: Colors.grey.shade700,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ],
                         ],
@@ -1229,25 +1302,37 @@ class _ExpressLivreurState extends State<ExpressLivreur> with SingleTickerProvid
                     if (status == 'in_progress')
                       Container(
                         width: double.infinity,
-                        padding: const EdgeInsets.all(16),
+                        padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          color: Colors.grey[50],
+                          color: Colors.grey.shade50,
                           borderRadius: const BorderRadius.only(
-                            bottomLeft: Radius.circular(16),
-                            bottomRight: Radius.circular(16),
+                            bottomLeft: Radius.circular(12),
+                            bottomRight: Radius.circular(12),
+                          ),
+                          border: Border(
+                            top: BorderSide(
+                              color: Colors.grey.shade200,
+                              width: 0.5,
+                            ),
                           ),
                         ),
-                        child: ElevatedButton.icon(
+                        child: OutlinedButton.icon(
                           onPressed: () => _deliverPackage(order['id']),
-                          icon: const Icon(Icons.check_circle),
-                          label: const Text('Colis livré'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.green,
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
+                          icon: const Icon(Icons.check_circle_outline, size: 16),
+                          label: const Text(
+                            'Confirmer la livraison',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
                             ),
-                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.green.shade700,
+                            side: BorderSide(color: Colors.green.shade300),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 10),
                           ),
                         ),
                       ),

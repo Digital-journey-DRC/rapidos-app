@@ -501,23 +501,63 @@ class _NavigationExampleState extends State<NavigationExample> {
   }
 
   Future<void> _makePhoneCall(String phoneNumber) async {
-    print('Attempting to call: $phoneNumber');
-    final Uri phoneUri = Uri(scheme: 'tel', path: phoneNumber);
     try {
-      if (await canLaunchUrl(phoneUri)) {
-        await launchUrl(phoneUri);
+      // Nettoyer et formater le numéro de téléphone
+      String cleanedPhone = phoneNumber.replaceAll(RegExp(r'[^0-9+]'), '');
+      
+      // S'assurer que le numéro commence par +
+      if (!cleanedPhone.startsWith('+')) {
+        cleanedPhone = '+$cleanedPhone';
+      }
+      
+      print('📞 Attempting to call: $cleanedPhone');
+      
+      final Uri phoneUri = Uri.parse('tel:$cleanedPhone');
+      
+      // Vérifier si l'URL peut être lancée
+      bool canLaunch = await canLaunchUrl(phoneUri);
+      print('📱 canLaunchUrl result: $canLaunch');
+      
+      if (canLaunch) {
+        try {
+          await launchUrl(phoneUri, mode: LaunchMode.externalApplication);
+          print('✅ Phone call launched successfully');
+        } catch (launchError) {
+          print('❌ Error launching URL: $launchError');
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: const Text('Impossible d\'ouvrir l\'application téléphone. Vérifiez que vous êtes sur un appareil réel et non un émulateur.'),
+                backgroundColor: Colors.orange,
+                behavior: SnackBarBehavior.floating,
+                duration: const Duration(seconds: 4),
+              ),
+            );
+          }
+        }
       } else {
+        print('❌ Cannot launch phone call for: $cleanedPhone');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Impossible de lancer l\'appel')),
+            SnackBar(
+              content: const Text('Impossible d\'appeler. Sur un émulateur, cette fonctionnalité n\'est pas disponible. Testez sur un appareil réel.'),
+              backgroundColor: Colors.orange,
+              behavior: SnackBarBehavior.floating,
+              duration: const Duration(seconds: 4),
+            ),
           );
         }
       }
     } catch (e) {
-      print('Error making phone call: $e');
+      print('❌ Error making phone call: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Erreur lors de l\'appel')),
+          SnackBar(
+            content: Text('Erreur lors de l\'appel: ${e.toString()}'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 3),
+          ),
         );
       }
     }
@@ -667,13 +707,37 @@ class _NavigationExampleState extends State<NavigationExample> {
         ],
       ),
       body: _isLoading
-          ? const Center(
+          ? Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  CircularProgressIndicator(),
-                  SizedBox(height: 16),
-                  Text('Chargement des positions...'),
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.primary.withOpacity(0.2),
+                          blurRadius: 20,
+                          spreadRadius: 5,
+                        ),
+                      ],
+                    ),
+                    child: CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                      strokeWidth: 3,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Text(
+                    'Chargement des positions...',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey.shade700,
+                    ),
+                  ),
                 ],
               ),
             )
@@ -722,78 +786,156 @@ class _NavigationExampleState extends State<NavigationExample> {
                       ),
                     ),
                 
-                // Cartes d'information
-                Expanded(
-                  flex: 1,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                // Cartes d'information avec scroll
+                Container(
+                  height: MediaQuery.of(context).size.height * 0.35,
+                  child: SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: EdgeInsets.only(
+                      left: 16,
+                      right: 16,
+                      top: 8,
+                      bottom: MediaQuery.of(context).padding.bottom + 20,
+                    ),
                     child: Column(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         // Carte d'appel
-                        Card(
-                          elevation: 4,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                        Container(
+                          margin: const EdgeInsets.only(bottom: 10),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                              color: Colors.grey.shade200,
+                              width: 1,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.05),
+                                blurRadius: 10,
+                                offset: const Offset(0, 3),
+                              ),
+                            ],
                           ),
                           child: Padding(
-                            padding: const EdgeInsets.all(16),
+                            padding: const EdgeInsets.all(14),
                             child: Row(
                               children: [
                                 Container(
-                                  padding: const EdgeInsets.all(8),
+                                  padding: const EdgeInsets.all(10),
                                   decoration: BoxDecoration(
-                                    color: isLivreur
-                                        ? Colors.green.withOpacity(0.1)
-                                        : Colors.red.withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(8),
+                                    gradient: LinearGradient(
+                                      colors: isLivreur
+                                          ? [Colors.green.shade400, Colors.green.shade600]
+                                          : [Colors.red.shade400, Colors.red.shade600],
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                    ),
+                                    borderRadius: BorderRadius.circular(12),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: (isLivreur ? Colors.green : Colors.red).withOpacity(0.3),
+                                        blurRadius: 6,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
                                   ),
                                   child: Icon(
                                     isLivreur
                                         ? Icons.location_on
                                         : Icons.delivery_dining,
-                                    color: isLivreur
-                                        ? Colors.green
-                                        : Colors.red,
+                                    color: Colors.white,
+                                    size: 20,
                                   ),
                                 ),
                                 const SizedBox(width: 12),
                                 Expanded(
-                                  child: Text(
-                                    isLivreur
-                                        ? 'Position de l\'acheteur'
-                                        : 'Position du livreur',
-                                    style: const TextStyle(fontWeight: FontWeight.bold),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        isLivreur
+                                            ? 'Position de l\'acheteur'
+                                            : 'Position du livreur',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 14,
+                                          color: Colors.black87,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        isLivreur
+                                            ? 'Appeler le client'
+                                            : 'Contacter le livreur',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.grey.shade600,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
-                                const SizedBox(width: 20),
-                                Expanded(
-                                  child: GestureDetector(
-                                    onTap: () {
-                                      final phoneToCall = isLivreur
-                                          ? _acheteurPhone
-                                          : _livreurPhone;
-                                      if (phoneToCall != null && phoneToCall.isNotEmpty) {
-                                        _makePhoneCall(phoneToCall);
-                                      } else {
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          const SnackBar(
-                                            content: Text('Numéro de téléphone non disponible'),
-                                          ),
-                                        );
-                                      }
-                                    },
-                                    child: Container(
-                                      padding: const EdgeInsets.all(8),
-                                      decoration: BoxDecoration(
-                                        color: AppColors.primary,
-                                        borderRadius: BorderRadius.circular(8),
+                                const SizedBox(width: 8),
+                                Container(
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: [
+                                        AppColors.primary,
+                                        AppColors.primary.withOpacity(0.8),
+                                      ],
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                    ),
+                                    borderRadius: BorderRadius.circular(10),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: AppColors.primary.withOpacity(0.3),
+                                        blurRadius: 6,
+                                        offset: const Offset(0, 2),
                                       ),
-                                      child: const Text(
-                                        'Appeler',
-                                        textAlign: TextAlign.center,
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.bold,
+                                    ],
+                                  ),
+                                  child: Material(
+                                    color: Colors.transparent,
+                                    child: InkWell(
+                                      borderRadius: BorderRadius.circular(10),
+                                      onTap: () {
+                                        final phoneToCall = isLivreur
+                                            ? _acheteurPhone
+                                            : _livreurPhone;
+                                        if (phoneToCall != null && phoneToCall.isNotEmpty) {
+                                          _makePhoneCall(phoneToCall);
+                                        } else {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            const SnackBar(
+                                              content: Text('Numéro de téléphone non disponible'),
+                                              behavior: SnackBarBehavior.floating,
+                                            ),
+                                          );
+                                        }
+                                      },
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            const Icon(
+                                              Icons.phone,
+                                              color: Colors.white,
+                                              size: 18,
+                                            ),
+                                            const SizedBox(width: 6),
+                                            const Text(
+                                              'Appeler',
+                                              style: TextStyle(
+                                                color: Colors.white,
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 13,
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       ),
                                     ),
@@ -804,28 +946,53 @@ class _NavigationExampleState extends State<NavigationExample> {
                           ),
                         ),
                         
-                        const SizedBox(height: 8),
-                        
                         // Carte d'information sur la route
                         if (_routeDistance != null && _routeDuration != null)
-                          Card(
-                            elevation: 4,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
+                          Container(
+                            margin: const EdgeInsets.only(bottom: 10),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: Colors.grey.shade200,
+                                width: 1,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.05),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 3),
+                                ),
+                              ],
                             ),
                             child: Padding(
-                              padding: const EdgeInsets.all(16),
+                              padding: const EdgeInsets.all(14),
                               child: Row(
                                 children: [
                                   Container(
-                                    padding: const EdgeInsets.all(8),
+                                    padding: const EdgeInsets.all(10),
                                     decoration: BoxDecoration(
-                                      color: Colors.blue.withOpacity(0.1),
-                                      borderRadius: BorderRadius.circular(8),
+                                      gradient: LinearGradient(
+                                        colors: [
+                                          Colors.blue.shade400,
+                                          Colors.blue.shade600,
+                                        ],
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                      ),
+                                      borderRadius: BorderRadius.circular(12),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.blue.withOpacity(0.3),
+                                          blurRadius: 6,
+                                          offset: const Offset(0, 2),
+                                        ),
+                                      ],
                                     ),
                                     child: const Icon(
                                       Icons.route,
-                                      color: Colors.blue,
+                                      color: Colors.white,
+                                      size: 20,
                                     ),
                                   ),
                                   const SizedBox(width: 12),
@@ -835,16 +1002,49 @@ class _NavigationExampleState extends State<NavigationExample> {
                                       children: [
                                         const Text(
                                           'Informations du trajet',
-                                          style: TextStyle(fontWeight: FontWeight.bold),
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 14,
+                                            color: Colors.black87,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Row(
+                                          children: [
+                                            Icon(
+                                              Icons.straighten,
+                                              size: 14,
+                                              color: Colors.grey.shade600,
+                                            ),
+                                            const SizedBox(width: 6),
+                                            Text(
+                                              _routeDistance ?? 'N/A',
+                                              style: TextStyle(
+                                                fontSize: 13,
+                                                color: Colors.grey.shade700,
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                         const SizedBox(height: 4),
-                                        Text(
-                                          'Distance: $_routeDistance',
-                                          style: const TextStyle(fontSize: 14),
-                                        ),
-                                        Text(
-                                          'Durée estimée: $_routeDuration',
-                                          style: const TextStyle(fontSize: 14),
+                                        Row(
+                                          children: [
+                                            Icon(
+                                              Icons.access_time,
+                                              size: 14,
+                                              color: Colors.grey.shade600,
+                                            ),
+                                            const SizedBox(width: 6),
+                                            Text(
+                                              _routeDuration ?? 'N/A',
+                                              style: TextStyle(
+                                                fontSize: 13,
+                                                color: Colors.grey.shade700,
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       ],
                                     ),
@@ -854,63 +1054,135 @@ class _NavigationExampleState extends State<NavigationExample> {
                             ),
                           ),
                         
-                        if (_routeDistance != null && _routeDuration != null)
-                          const SizedBox(height: 8),
-                        
                         // Contrôles de navigation Mapbox
-                        Card(
-                          elevation: 4,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                        Container(
+                          margin: const EdgeInsets.only(bottom: 10),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                              color: Colors.grey.shade200,
+                              width: 1,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.05),
+                                blurRadius: 10,
+                                offset: const Offset(0, 3),
+                              ),
+                            ],
                           ),
                           child: Padding(
-                            padding: const EdgeInsets.all(16),
+                            padding: const EdgeInsets.all(14),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
                               children: [
-                                Text(
-                                  'Navigation',
-                                  style: Theme.of(context).textTheme.titleMedium,
+                                Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(6),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.primary.withOpacity(0.1),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Icon(
+                                        Icons.navigation,
+                                        color: AppColors.primary,
+                                        size: 18,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    const Text(
+                                      'Navigation',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 15,
+                                        color: Colors.black87,
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                                const SizedBox(height: 8),
+                                const SizedBox(height: 12),
                                 Row(
                                   children: [
                                     Expanded(
-                                      child: ElevatedButton.icon(
+                                      child: OutlinedButton.icon(
                                         onPressed: _isNavigationActive ? null : _startNavigation,
-                                        icon: const Icon(Icons.navigation, color: Colors.white),
+                                        icon: const Icon(Icons.play_arrow, size: 18),
                                         label: const Text('Démarrer'),
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: Colors.green,
-                                          foregroundColor: Colors.white,
+                                        style: OutlinedButton.styleFrom(
+                                          foregroundColor: Colors.green.shade700,
+                                          side: BorderSide(
+                                            color: Colors.green.shade700,
+                                            width: 1.5,
+                                          ),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(10),
+                                          ),
+                                          padding: const EdgeInsets.symmetric(vertical: 12),
                                         ),
                                       ),
                                     ),
-                                    const SizedBox(width: 8),
+                                    const SizedBox(width: 10),
                                     Expanded(
-                                      child: ElevatedButton.icon(
+                                      child: OutlinedButton.icon(
                                         onPressed: _isNavigationActive ? _finishNavigation : null,
-                                        icon: const Icon(Icons.stop),
+                                        icon: const Icon(Icons.stop, size: 18),
                                         label: const Text('Arrêter'),
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: Colors.red,
-                                          foregroundColor: Colors.white,
+                                        style: OutlinedButton.styleFrom(
+                                          foregroundColor: Colors.red.shade700,
+                                          side: BorderSide(
+                                            color: _isNavigationActive ? Colors.red.shade700 : Colors.grey.shade300,
+                                            width: 1.5,
+                                          ),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(10),
+                                          ),
+                                          padding: const EdgeInsets.symmetric(vertical: 12),
                                         ),
                                       ),
                                     ),
                                   ],
                                 ),
                                 if (_instruction.isNotEmpty) ...[
-                                  const SizedBox(height: 8),
+                                  const SizedBox(height: 12),
                                   Container(
-                                    padding: const EdgeInsets.all(8),
+                                    padding: const EdgeInsets.all(12),
                                     decoration: BoxDecoration(
-                                      color: Colors.blue.withOpacity(0.1),
-                                      borderRadius: BorderRadius.circular(8),
+                                      gradient: LinearGradient(
+                                        colors: [
+                                          Colors.blue.shade50,
+                                          Colors.blue.shade100.withOpacity(0.5),
+                                        ],
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                      ),
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(
+                                        color: Colors.blue.shade200,
+                                        width: 1,
+                                      ),
                                     ),
-                                    child: Text(
-                                      'Instruction: $_instruction',
-                                      style: const TextStyle(fontStyle: FontStyle.italic),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          Icons.info_outline,
+                                          color: Colors.blue.shade700,
+                                          size: 18,
+                                        ),
+                                        const SizedBox(width: 10),
+                                        Expanded(
+                                          child: Text(
+                                            _instruction,
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              color: Colors.blue.shade900,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
                                 ],
@@ -925,33 +1197,45 @@ class _NavigationExampleState extends State<NavigationExample> {
               ],
             )
           : Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.delivery_dining,
-                    size: 80,
-                    color: Colors.grey[400],
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Aucune livraison en cours',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.grey[600],
+              child: Padding(
+                padding: const EdgeInsets.all(32.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade100,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.delivery_dining_outlined,
+                        size: 64,
+                        color: Colors.grey.shade400,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Vous n\'avez pas de commande\n en cours',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey[500],
+                    const SizedBox(height: 24),
+                    Text(
+                      'Aucune livraison en cours',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey.shade700,
+                      ),
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 12),
+                    Text(
+                      'Vous n\'avez pas de commande\nen cours de livraison',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 15,
+                        color: Colors.grey.shade600,
+                        height: 1.5,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
     );
