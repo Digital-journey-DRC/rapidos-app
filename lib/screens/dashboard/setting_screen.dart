@@ -22,6 +22,7 @@ import '../../widgets/merchant_section_card.dart';
 import '../product/merchant_promo_products_screen.dart';
 import '../home/voir_plus_produits.dart';
 import '../merchant/merchant_service_hours_screen.dart';
+import '../merchant/payment_methods_screen.dart';
 import '../../cubit/product_cubit.dart';
 import '../../services/promotion_service.dart';
 import '../../models/promotion.dart';
@@ -1604,6 +1605,20 @@ class _SettingScreenState extends State<SettingScreen>
                         context,
                         MaterialPageRoute(
                           builder: (context) => const MerchantServiceHoursScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                  MerchantSectionCard(
+                    title: 'Moyens de paiement',
+                    subtitle: 'Configurer vos moyens de paiement acceptés',
+                    icon: Icons.payment,
+                    iconColor: Colors.green,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const PaymentMethodsScreen(),
                         ),
                       );
                     },
