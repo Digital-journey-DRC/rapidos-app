@@ -23,6 +23,7 @@ import '../product/merchant_promo_products_screen.dart';
 import '../home/voir_plus_produits.dart';
 import '../merchant/merchant_service_hours_screen.dart';
 import '../merchant/payment_methods_screen.dart';
+import '../merchant/location_screen.dart';
 import '../../cubit/product_cubit.dart';
 import '../../services/promotion_service.dart';
 import '../../models/promotion.dart';
@@ -785,11 +786,11 @@ class _SettingScreenState extends State<SettingScreen>
               onTap: () {
                 Navigator.pop(context);
               },
-              child: const Icon(Icons.arrow_back_ios, color: Colors.white)),
+              child: Icon(Icons.arrow_back_ios, color: Colors.grey.shade800)),
           title: 'Paramètres du compte',
-          backgroundColor: AppColors.buttonColor,
+          backgroundColor: Colors.white,
           elevation: 0,
-          useWhiteLogo: true,
+          useWhiteLogo: false,
         ),
         body: BlocConsumer<ProfileCubit, ProfileState>(
           listener: (context, state) {
@@ -893,122 +894,153 @@ class _SettingScreenState extends State<SettingScreen>
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            AppColors.buttonColor,
-            AppColors.buttonColor.withOpacity(0.9),
+            AppColors.primary.withOpacity(0.15),
+            AppColors.primary.withOpacity(0.08),
+            Colors.white,
           ],
+          stops: const [0.0, 0.5, 1.0],
         ),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.buttonColor.withOpacity(0.3),
-            blurRadius: 15,
-            offset: const Offset(0, 5),
-          ),
-        ],
       ),
       child: Column(
         children: [
-          const SizedBox(height: 24),
-          Stack(
-            alignment: Alignment.bottomRight,
-            children: [
-              Container(
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.2),
-                      blurRadius: 20,
-                      offset: const Offset(0, 8),
-                    ),
-                  ],
+          const SizedBox(height: 40),
+          // Photo de profil avec design distinct
+          Container(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  AppColors.primary.withOpacity(0.2),
+                  AppColors.primary.withOpacity(0.1),
+                ],
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.primary.withOpacity(0.2),
+                  blurRadius: 25,
+                  offset: const Offset(0, 8),
+                  spreadRadius: 2,
                 ),
-                child: CircleAvatar(
-                  radius: 55,
+              ],
+            ),
+            padding: const EdgeInsets.all(5),
+            child: Stack(
+              alignment: Alignment.bottomRight,
+              children: [
+                CircleAvatar(
+                  radius: 65,
                   backgroundColor: Colors.white,
                   child: CircleAvatar(
-                    radius: 52,
-                    backgroundColor: Colors.white,
-                    child: CircleAvatar(
-                      radius: 50,
-                      backgroundColor: Colors.grey.shade100,
-                      backgroundImage: _selectedImage != null
-                          ? FileImage(_selectedImage!) as ImageProvider
-                          : (profileImage.isNotEmpty
-                              ? NetworkImage(profileImage)
-                              : null),
-                      child: _selectedImage == null && profileImage.isEmpty
-                          ? Icon(
-                              Icons.person,
-                              size: 50,
-                              color: AppColors.buttonColor.withOpacity(0.5),
-                            )
-                          : null,
-                    ),
+                    radius: 62,
+                    backgroundColor: Colors.grey.shade100,
+                    backgroundImage: _selectedImage != null
+                        ? FileImage(_selectedImage!) as ImageProvider
+                        : (profileImage.isNotEmpty
+                            ? NetworkImage(profileImage)
+                            : null),
+                    child: _selectedImage == null && profileImage.isEmpty
+                        ? Icon(
+                            Icons.person,
+                            size: 65,
+                            color: AppColors.primary.withOpacity(0.3),
+                          )
+                        : null,
                   ),
                 ),
-              ),
-              GestureDetector(
-                onTap: () {
-                  // print('🖼️ [PROFILE PHOTO] Clic sur le bouton de modification de photo');
-                  // print('🖼️ [PROFILE PHOTO] Appel de _showImageSourceDialog()');
-                  _showImageSourceDialog();
-                },
-                child: Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: AppColors.buttonColor, width: 2.5),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.15),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
+                // Bouton d'édition avec design distinct
+                GestureDetector(
+                  onTap: () {
+                    _showImageSourceDialog();
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          AppColors.primary,
+                          AppColors.primary.withOpacity(0.8),
+                        ],
                       ),
-                    ],
-                  ),
-                  child: Icon(
-                    Icons.edit,
-                    color: AppColors.buttonColor,
-                    size: 18,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Text(
-            fullName,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 0.3,
-            ),
-          ),
-          if (isProprietaire) ...[
-            const SizedBox(height: 6),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.email_outlined,
-                  size: 14,
-                  color: Colors.white.withOpacity(0.8),
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  user['email'] ?? '',
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.9),
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: Colors.white,
+                        width: 3,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.primary.withOpacity(0.4),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.camera_alt,
+                      color: Colors.white,
+                      size: 18,
+                    ),
                   ),
                 ),
               ],
             ),
-          ],
+          ),
           const SizedBox(height: 24),
+          // Nom avec style distinct
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.7),
+              borderRadius: BorderRadius.circular(30),
+              border: Border.all(
+                color: AppColors.primary.withOpacity(0.2),
+                width: 1,
+              ),
+            ),
+            child: Text(
+              fullName,
+              style: TextStyle(
+                color: Colors.grey.shade900,
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 0.3,
+              ),
+            ),
+          ),
+          if (isProprietaire) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.6),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: AppColors.primary.withOpacity(0.15),
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.email_outlined,
+                    size: 16,
+                    color: AppColors.primary,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    user['email'] ?? '',
+                    style: TextStyle(
+                      color: Colors.grey.shade800,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          const SizedBox(height: 32),
         ],
       ),
     );
@@ -1480,44 +1512,9 @@ class _SettingScreenState extends State<SettingScreen>
           // Bannière de fermeture pour les marchands
           // if (isVendeur) const MerchantClosedBanner(),
           
-          // Sections marchand
+          // Sections marchand - Dashboard
           if (isVendeur) ...[
-            Container(
-              width: double.infinity,
-              margin: const EdgeInsets.only(bottom: 16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(18),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.08),
-                    blurRadius: 16,
-                    offset: const Offset(0, 4),
-                    spreadRadius: 0,
-                  ),
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.04),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.start,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
-                    child: const Text(
-                      'Gestion boutique',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black87,
-                      ),
-                    ),
-                  ),
-                  BlocBuilder<ProductCubit, ProductState>(
+            BlocBuilder<ProductCubit, ProductState>(
                     builder: (context, productState) {
                       // Mettre à jour le compteur si les produits sont chargés
                       if (productState is ProductLoaded) {
@@ -1532,189 +1529,248 @@ class _SettingScreenState extends State<SettingScreen>
                         });
                       }
                       
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        child: MerchantSectionCard(
-                          title: 'Tous les produits',
-                          subtitle: 'Voir et gérer tous vos produits',
-                          icon: Icons.inventory_2_outlined,
-                          iconColor: AppColors.primary,
-                          count: _isLoadingCounts ? null : _allProductsCount,
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const VoirPlusProduitsScreen(),
-                              ),
-                            ).then((_) {
-                              // Rafraîchir les compteurs après retour
-                              _loadMerchantCounts();
-                            });
-                          },
-                        ),
-                      );
-                    },
-                  ),
-                  FutureBuilder<Map<String, dynamic>>(
-                    future: PromotionService().getPromotions(),
-                    builder: (context, snapshot) {
-                      if (snapshot.hasData && snapshot.data!['success'] == true) {
-                        final promotions = snapshot.data!['promotions'] as List<Promotion>;
-                        final activePromos = promotions.where((p) => p.isActive).length;
-                        if (mounted && _promoProductsCount != activePromos) {
-                          WidgetsBinding.instance.addPostFrameCallback((_) {
-                            if (mounted) {
-                              setState(() {
-                                _promoProductsCount = activePromos;
+                      return _buildDashboardSection(
+                        'Produits',
+                        [
+                          MerchantSectionCard(
+                            title: 'Tous les produits',
+                            subtitle: 'Voir et gérer tous vos produits',
+                            icon: Icons.inventory_2_outlined,
+                            iconColor: AppColors.primary,
+                            count: _isLoadingCounts ? null : _allProductsCount,
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => const VoirPlusProduitsScreen(),
+                                ),
+                              ).then((_) {
+                                _loadMerchantCounts();
                               });
-                            }
-                          });
-                        }
-                      }
-                      
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        child: MerchantSectionCard(
-                          title: 'Produits en promotions',
-                          subtitle: 'Gérer vos produits en promotion',
-                          icon: Icons.local_offer_outlined,
-                          iconColor: Colors.red,
-                          count: _isLoadingCounts ? null : _promoProductsCount,
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const MerchantPromoProductsScreen(),
-                              ),
-                            ).then((_) {
-                              // Rafraîchir les compteurs après retour
-                              _loadMerchantCounts();
-                            });
-                          },
-                        ),
+                            },
+                          ),
+                          FutureBuilder<Map<String, dynamic>>(
+                            future: PromotionService().getPromotions(),
+                            builder: (context, snapshot) {
+                              if (snapshot.hasData && snapshot.data!['success'] == true) {
+                                final promotions = snapshot.data!['promotions'] as List<Promotion>;
+                                final activePromos = promotions.where((p) => p.isActive).length;
+                                if (mounted && _promoProductsCount != activePromos) {
+                                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                                    if (mounted) {
+                                      setState(() {
+                                        _promoProductsCount = activePromos;
+                                      });
+                                    }
+                                  });
+                                }
+                              }
+                              
+                              return MerchantSectionCard(
+                                title: 'Produits en promotions',
+                                subtitle: 'Gérer vos produits en promotion',
+                                icon: Icons.local_offer_outlined,
+                                iconColor: Colors.red,
+                                count: _isLoadingCounts ? null : _promoProductsCount,
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => const MerchantPromoProductsScreen(),
+                                    ),
+                                  ).then((_) {
+                                    _loadMerchantCounts();
+                                  });
+                                },
+                              );
+                            },
+                          ),
+                        ],
                       );
                     },
                   ),
-                  MerchantSectionCard(
-                    title: 'Configurer heures de service',
-                    subtitle: 'Définir vos heures d\'ouverture',
-                    icon: Icons.access_time,
-                    iconColor: Colors.blue,
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const MerchantServiceHoursScreen(),
-                        ),
-                      );
-                    },
+                  const SizedBox(height: 24),
+                  _buildDashboardSection(
+                    'Configuration',
+                    [
+                      MerchantSectionCard(
+                        title: 'Heures de service',
+                        subtitle: 'Définir vos heures d\'ouverture',
+                        icon: Icons.access_time,
+                        iconColor: Colors.blue,
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const MerchantServiceHoursScreen(),
+                            ),
+                          );
+                        },
+                      ),
+                      MerchantSectionCard(
+                        title: 'Moyens de paiement',
+                        subtitle: 'Configurer vos moyens de paiement',
+                        icon: Icons.payment,
+                        iconColor: Colors.green,
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const PaymentMethodsScreen(),
+                            ),
+                          );
+                        },
+                      ),
+                      MerchantSectionCard(
+                        title: 'Localisation',
+                        subtitle: 'Configurer votre position',
+                        icon: Icons.location_on,
+                        iconColor: Colors.orange,
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const LocationScreen(),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
                   ),
-                  MerchantSectionCard(
-                    title: 'Moyens de paiement',
-                    subtitle: 'Configurer vos moyens de paiement acceptés',
-                    icon: Icons.payment,
-                    iconColor: Colors.green,
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const PaymentMethodsScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                ],
+            ],
+          const SizedBox(height: 24),
+          _buildDashboardSection(
+            'Profil',
+            [
+              MerchantSectionCard(
+                title: 'Informations personnelles',
+                subtitle: 'Mettre à jour vos données',
+                icon: Icons.edit_outlined,
+                iconColor: AppColors.primary,
+                onTap: () {
+                  _showUpdateProfileDialog();
+                },
+              ),
+              MerchantSectionCard(
+                title: 'Numéro de téléphone',
+                subtitle: 'Changer votre numéro',
+                icon: Icons.phone_outlined,
+                iconColor: AppColors.primary,
+                onTap: () {
+                  _showUpdatePhoneDialog();
+                },
+              ),
+              MerchantSectionCard(
+                title: 'Mot de passe',
+                subtitle: 'Changer votre mot de passe',
+                icon: Icons.lock_outline,
+                iconColor: AppColors.primary,
+                onTap: () {
+                  _showChangePasswordDialog();
+                },
+              ),
+              MerchantSectionCard(
+                title: 'Adresses',
+                subtitle: 'Gérer vos adresses',
+                icon: Icons.location_on_outlined,
+                iconColor: AppColors.primary,
+                onTap: () {
+                  _showAddressesDialog();
+                },
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          _buildDashboardSection(
+            'Compte',
+            [
+              MerchantSectionCard(
+                title: 'Se déconnecter',
+                subtitle: 'Déconnexion de votre compte',
+                icon: Icons.logout,
+                iconColor: AppColors.error,
+                onTap: () {
+                  _showLogoutConfirmation();
+                },
+              ),
+              MerchantSectionCard(
+                title: 'Supprimer compte',
+                subtitle: 'Supprimer définitivement',
+                icon: Icons.delete_outline,
+                iconColor: Colors.red,
+                onTap: () {
+                  _showDeleteAccountConfirmation();
+                },
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Construit une section du dashboard avec un titre et des cartes
+  Widget _buildDashboardSection(String title, List<Widget> cards) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: Colors.grey.shade200,
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+            spreadRadius: 0,
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+            decoration: BoxDecoration(
+              border: Border(
+                bottom: BorderSide(
+                  color: Colors.grey.shade200,
+                  width: 1,
+                ),
               ),
             ),
-          ],
-          
-          // Options de profil
-          Container(
-            width: double.infinity,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(18),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.08),
-                  blurRadius: 16,
-                  offset: const Offset(0, 4),
-                  spreadRadius: 0,
-                ),
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.04),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.start,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+            child: Row(
               children: [
-                // Modifier informations personnelles
-                MerchantSectionCard(
-                  title: 'Modifier informations personnelles',
-                  subtitle: 'Mettre à jour vos données personnelles',
-                  icon: Icons.edit_outlined,
-                  iconColor: AppColors.primary,
-                  onTap: () {
-                    _showUpdateProfileDialog();
-                  },
+                Container(
+                  width: 4,
+                  height: 20,
+                  decoration: BoxDecoration(
+                    color: AppColors.primary,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
-                // Modifier numéro de téléphone
-                MerchantSectionCard(
-                  title: 'Modifier numéro de téléphone',
-                  subtitle: 'Changer votre numéro de téléphone',
-                  icon: Icons.phone_outlined,
-                  iconColor: AppColors.primary,
-                  onTap: () {
-                    _showUpdatePhoneDialog();
-                  },
-                ),
-                // Modifier mot de passe
-                MerchantSectionCard(
-                  title: 'Modifier mot de passe',
-                  subtitle: 'Changer votre mot de passe de sécurité',
-                  icon: Icons.lock_outline,
-                  iconColor: AppColors.primary,
-                  onTap: () {
-                    _showChangePasswordDialog();
-                  },
-                ),
-                // Modifier vos adresses
-                MerchantSectionCard(
-                  title: 'Modifier vos adresses',
-                  subtitle: 'Gérer vos adresses de livraison',
-                  icon: Icons.location_on_outlined,
-                  iconColor: AppColors.primary,
-                  onTap: () {
-                    _showAddressesDialog();
-                  },
-                ),
-                // Se déconnecter
-                MerchantSectionCard(
-                  title: 'Se déconnecter',
-                  subtitle: 'Déconnexion de votre compte',
-                  icon: Icons.logout,
-                  iconColor: AppColors.error,
-                  onTap: () {
-                    _showLogoutConfirmation();
-                  },
-                ),
-                // Supprimer compte
-                MerchantSectionCard(
-                  title: 'Supprimer compte',
-                  subtitle: 'Supprimer définitivement votre compte',
-                  icon: Icons.delete_outline,
-                  iconColor: Colors.red,
-                  onTap: () {
-                    _showDeleteAccountConfirmation();
-                  },
+                const SizedBox(width: 12),
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey.shade800,
+                    letterSpacing: 0.2,
+                  ),
                 ),
               ],
             ),
           ),
+          ...cards.map((card) => Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                child: card,
+              )),
+          const SizedBox(height: 12),
         ],
       ),
     );

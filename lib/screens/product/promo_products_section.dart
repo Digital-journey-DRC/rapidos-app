@@ -174,7 +174,7 @@ class PromoProductsSection extends StatelessWidget {
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return Padding(
-            padding: const EdgeInsets.symmetric(vertical: 16.0),
+            padding: const EdgeInsets.only(top: 8.0, bottom: 8.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -183,13 +183,14 @@ class PromoProductsSection extends StatelessWidget {
                   child: Text(
                     'Produits en promo',
                     style: TextStyle(
-                      fontSize: 18,
+                      fontSize: 20,
                       fontWeight: FontWeight.bold,
-                      color: Colors.black,
+                      color: Colors.black87,
+                      letterSpacing: 0.3,
                     ),
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 16),
                 SizedBox(
                   height: 180,
                   child: ListView.separated(
@@ -251,7 +252,7 @@ class PromoProductsSection extends StatelessWidget {
   /// Construit la liste avec les données statiques (fallback)
   Widget _buildPromoList(BuildContext context, List<Map<String, dynamic>> promoProducts) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 16.0),
+      padding: const EdgeInsets.only(top: 8.0, bottom: 8.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -263,9 +264,10 @@ class PromoProductsSection extends StatelessWidget {
                 child: Text(
                   'Produits en promo',
                   style: TextStyle(
-                    fontSize: 18,
+                    fontSize: 20,
                     fontWeight: FontWeight.bold,
-                    color: Colors.black,
+                    color: Colors.black87,
+                    letterSpacing: 0.3,
                   ),
                 ),
               ),
@@ -285,7 +287,7 @@ class PromoProductsSection extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
           SizedBox(
             height: 180,
             child: ListView.separated(
@@ -307,7 +309,7 @@ class PromoProductsSection extends StatelessWidget {
   /// Construit la liste avec les promotions dynamiques depuis l'API
   Widget _buildPromoListFromPromotions(BuildContext context, List<Promotion> promotions) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 16.0),
+      padding: const EdgeInsets.only(top: 8.0, bottom: 8.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -319,9 +321,10 @@ class PromoProductsSection extends StatelessWidget {
                 child: Text(
                   'Produits en promo',
                   style: TextStyle(
-                    fontSize: 18,
+                    fontSize: 20,
                     fontWeight: FontWeight.bold,
-                    color: Colors.black,
+                    color: Colors.black87,
+                    letterSpacing: 0.3,
                   ),
                 ),
               ),
@@ -341,7 +344,7 @@ class PromoProductsSection extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
           SizedBox(
             height: 180,
             child: ListView.separated(

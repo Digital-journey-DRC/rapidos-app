@@ -373,7 +373,7 @@ void saveCommande() async {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const SizedBox(
                     height: 90,
-                    child: Center(child: EcommerceLoading.simple(size: 40)),
+                    child: Center(child: EcommerceLoading.simple(size: 120)),
                   );
                 }
 
@@ -465,7 +465,7 @@ void saveCommande() async {
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(16),
                 child: _isLoading
-                    ? const Center(child: EcommerceLoading.simple(size: 50))
+                    ? const Center(child: EcommerceLoading.simple(size: 150))
                     : _currentPosition == null
                         ? Center(
                             child: Column(
@@ -1317,7 +1317,7 @@ class _SalesStatisticsWidgetState extends State<_SalesStatisticsWidget> {
                   border: Border.all(color: Colors.grey.shade200, width: 0.5),
                 ),
                 child: const Center(
-                  child: EcommerceLoading.simple(size: 50, color: AppColors.primary),
+                  child: EcommerceLoading.simple(size: 150, color: AppColors.primary),
                 ),
               )
             : _statistics == null

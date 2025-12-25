@@ -91,7 +91,7 @@ class RecommendedProductsSection extends StatelessWidget {
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return Padding(
-            padding: const EdgeInsets.symmetric(vertical: 16.0),
+            padding: const EdgeInsets.only(top: 8.0, bottom: 8.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -100,9 +100,10 @@ class RecommendedProductsSection extends StatelessWidget {
                   child: Text(
                     'Produits recommandés',
                     style: TextStyle(
-                      fontSize: 18,
+                      fontSize: 20,
                       fontWeight: FontWeight.bold,
-                      color: Colors.black,
+                      color: Colors.black87,
+                      letterSpacing: 0.3,
                     ),
                   ),
                 ),
@@ -156,7 +157,7 @@ class RecommendedProductsSection extends StatelessWidget {
   /// Construit la liste avec les données statiques (fallback)
   Widget _buildPromoList(BuildContext context, List<Map<String, dynamic>> recommendedProducts) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 16.0),
+      padding: const EdgeInsets.only(top: 8.0, bottom: 8.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -168,9 +169,10 @@ class RecommendedProductsSection extends StatelessWidget {
                 child: Text(
                   'Produits recommandés',
                   style: TextStyle(
-                    fontSize: 18,
+                    fontSize: 20,
                     fontWeight: FontWeight.bold,
-                    color: Colors.black,
+                    color: Colors.black87,
+                    letterSpacing: 0.3,
                   ),
                 ),
               ),
@@ -212,7 +214,7 @@ class RecommendedProductsSection extends StatelessWidget {
   /// Construit la liste avec les produits dynamiques depuis l'API
   Widget _buildPromoListFromProducts(BuildContext context, List<Product> products) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 16.0),
+      padding: const EdgeInsets.only(top: 8.0, bottom: 8.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -224,9 +226,10 @@ class RecommendedProductsSection extends StatelessWidget {
                 child: Text(
                   'Produits recommandés',
                   style: TextStyle(
-                    fontSize: 18,
+                    fontSize: 20,
                     fontWeight: FontWeight.bold,
-                    color: Colors.black,
+                    color: Colors.black87,
+                    letterSpacing: 0.3,
                   ),
                 ),
               ),

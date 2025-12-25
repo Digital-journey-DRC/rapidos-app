@@ -66,7 +66,7 @@ class EcommerceLoading extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final loadingSize = size ?? 80.0;
+    final loadingSize = size ?? 150.0;
     final loadingColor = color ?? AppColors.primary;
 
     // Animation Lottie inline (shopping bag/cart animation)
@@ -88,7 +88,7 @@ class EcommerceLoading extends StatelessWidget {
       // Essayer de charger depuis les assets locaux
       try {
         lottieWidget = Lottie.asset(
-          'assets/lottie/shopping_loading.json',
+          'assets/lottie/LoadingDotsBlue.json',
           width: loadingSize,
           height: loadingSize,
           fit: BoxFit.contain,
@@ -214,7 +214,7 @@ class EcommerceImageLoading extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final loadingSize = size ?? 60.0;
+    final loadingSize = size ?? 130.0;
     final loadingColor = color ?? AppColors.primary;
 
     return Center(
@@ -222,7 +222,7 @@ class EcommerceImageLoading extends StatelessWidget {
         width: loadingSize,
         height: loadingSize,
         child: Lottie.asset(
-          'assets/lottie/shopping_loading.json',
+          'assets/lottie/LoadingDotsBlue.json',
           width: loadingSize,
           height: loadingSize,
           fit: BoxFit.contain,
