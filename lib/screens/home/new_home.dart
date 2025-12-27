@@ -29,6 +29,25 @@ import 'package:immo/models/product.dart';
 import 'package:immo/services/review_service.dart';
 import 'package:immo/services/product_service.dart';
 import 'package:immo/services/event_service.dart';
+import 'package:immo/screens/product/category_products_all_screen.dart';
+
+/// Clipper personnalisé pour créer une forme asymétrique pour l'image restaurant
+class _RestaurantImageClipper extends CustomClipper<Path> {
+  @override
+  Path getClip(Size size) {
+    final path = Path();
+    path.moveTo(0, 0);
+    path.lineTo(size.width, 0);
+    path.lineTo(size.width, size.height - 15);
+    path.quadraticBezierTo(size.width * 0.7, size.height, size.width * 0.5, size.height - 10);
+    path.quadraticBezierTo(size.width * 0.3, size.height - 20, 0, size.height - 15);
+    path.close();
+    return path;
+  }
+
+  @override
+  bool shouldReclip(CustomClipper<Path> oldClipper) => false;
+}
 
 class NewHomeScreen extends StatefulWidget {
   const NewHomeScreen({Key? key}) : super(key: key);
@@ -909,6 +928,80 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
 
                   // Produits en promo section
                   const PromoProductsSection(),
+
+                  // Espacement entre sections
+                  const SizedBox(height: 24),
+
+                  // Section Restaurants & Repas
+                  BlocBuilder<FeaturedProductCubit, FeaturedProductState>(
+                    builder: (context, state) {
+                      if (state is FeaturedProductLoaded && state.products.isNotEmpty) {
+                        final allProducts = state.products;
+                        // Utiliser les 6 premiers produits pour l'affichage
+                        final displayProducts = allProducts.take(6).toList();
+                        return _buildCategorySection(
+                          title: 'Restaurants & Repas',
+                          products: displayProducts,
+                          allProducts: allProducts, // Tous les produits pour "Voir tout"
+                          cardBuilder: _buildRestaurantCard,
+                          categoryName: 'Restaurants & Repas',
+                        );
+                      }
+                      return const SizedBox.shrink();
+                    },
+                  ),
+
+                  // Espacement entre sections
+                  const SizedBox(height: 24),
+
+                  // Section Mode, Beauté & Accessoires
+                  BlocBuilder<FeaturedProductCubit, FeaturedProductState>(
+                    builder: (context, state) {
+                      if (state is FeaturedProductLoaded && state.products.isNotEmpty) {
+                        final allProducts = state.products;
+                        // Utiliser les produits suivants pour l'affichage
+                        final startIndex = allProducts.length > 6 ? 6 : 0;
+                        final endIndex = allProducts.length > 12 ? 12 : allProducts.length;
+                        if (startIndex < endIndex) {
+                          final displayProducts = allProducts.sublist(startIndex, endIndex);
+                          return _buildCategorySection(
+                            title: 'Mode, Beauté & Accessoires',
+                            products: displayProducts,
+                            allProducts: allProducts, // Tous les produits pour "Voir tout"
+                            cardBuilder: _buildFashionCard,
+                            categoryName: 'Mode, Beauté & Accessoires',
+                          );
+                        }
+                      }
+                      return const SizedBox.shrink();
+                    },
+                  ),
+
+                  // Espacement entre sections
+                  const SizedBox(height: 24),
+
+                  // Section Téléphones & Accessoires
+                  BlocBuilder<FeaturedProductCubit, FeaturedProductState>(
+                    builder: (context, state) {
+                      if (state is FeaturedProductLoaded && state.products.isNotEmpty) {
+                        final allProducts = state.products;
+                        // Utiliser les produits suivants pour l'affichage
+                        final startIndex = allProducts.length > 12 ? 12 : 0;
+                        final endIndex = allProducts.length > 18 ? 18 : allProducts.length;
+                        if (startIndex < endIndex) {
+                          final displayProducts = allProducts.sublist(startIndex, endIndex);
+                          return _buildCategorySection(
+                            title: 'Téléphones & Accessoires',
+                            products: displayProducts,
+                            allProducts: allProducts, // Tous les produits pour "Voir tout"
+                            cardBuilder: _buildPhoneCard,
+                            categoryName: 'Téléphones & Accessoires',
+                          );
+                        }
+                      }
+                      return const SizedBox.shrink();
+                    },
+                  ),
 
                   // Espacement entre sections
                   const SizedBox(height: 24),
@@ -2091,6 +2184,689 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
           },
         );
       },
+    );
+  }
+
+  /// Construit une section de catégorie avec titre, bouton "Voir tout" et liste de produits
+  Widget _buildCategorySection({
+    required String title,
+    required List<Product> products,
+    List<Product>? allProducts, // Tous les produits pour "Voir tout"
+    required Widget Function(Product, {double? width}) cardBuilder,
+    required String categoryName,
+    double? listHeight, // Hauteur personnalisée pour la liste
+  }) {
+    if (products.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    // Utiliser allProducts si fourni, sinon utiliser products
+    final productsForViewAll = allProducts ?? products;
+    
+    // Déterminer la hauteur selon la catégorie
+    final height = listHeight ?? 
+                   (categoryName == 'Restaurants & Repas' ? 220.0 : 
+                    categoryName == 'Mode, Beauté & Accessoires' ? 240.0 : 200.0);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                  letterSpacing: 0.3,
+                ),
+              ),
+              TextButton(
+                onPressed: () {
+                  // Naviguer vers l'écran "Voir tout" avec tous les produits
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => CategoryProductsAllScreen(
+                        categoryName: categoryName,
+                        products: productsForViewAll,
+                        cardBuilder: cardBuilder,
+                      ),
+                    ),
+                  );
+                },
+                child: const Text(
+                  'Voir tout',
+                  style: TextStyle(color: AppColors.primary),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            height: height,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: products.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 12),
+              itemBuilder: (context, index) {
+                return cardBuilder(products[index]);
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Carte pour Restaurants & Repas - Design organique avec forme asymétrique (LARGE)
+  Widget _buildRestaurantCard(Product product, {double? width}) {
+    final cardWidth = width ?? 180.0; // Plus large
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ProductDetailScreen(
+              description: product.description,
+              idVendeur: product.vendeurId.toString(),
+              id: product.id,
+              tag: product.category?.name ?? '',
+              category: product.category?.name ?? '',
+              stock: product.stock,
+              name: product.name,
+              price: product.price,
+              imagePath: product.getMainImage(),
+              product: product,
+            ),
+          ),
+        );
+      },
+      child: Container(
+        width: cardWidth,
+        height: 220, // Hauteur fixe
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(24), // Plus arrondi
+          border: Border.all(
+            color: Colors.grey.shade200,
+            width: 1,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.06),
+              blurRadius: 12,
+              offset: const Offset(0, 5),
+              spreadRadius: 0,
+            ),
+          ],
+        ),
+        child: Stack(
+          children: [
+            // Image avec forme asymétrique organique
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: ClipPath(
+                clipper: _RestaurantImageClipper(),
+                child: Container(
+                  height: 150, // Plus haute
+                  decoration: BoxDecoration(
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(24),
+                      topRight: Radius.circular(24),
+                    ),
+                  ),
+                  child: Stack(
+                    children: [
+                      Image.network(
+                        product.getMainImage(),
+                        height: 150,
+                        width: cardWidth,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            height: 150,
+                            width: cardWidth,
+                            color: Colors.grey.shade200,
+                            child: Icon(
+                              Icons.restaurant_menu,
+                              color: Colors.grey.shade400,
+                              size: 50,
+                            ),
+                          );
+                        },
+                      ),
+                      Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.transparent,
+                              Colors.black.withOpacity(0.2),
+                            ],
+                          ),
+                        ),
+                      ),
+                      // Badge organique arrondi
+                      Positioned(
+                        top: 10,
+                        right: 10,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withOpacity(0.6),
+                            borderRadius: BorderRadius.circular(20),
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppColors.primary.withOpacity(0.15),
+                                blurRadius: 6,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.local_fire_department,
+                                size: 14,
+                                color: Colors.white,
+                              ),
+                              const SizedBox(width: 4),
+                              const Text(
+                                'HOT',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            // Section info en bas
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: const BorderRadius.only(
+                    bottomLeft: Radius.circular(24),
+                    bottomRight: Radius.circular(24),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      product.name,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey.shade800,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withOpacity(0.6),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.attach_money,
+                                size: 11,
+                                color: Colors.white,
+                              ),
+                              const SizedBox(width: 2),
+                              Text(
+                                "${product.price} FC",
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Container(
+                          width: 28,
+                          height: 28,
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withOpacity(0.6),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.add,
+                            size: 16,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Carte pour Mode, Beauté & Accessoires - Design élégant VERTICAL ÉTROIT (HAUTE)
+  Widget _buildFashionCard(Product product, {double? width}) {
+    final cardWidth = width ?? 140.0; // Plus étroite
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ProductDetailScreen(
+              description: product.description,
+              idVendeur: product.vendeurId.toString(),
+              id: product.id,
+              tag: product.category?.name ?? '',
+              category: product.category?.name ?? '',
+              stock: product.stock,
+              name: product.name,
+              price: product.price,
+              imagePath: product.getMainImage(),
+              product: product,
+            ),
+          ),
+        );
+      },
+      child: Container(
+        width: cardWidth,
+        height: 240, // Plus haute
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(28), // Très arrondi
+          border: Border.all(
+            color: Colors.grey.shade200,
+            width: 1,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+              spreadRadius: 0,
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Image avec coins très arrondis
+            Expanded(
+              flex: 3,
+              child: Container(
+                decoration: BoxDecoration(
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(28),
+                    topRight: Radius.circular(28),
+                  ),
+                ),
+                child: ClipRRect(
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(28),
+                    topRight: Radius.circular(28),
+                  ),
+                  child: Stack(
+                    children: [
+                      Image.network(
+                        product.getMainImage(),
+                        height: double.infinity,
+                        width: cardWidth,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            height: double.infinity,
+                            width: cardWidth,
+                            color: Colors.grey.shade200,
+                            child: Icon(
+                              Icons.checkroom,
+                              color: Colors.grey.shade400,
+                              size: 40,
+                            ),
+                          );
+                        },
+                      ),
+                      // Badge losange élégant
+                      Positioned(
+                        top: 8,
+                        right: 8,
+                        child: Transform.rotate(
+                          angle: 0.785398,
+                          child: Container(
+                            width: 36,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              color: AppColors.primary.withOpacity(0.6),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Center(
+                              child: Transform.rotate(
+                                angle: -0.785398,
+                                child: Icon(
+                                  Icons.star,
+                                  size: 16,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            // Section info compacte
+            Expanded(
+              flex: 2,
+              child: Padding(
+                padding: const EdgeInsets.all(10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      product.name,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey.shade800,
+                        letterSpacing: 0.2,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: AppColors.primary.withOpacity(0.6),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.attach_money,
+                                  size: 10,
+                                  color: Colors.white,
+                                ),
+                                const SizedBox(width: 2),
+                                Flexible(
+                                  child: Text(
+                                    "${product.price} FC",
+                                    style: const TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          width: 24,
+                          height: 24,
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withOpacity(0.6),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.add,
+                            size: 14,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Carte pour Téléphones & Accessoires - Design RECTANGULAIRE MODERNE (COMPACT)
+  Widget _buildPhoneCard(Product product, {double? width}) {
+    final cardWidth = width ?? 150.0; // Compact
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ProductDetailScreen(
+              description: product.description,
+              idVendeur: product.vendeurId.toString(),
+              id: product.id,
+              tag: product.category?.name ?? '',
+              category: product.category?.name ?? '',
+              stock: product.stock,
+              name: product.name,
+              price: product.price,
+              imagePath: product.getMainImage(),
+              product: product,
+            ),
+          ),
+        );
+      },
+      child: Container(
+        width: cardWidth,
+        height: 200, // Compact
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12), // Moins arrondi - rectangulaire
+          border: Border.all(
+            color: Colors.grey.shade200,
+            width: 1,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
+              spreadRadius: 0,
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Image rectangulaire avec fond tech
+            Expanded(
+              flex: 3,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(12),
+                    topRight: Radius.circular(12),
+                  ),
+                ),
+                child: Stack(
+                  children: [
+                    // Image centrée
+                    Center(
+                      child: Container(
+                        padding: const EdgeInsets.all(10),
+                        child: Image.network(
+                          product.getMainImage(),
+                          height: 100,
+                          width: cardWidth * 0.8,
+                          fit: BoxFit.contain,
+                          errorBuilder: (context, error, stackTrace) {
+                            return Container(
+                              height: 100,
+                              width: cardWidth * 0.8,
+                              color: Colors.grey.shade200,
+                              child: Icon(
+                                Icons.smartphone,
+                                color: Colors.grey.shade400,
+                                size: 45,
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+                    // Badge rectangulaire tech
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withOpacity(0.6),
+                          borderRadius: BorderRadius.circular(6), // Rectangulaire arrondi
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.memory,
+                              size: 10,
+                              color: Colors.white,
+                            ),
+                            const SizedBox(width: 3),
+                            const Text(
+                              'TECH',
+                              style: TextStyle(
+                                fontSize: 8,
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            // Section info compacte rectangulaire
+            Expanded(
+              flex: 2,
+              child: Padding(
+                padding: const EdgeInsets.all(10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      product.name,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey.shade800,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: AppColors.primary.withOpacity(0.6),
+                              borderRadius: BorderRadius.circular(6), // Rectangulaire
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.attach_money,
+                                  size: 10,
+                                  color: Colors.white,
+                                ),
+                                const SizedBox(width: 2),
+                                Flexible(
+                                  child: Text(
+                                    "${product.price} FC",
+                                    style: const TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          width: 24,
+                          height: 24,
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withOpacity(0.6),
+                            borderRadius: BorderRadius.circular(4), // Carré arrondi
+                          ),
+                          child: Icon(
+                            Icons.add,
+                            size: 14,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

@@ -321,5 +321,59 @@ class PaymentMethodService {
       };
     }
   }
+
+  /// Récupère les moyens de paiement actifs d'un vendeur spécifique
+  /// Endpoint: GET /payment-methods/vendeur/:vendeurId
+  /// Authentification: REQUISE (Tous les utilisateurs authentifiés)
+  Future<Map<String, dynamic>> getVendeurPaymentMethodsForClient(int vendeurId) async {
+    try {
+      final token = await StorageService().getToken();
+
+      if (token == null) {
+        return {
+          'success': false,
+          'message': 'Token d\'authentification manquant',
+          'paymentMethods': [],
+        };
+      }
+
+      final response = await http.get(
+        Uri.parse('$baseUrl/payment-methods/vendeur/$vendeurId'),
+        headers: {
+          'Content-Type': 'application/json',
+          'accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          throw Exception('Timeout: La connexion au serveur a pris trop de temps');
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(response.body);
+        return {
+          'success': true,
+          'paymentMethods': responseData['paymentMethods'] ?? [],
+          'vendeur': responseData['vendeur'],
+          'message': responseData['message'] ?? 'Moyens de paiement du vendeur récupérés avec succès',
+        };
+      } else {
+        final errorData = jsonDecode(response.body);
+        return {
+          'success': false,
+          'message': errorData['message'] ?? 'Erreur lors de la récupération des moyens de paiement',
+          'paymentMethods': [],
+        };
+      }
+    } catch (e) {
+      return {
+        'success': false,
+        'message': 'Erreur de connexion: $e',
+        'paymentMethods': [],
+      };
+    }
+  }
 }
 

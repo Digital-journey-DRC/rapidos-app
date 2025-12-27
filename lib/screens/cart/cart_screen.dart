@@ -16,6 +16,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:http/http.dart' as http;
 import 'package:cached_network_image/cached_network_image.dart';
+import 'payment_method_selection_screen.dart';
 
 class CartScreen extends StatefulWidget {
   final bool backNavigaton;
@@ -49,6 +50,9 @@ class _CartScreenState extends State<CartScreen> {
 
   // Variable pour stocker les données extraites de manière persistante
   Map<String, String> _extractedAddressData = {};
+
+  // Variable pour stocker le moyen de paiement sélectionné
+  Map<String, dynamic>? _selectedPaymentMethod;
 
   // Contrôleurs pour les champs d'adresse
   final TextEditingController _villeController = TextEditingController();
@@ -327,8 +331,91 @@ class _CartScreenState extends State<CartScreen> {
     'Selembao',
   ];
 
+  void _showPaymentMethodSelection(
+      BuildContext context, List<Map<String, dynamic>> cartItems) async {
+    // Récupérer l'ID du vendeur depuis le premier item du panier
+    if (cartItems.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Votre panier est vide'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    // Récupérer l'ID du vendeur (on suppose que tous les items sont du même vendeur)
+    final firstItem = cartItems.first;
+    final vendeurId = firstItem['idVendeur'];
+    
+    if (vendeurId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Impossible de déterminer le vendeur'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    // Récupérer le nom du vendeur si disponible
+    String vendeurName = 'Vendeur';
+    if (firstItem['vendeurName'] != null) {
+      vendeurName = firstItem['vendeurName'].toString();
+    } else if (firstItem['vendeur'] != null) {
+      final vendeur = firstItem['vendeur'] as Map<String, dynamic>?;
+      if (vendeur != null) {
+        final firstName = vendeur['firstName']?.toString() ?? '';
+        final lastName = vendeur['lastName']?.toString() ?? '';
+        vendeurName = '$firstName $lastName'.trim();
+        if (vendeurName.isEmpty) {
+          vendeurName = 'Vendeur';
+        }
+      }
+    }
+
+    // Convertir vendeurId en int
+    int? vendeurIdInt;
+    if (vendeurId is int) {
+      vendeurIdInt = vendeurId;
+    } else if (vendeurId is String) {
+      vendeurIdInt = int.tryParse(vendeurId);
+    } else {
+      vendeurIdInt = int.tryParse(vendeurId.toString());
+    }
+
+    if (vendeurIdInt == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('ID du vendeur invalide'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    // Afficher l'écran de sélection des moyens de paiement
+    final selectedPaymentMethod = await Navigator.push<Map<String, dynamic>>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => PaymentMethodSelectionScreen(
+          vendeurId: vendeurIdInt!,
+          vendeurName: vendeurName,
+        ),
+      ),
+    );
+
+    // Si un moyen de paiement a été sélectionné, afficher l'écran d'adresse
+    if (selectedPaymentMethod != null && mounted) {
+      setState(() {
+        _selectedPaymentMethod = selectedPaymentMethod;
+      });
+      _showAddressBottomSheet(context, cartItems, selectedPaymentMethod);
+    }
+  }
+
   void _showAddressBottomSheet(
-      BuildContext context, List<Map<String, dynamic>> cartItems) {
+      BuildContext context, List<Map<String, dynamic>> cartItems, Map<String, dynamic> selectedPaymentMethod) {
     // Réinitialiser la sélection d'adresse
     setState(() {
       _selectedGoogleAddress = null;
@@ -712,7 +799,7 @@ class _CartScreenState extends State<CartScreen> {
                                   _selectedGoogleAddress = null;
                                 });
                                 Navigator.pop(context);
-                                _showAddressBottomSheet(context, cartItems);
+                                _showPaymentMethodSelection(context, cartItems);
                               },
                             ),
                             const Text(
@@ -2867,7 +2954,7 @@ class _CartScreenState extends State<CartScreen> {
                             height: 52,
                             child: ElevatedButton(
                               onPressed: () {
-                                _showAddressBottomSheet(context, cartItems);
+                                _showPaymentMethodSelection(context, cartItems);
                               },
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: AppColors.primary,
