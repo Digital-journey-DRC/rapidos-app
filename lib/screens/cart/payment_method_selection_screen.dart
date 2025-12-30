@@ -1,17 +1,23 @@
 import 'package:flutter/material.dart';
-import '../../constants.dart';
-import '../../widgets/app_logo.dart';
-import '../../services/payment_method_service.dart';
-import '../../widgets/ecommerce_loading.dart';
+import 'package:flutter/services.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:immo/constants.dart';
+import 'package:immo/cubit/order_cubit.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'dart:convert';
 
 class PaymentMethodSelectionScreen extends StatefulWidget {
   final int vendeurId;
-  final String vendeurName;
+  final List<Map<String, dynamic>> paymentMethods;
+  final Map<String, dynamic>? currentPaymentMethod;
+  final List<int> orderIds; // IDs des commandes à mettre à jour
 
   const PaymentMethodSelectionScreen({
     Key? key,
     required this.vendeurId,
-    required this.vendeurName,
+    required this.paymentMethods,
+    this.currentPaymentMethod,
+    required this.orderIds,
   }) : super(key: key);
 
   @override
@@ -19,533 +25,488 @@ class PaymentMethodSelectionScreen extends StatefulWidget {
 }
 
 class _PaymentMethodSelectionScreenState extends State<PaymentMethodSelectionScreen> {
-  final PaymentMethodService _paymentMethodService = PaymentMethodService();
-  List<Map<String, dynamic>> _paymentMethods = [];
-  bool _isLoading = true;
-  String? _errorMessage;
   Map<String, dynamic>? _selectedPaymentMethod;
+  final TextEditingController _numeroController = TextEditingController();
+  String? _numeroError;
+
+  // Préfixes de validation par type de moyen de paiement
+  final Map<String, List<String>> _paymentPrefixes = {
+    'orange money': ['089', '080', '087', '084'],
+    'orange': ['089', '080', '087', '084'],
+    'airtel money': ['099', '097', '098'],
+    'airtel': ['099', '097', '098'],
+    'mpesa': ['081', '082', '083'],
+    'afrimoney': ['090', '0900'],
+    'afri money': ['090', '0900'],
+  };
 
   @override
   void initState() {
     super.initState();
-    _loadPaymentMethods();
+    _selectedPaymentMethod = widget.currentPaymentMethod;
   }
 
-  Future<void> _loadPaymentMethods() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+  @override
+  void dispose() {
+    _numeroController.dispose();
+    super.dispose();
+  }
 
-    try {
-      final result = await _paymentMethodService.getVendeurPaymentMethodsForClient(widget.vendeurId);
+  bool _requiresNumero(String? paymentMethodName) {
+    if (paymentMethodName == null) return false;
+    final name = paymentMethodName.toLowerCase();
+    return name.contains('cash') == false && 
+           (name.contains('orange') || 
+            name.contains('airtel') || 
+            name.contains('mpesa') || 
+            name.contains('afrimoney') ||
+            name.contains('mobile money'));
+  }
 
-      if (result['success'] == true) {
-        setState(() {
-          _paymentMethods = List<Map<String, dynamic>>.from(result['paymentMethods'] ?? []);
-          // Sélectionner le moyen de paiement par défaut s'il existe
-          if (_paymentMethods.isNotEmpty) {
-            final defaultMethod = _paymentMethods.firstWhere(
-              (method) => method['isDefault'] == true,
-              orElse: () => _paymentMethods.first,
-            );
-            _selectedPaymentMethod = defaultMethod;
-          }
-          _isLoading = false;
-        });
-      } else {
-        setState(() {
-          _errorMessage = result['message'] ?? 'Erreur lors du chargement';
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      setState(() {
-        _errorMessage = 'Erreur: $e';
-        _isLoading = false;
-      });
+  List<String>? _getValidPrefixes(String? paymentMethodName) {
+    if (paymentMethodName == null) return null;
+    final name = paymentMethodName.toLowerCase().trim();
+    
+    print('🔍 [Prefixes] Recherche de préfixes pour: "$name"');
+    
+    // Chercher une correspondance exacte d'abord
+    if (_paymentPrefixes.containsKey(name)) {
+      print('✅ [Prefixes] Correspondance exacte trouvée: ${_paymentPrefixes[name]}');
+      return _paymentPrefixes[name];
     }
+    
+    // Chercher une correspondance partielle
+    for (var entry in _paymentPrefixes.entries) {
+      if (name.contains(entry.key) || entry.key.contains(name)) {
+        print('✅ [Prefixes] Correspondance partielle trouvée: ${entry.key} -> ${entry.value}');
+        return entry.value;
+      }
+    }
+    
+    print('❌ [Prefixes] Aucun préfixe trouvé pour: "$name"');
+    return null;
   }
 
-  String _getPaymentMethodName(String type) {
-    final names = {
-      'cash': 'Cash',
-      'mpesa': 'Mpesa',
-      'orange_money': 'Orange Money',
-      'airtel_money': 'Airtel Money',
-      'afrimoney': 'Afrimoney',
-      'visa': 'Visa',
-      'mastercard': 'Mastercard',
-    };
-    return names[type] ?? type;
+  bool _validateNumero(String numero, String? paymentMethodName) {
+    if (!_requiresNumero(paymentMethodName)) {
+      return true; // Pas de validation nécessaire pour Cash
+    }
+
+    if (numero.isEmpty) {
+      return false;
+    }
+
+    final prefixes = _getValidPrefixes(paymentMethodName);
+    if (prefixes == null) {
+      return true; // Pas de préfixe spécifique, accepter
+    }
+
+    print('🔍 [Validation] Numéro à valider: "$numero" (longueur: ${numero.length})');
+    print('🔍 [Validation] Préfixes valides: $prefixes');
+    print('🔍 [Validation] Moyen de paiement: $paymentMethodName');
+
+    // Vérifier si le numéro commence par un des préfixes valides
+    String? matchedPrefix;
+    
+    for (var prefix in prefixes) {
+      if (numero.startsWith(prefix)) {
+        matchedPrefix = prefix;
+        print('✅ [Validation] Préfixe trouvé: $prefix');
+        break;
+      }
+    }
+
+    if (matchedPrefix != null) {
+      // Le numéro commence par un préfixe valide
+      // Tous les numéros doivent avoir 10 chiffres au total
+      final totalLength = numero.length;
+      final expectedLength = 10;
+      
+      print('🔍 [Validation] Longueur: $totalLength, attendue: $expectedLength');
+      
+      if (totalLength == expectedLength) {
+        print('✅ [Validation] Numéro valide!');
+        return true;
+      } else {
+        print('❌ [Validation] Longueur incorrecte: $totalLength au lieu de $expectedLength');
+        return false;
+      }
+    }
+
+    // Le numéro ne commence pas par un préfixe valide
+    print('❌ [Validation] Le numéro ne commence pas par un préfixe valide');
+    return false;
   }
 
-  IconData _getPaymentMethodIcon(String type) {
-    final icons = {
-      'cash': Icons.money,
-      'mpesa': Icons.phone_android,
-      'orange_money': Icons.phone_android,
-      'airtel_money': Icons.phone_android,
-      'afrimoney': Icons.phone_android,
-      'visa': Icons.credit_card,
-      'mastercard': Icons.credit_card,
-    };
-    return icons[type] ?? Icons.payment;
+  String? _getValidationMessage(String? paymentMethodName) {
+    final prefixes = _getValidPrefixes(paymentMethodName);
+    if (prefixes == null) return 'Numéro invalide';
+    
+    final expectedLength = 10;
+    return 'Le numéro doit commencer par ${prefixes.join(', ')} et avoir $expectedLength chiffres au total (ex: ${prefixes.first}1234567)';
   }
 
-  void _confirmSelection() {
-    if (_selectedPaymentMethod != null) {
-      Navigator.of(context).pop(_selectedPaymentMethod);
-    } else {
+  void _onPaymentMethodSelected(Map<String, dynamic> method) {
+    setState(() {
+      _selectedPaymentMethod = method;
+      _numeroController.clear();
+      _numeroError = null;
+    });
+  }
+
+  void _validateAndSave() async {
+    print('🔘 [PaymentMethodSelection] BOUTON CONFIRMER CLIQUÉ');
+    
+    if (_selectedPaymentMethod == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Veuillez sélectionner un moyen de paiement'),
           backgroundColor: Colors.orange,
         ),
       );
+      return;
+    }
+
+    final paymentMethodName = _selectedPaymentMethod!['name']?.toString() ?? '';
+    final requiresNumero = _requiresNumero(paymentMethodName);
+    // Nettoyer le numéro : enlever les espaces et garder seulement les chiffres
+    var numero = _numeroController.text.trim().replaceAll(RegExp(r'[^\d]'), '');
+
+    if (requiresNumero) {
+      if (numero.isEmpty) {
+        setState(() {
+          _numeroError = 'Veuillez renseigner votre numéro';
+        });
+        return;
+      }
+
+      print('📱 [Validation] Numéro saisi: "$numero" (longueur: ${numero.length})');
+      print('📱 [Validation] Moyen de paiement: $paymentMethodName');
+
+      // Vérifier si le numéro est valide tel quel (l'utilisateur doit saisir le préfixe)
+      bool isValid = _validateNumero(numero, paymentMethodName);
+
+      if (!isValid) {
+        final message = _getValidationMessage(paymentMethodName);
+        setState(() {
+          _numeroError = message ?? 'Numéro invalide. Le numéro doit avoir 10 chiffres (ex: 0991234567)';
+        });
+        print('❌ [Validation] Erreur de validation: $_numeroError');
+        return;
+      }
+      
+      print('✅ [Validation] Numéro validé avec succès: $numero');
+    }
+    
+    // Préparer le body AVANT l'envoi
+    final paymentMethodId = _selectedPaymentMethod!['id'] as int;
+    final body = <String, dynamic>{
+      'paymentMethodId': paymentMethodId,
+    };
+    
+    if (requiresNumero && numero.isNotEmpty) {
+      body['numeroPayment'] = numero;
+    }
+    
+    print('');
+    print('═══════════════════════════════════════════════════════════');
+    print('📦 [PaymentMethodSelection] BODY QUI SERA ENVOYÉ:');
+    print('═══════════════════════════════════════════════════════════');
+    print('${jsonEncode(body)}');
+    print('');
+    print('Structure détaillée:');
+    print('{');
+    print('  "paymentMethodId": $paymentMethodId,');
+    if (requiresNumero && numero.isNotEmpty) {
+      print('  "numeroPayment": "$numero"');
+    }
+    print('}');
+    print('═══════════════════════════════════════════════════════════');
+    print('');
+
+    // Mettre à jour toutes les commandes
+    final orderCubit = context.read<OrderCubit>();
+    
+    print('🔄 [PaymentMethodSelection] Début de la mise à jour du moyen de paiement');
+    print('📋 [PaymentMethodSelection] Nombre de commandes à mettre à jour: ${widget.orderIds.length}');
+    print('📋 [PaymentMethodSelection] IDs des commandes: ${widget.orderIds}');
+    print('💳 [PaymentMethodSelection] Moyen de paiement sélectionné: ID=$paymentMethodId, Nom=${_selectedPaymentMethod!['name']}');
+    print('📱 [PaymentMethodSelection] Numéro de paiement: ${requiresNumero && numero.isNotEmpty ? numero : 'Non requis'}');
+    
+    // Utiliser BlocListener pour écouter les résultats
+    for (var orderId in widget.orderIds) {
+      print('🔄 [PaymentMethodSelection] Mise à jour de la commande ID: $orderId');
+      print('   - PaymentMethodId: $paymentMethodId');
+      print('   - NumeroPayment: ${requiresNumero && numero.isNotEmpty ? numero : null}');
+      print('   - Body: ${jsonEncode(body)}');
+      
+      await orderCubit.updatePaymentMethod(
+        orderId: orderId,
+        paymentMethodId: paymentMethodId,
+        numeroPayment: requiresNumero ? numero : null,
+      );
+      
+      print('✅ [PaymentMethodSelection] Commande $orderId mise à jour avec succès');
+      
+      // Attendre un peu entre chaque mise à jour
+      await Future.delayed(const Duration(milliseconds: 200));
+    }
+    
+    print('✅ [PaymentMethodSelection] Toutes les commandes ont été mises à jour');
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Moyen de paiement mis à jour avec succès'),
+          backgroundColor: AppColors.success,
+        ),
+      );
+      Navigator.pop(context, _selectedPaymentMethod);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final paymentMethodName = _selectedPaymentMethod?['name']?.toString() ?? '';
+    final requiresNumero = _requiresNumero(paymentMethodName);
+    final validPrefixes = _getValidPrefixes(paymentMethodName);
+
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
-      appBar: AppBarWithLogo(
-        title: 'Moyen de paiement',
-        backgroundColor: Colors.white,
+      appBar: AppBar(
+        title: const Text(
+          'Moyen de paiement',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        ),
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
         elevation: 0,
-        centerTitle: true,
       ),
-      body: _isLoading
-          ? const Center(
-              child: EcommerceLoading.simple(size: 150),
-            )
-          : _errorMessage != null
-              ? Center(
+      body: BlocConsumer<OrderCubit, OrderState>(
+        listener: (context, state) {
+          if (state.error != null && mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(state.error!),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        },
+        builder: (context, state) {
+          return Column(
+            children: [
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(16),
                   child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(
-                        Icons.error_outline,
-                        size: 64,
-                        color: Colors.red.shade300,
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        _errorMessage!,
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: Colors.grey.shade600,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 24),
-                      ElevatedButton.icon(
-                        onPressed: _loadPaymentMethods,
-                        icon: const Icon(Icons.refresh),
-                        label: const Text('Réessayer'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                        ),
-                      ),
-                    ],
-                  ),
-                )
-              : _paymentMethods.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.payment_outlined,
-                            size: 64,
-                            color: Colors.grey.shade400,
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            'Aucun moyen de paiement disponible',
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: Colors.grey.shade600,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Le vendeur n\'a pas configuré de moyens de paiement',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey.shade500,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                        ],
-                      ),
-                    )
-                  : Column(
-                      children: [
-                        // Info sur le vendeur - Design compact et élégant
-                        Container(
-                          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      // Liste des moyens de paiement
+                      ...widget.paymentMethods.map((method) {
+                        final isSelected = _selectedPaymentMethod != null &&
+                            method['id'] == _selectedPaymentMethod!['id'];
+
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 12),
                           decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                              colors: [
-                                AppColors.primary.withOpacity(0.06),
-                                AppColors.primary.withOpacity(0.02),
-                              ],
-                            ),
-                            borderRadius: BorderRadius.circular(16),
+                            color: isSelected ? AppColors.primary.withOpacity(0.1) : Colors.white,
+                            borderRadius: BorderRadius.circular(12),
                             border: Border.all(
-                              color: AppColors.primary.withOpacity(0.12),
-                              width: 1,
+                              color: isSelected ? AppColors.primary : Colors.grey.shade300,
+                              width: isSelected ? 2 : 1,
                             ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: AppColors.primary.withOpacity(0.06),
-                                blurRadius: 10,
-                                offset: const Offset(0, 3),
-                                spreadRadius: 0,
-                              ),
-                            ],
                           ),
-                          child: Padding(
-                            padding: const EdgeInsets.all(14),
-                            child: Row(
-                              children: [
-                                // Icône compacte
-                                Container(
-                                  padding: const EdgeInsets.all(10),
-                                  decoration: BoxDecoration(
-                                    gradient: LinearGradient(
-                                      begin: Alignment.topLeft,
-                                      end: Alignment.bottomRight,
-                                      colors: [
-                                        AppColors.primary,
-                                        AppColors.primary.withOpacity(0.85),
-                                      ],
-                                    ),
-                                    borderRadius: BorderRadius.circular(12),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: AppColors.primary.withOpacity(0.25),
-                                        blurRadius: 6,
-                                        offset: const Offset(0, 2),
-                                      ),
-                                    ],
-                                  ),
-                                  child: const Icon(
-                                    Icons.store_rounded,
-                                    color: Colors.white,
-                                    size: 20,
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                // Informations du vendeur compactes
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      // Label compact
+                          child: Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(12),
+                              onTap: () => _onPaymentMethodSelected(method),
+                              child: Padding(
+                                padding: const EdgeInsets.all(12),
+                                child: Row(
+                                  children: [
+                                    if (method['imageUrl'] != null)
+                                      ClipRRect(
+                                        borderRadius: BorderRadius.circular(8),
+                                        child: CachedNetworkImage(
+                                          imageUrl: method['imageUrl'],
+                                          width: 40,
+                                          height: 40,
+                                          fit: BoxFit.cover,
+                                        ),
+                                      )
+                                    else
                                       Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 6,
-                                          vertical: 2,
-                                        ),
+                                        width: 40,
+                                        height: 40,
                                         decoration: BoxDecoration(
-                                          color: AppColors.primary.withOpacity(0.1),
-                                          borderRadius: BorderRadius.circular(4),
+                                          color: Colors.grey.shade200,
+                                          borderRadius: BorderRadius.circular(8),
                                         ),
-                                        child: Text(
-                                          'VENDEUR',
-                                          style: TextStyle(
-                                            fontSize: 9,
-                                            fontWeight: FontWeight.bold,
-                                            color: AppColors.primary,
-                                            letterSpacing: 0.6,
-                                          ),
-                                        ),
+                                        child: const Icon(Icons.payment),
                                       ),
-                                      const SizedBox(height: 6),
-                                      // Nom du vendeur
-                                      Text(
-                                        widget.vendeurName,
-                                        style: TextStyle(
-                                          fontSize: 15,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.grey.shade900,
-                                          letterSpacing: 0.1,
-                                        ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                      // Nom du titulaire si disponible
-                                      if (_paymentMethods.isNotEmpty &&
-                                          _paymentMethods.first['nomTitulaire'] != null) ...[
-                                        const SizedBox(height: 4),
-                                        Row(
-                                          children: [
-                                            Icon(
-                                              Icons.person_outline_rounded,
-                                              size: 12,
-                                              color: Colors.grey.shade600,
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            method['name'] ?? 'Moyen de paiement',
+                                            style: TextStyle(
+                                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                              fontSize: 14,
+                                              color: isSelected ? AppColors.primary : Colors.black87,
                                             ),
-                                            const SizedBox(width: 4),
-                                            Expanded(
-                                              child: Text(
-                                                _paymentMethods.first['nomTitulaire'],
-                                                style: TextStyle(
-                                                  fontSize: 11,
-                                                  color: Colors.grey.shade700,
-                                                  fontWeight: FontWeight.w500,
-                                                ),
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
+                                          ),
+                                          if (method['numeroCompte'] != null)
+                                            Text(
+                                              method['numeroCompte'],
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                color: isSelected ? AppColors.primary : Colors.grey.shade600,
                                               ),
                                             ),
-                                          ],
-                                        ),
-                                      ],
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                // Badge de vérification compact
-                                Container(
-                                  padding: const EdgeInsets.all(6),
-                                  decoration: BoxDecoration(
-                                    color: Colors.green.shade50,
-                                    borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(
-                                      color: Colors.green.shade200,
-                                      width: 1,
+                                        ],
+                                      ),
                                     ),
-                                  ),
-                                  child: Icon(
-                                    Icons.verified_rounded,
-                                    color: Colors.green.shade600,
-                                    size: 16,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        // Liste des moyens de paiement
-                        Expanded(
-                          child: ListView.builder(
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            itemCount: _paymentMethods.length,
-                            itemBuilder: (context, index) {
-                              final paymentMethod = _paymentMethods[index];
-                              final isSelected = _selectedPaymentMethod?['id'] == paymentMethod['id'];
-                              final type = paymentMethod['type']?.toString() ?? '';
-                              final name = _getPaymentMethodName(type);
-                              final icon = _getPaymentMethodIcon(type);
-
-                              return Container(
-                                margin: const EdgeInsets.only(bottom: 12),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(
-                                    color: isSelected
-                                        ? AppColors.primary
-                                        : Colors.grey.shade200,
-                                    width: isSelected ? 2 : 1,
-                                  ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: isSelected
-                                          ? AppColors.primary.withOpacity(0.1)
-                                          : Colors.black.withOpacity(0.03),
-                                      blurRadius: 8,
-                                      offset: const Offset(0, 2),
-                                    ),
+                                    if (isSelected)
+                                      Icon(Icons.check_circle, color: AppColors.primary, size: 24),
                                   ],
                                 ),
-                                child: InkWell(
-                                  onTap: () {
-                                    setState(() {
-                                      _selectedPaymentMethod = paymentMethod;
-                                    });
-                                  },
-                                  borderRadius: BorderRadius.circular(16),
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(16),
-                                    child: Row(
-                                      children: [
-                                        // Icône du moyen de paiement
-                                        Container(
-                                          width: 50,
-                                          height: 50,
-                                          decoration: BoxDecoration(
-                                            color: isSelected
-                                                ? AppColors.primary.withOpacity(0.1)
-                                                : Colors.grey.shade50,
-                                            borderRadius: BorderRadius.circular(12),
-                                            border: Border.all(
-                                              color: isSelected
-                                                  ? AppColors.primary.withOpacity(0.3)
-                                                  : Colors.grey.shade200,
-                                            ),
-                                          ),
-                                          child: Icon(
-                                            icon,
-                                            color: isSelected
-                                                ? AppColors.primary
-                                                : Colors.grey.shade600,
-                                            size: 24,
-                                          ),
-                                        ),
-                                        const SizedBox(width: 16),
-                                        // Détails du moyen de paiement
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            children: [
-                                              Row(
-                                                children: [
-                                                  Text(
-                                                    name,
-                                                    style: TextStyle(
-                                                      fontSize: 16,
-                                                      fontWeight: FontWeight.bold,
-                                                      color: Colors.grey.shade800,
-                                                    ),
-                                                    maxLines: 1,
-                                                    overflow: TextOverflow.ellipsis,
-                                                  ),
-                                                  if (paymentMethod['isDefault'] == true) ...[
-                                                    const SizedBox(width: 8),
-                                                    Container(
-                                                      padding: const EdgeInsets.symmetric(
-                                                        horizontal: 6,
-                                                        vertical: 2,
-                                                      ),
-                                                      decoration: BoxDecoration(
-                                                        color: AppColors.primary.withOpacity(0.1),
-                                                        borderRadius: BorderRadius.circular(4),
-                                                      ),
-                                                      child: Text(
-                                                        'Défaut',
-                                                        style: TextStyle(
-                                                          fontSize: 10,
-                                                          fontWeight: FontWeight.bold,
-                                                          color: AppColors.primary,
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ],
-                                              ),
-                                              const SizedBox(height: 4),
-                                              if (paymentMethod['nomTitulaire'] != null)
-                                                Text(
-                                                  paymentMethod['nomTitulaire'],
-                                                  style: TextStyle(
-                                                    fontSize: 13,
-                                                    color: Colors.grey.shade600,
-                                                  ),
-                                                  maxLines: 1,
-                                                  overflow: TextOverflow.ellipsis,
-                                                ),
-                                              if (paymentMethod['numeroCompte'] != null) ...[
-                                                const SizedBox(height: 2),
-                                                Text(
-                                                  paymentMethod['numeroCompte'],
-                                                  style: TextStyle(
-                                                    fontSize: 12,
-                                                    color: Colors.grey.shade500,
-                                                    fontWeight: FontWeight.w500,
-                                                  ),
-                                                ),
-                                              ],
-                                            ],
-                                          ),
-                                        ),
-                                        const SizedBox(width: 12),
-                                        // Indicateur de sélection
-                                        Container(
-                                          width: 24,
-                                          height: 24,
-                                          decoration: BoxDecoration(
-                                            shape: BoxShape.circle,
-                                            border: Border.all(
-                                              color: isSelected
-                                                  ? AppColors.primary
-                                                  : Colors.grey.shade300,
-                                              width: 2,
-                                            ),
-                                            color: isSelected
-                                                ? AppColors.primary
-                                                : Colors.transparent,
-                                          ),
-                                          child: isSelected
-                                              ? const Icon(
-                                                  Icons.check,
-                                                  size: 16,
-                                                  color: Colors.white,
-                                                )
-                                              : null,
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              );
-                            },
+                              ),
+                            ),
                           ),
-                        ),
-                        // Bouton de confirmation
+                        );
+                      }).toList(),
+
+                      // Champ de saisie du numéro si nécessaire
+                      if (_selectedPaymentMethod != null && requiresNumero) ...[
+                        const SizedBox(height: 24),
                         Container(
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
-                            color: Colors.white,
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.05),
-                                blurRadius: 10,
-                                offset: const Offset(0, -2),
-                              ),
-                            ],
+                            color: Colors.grey.shade50,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.grey.shade200),
                           ),
-                          child: SafeArea(
-                            child: SizedBox(
-                              width: double.infinity,
-                              height: 52,
-                              child: ElevatedButton(
-                                onPressed: _selectedPaymentMethod != null
-                                    ? _confirmSelection
-                                    : null,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppColors.primary,
-                                  foregroundColor: Colors.white,
-                                  elevation: 2,
-                                  shadowColor: AppColors.primary.withOpacity(0.3),
-                                  shape: RoundedRectangleBorder(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              TextField(
+                                controller: _numeroController,
+                                keyboardType: TextInputType.phone,
+                                inputFormatters: [
+                                  FilteringTextInputFormatter.digitsOnly,
+                                  LengthLimitingTextInputFormatter(10), // Max 10 chiffres
+                                ],
+                                decoration: InputDecoration(
+                                  labelText: 'Numéro à débiter',
+                                  labelStyle: TextStyle(color: Colors.grey.shade600),
+                                  hintText: validPrefixes != null && validPrefixes.isNotEmpty
+                                      ? 'Ex: ${validPrefixes.first}1234567'
+                                      : 'Entrez votre numéro',
+                                  errorText: _numeroError,
+                                  prefixIcon: Icon(Icons.phone, color: AppColors.primary),
+                                  border: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide(color: Colors.grey.shade300),
                                   ),
-                                ),
-                                child: const Text(
-                                  'CONFIRMER',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 16,
-                                    letterSpacing: 0.8,
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide(color: Colors.grey.shade300),
                                   ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide(color: AppColors.primary, width: 2),
+                                  ),
+                                  errorBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide(color: Colors.red.shade300),
+                                  ),
+                                  focusedErrorBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide(color: Colors.red, width: 2),
+                                  ),
+                                  filled: true,
+                                  fillColor: Colors.grey.shade50,
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                                 ),
+                                onChanged: (value) {
+                                  if (_numeroError != null) {
+                                    setState(() {
+                                      _numeroError = null;
+                                    });
+                                  }
+                                },
                               ),
-                            ),
+                              if (validPrefixes != null && validPrefixes.isNotEmpty) ...[
+                                const SizedBox(height: 8),
+                                Text(
+                                  _getValidationMessage(paymentMethodName) ?? '',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.grey.shade600,
+                                  ),
+                                ),
+                              ],
+                            ],
                           ),
                         ),
                       ],
+                    ],
+                  ),
+                ),
+              ),
+
+              // Bouton de confirmation
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.08),
+                      blurRadius: 8,
+                      offset: const Offset(0, -2),
                     ),
+                  ],
+                ),
+                child: SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton(
+                    onPressed: state.isLoading ? null : _validateAndSave,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      elevation: 2,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: state.isLoading
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            ),
+                          )
+                        : const Text(
+                            'Confirmer commande',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                          ),
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
     );
   }
 }
-

@@ -21,8 +21,8 @@ class _MerchantAllProductsScreenState extends State<MerchantAllProductsScreen> {
   @override
   void initState() {
     super.initState();
-    // Charger les produits au démarrage
-    context.read<ProductCubit>().fetchProducts();
+    // Charger les produits du vendeur au démarrage
+    context.read<ProductCubit>().fetchVendeurProducts();
   }
 
   @override
@@ -43,7 +43,7 @@ class _MerchantAllProductsScreenState extends State<MerchantAllProductsScreen> {
           ).then((success) {
             if (success == true && mounted) {
               // Rafraîchir la liste des produits
-              context.read<ProductCubit>().fetchProducts();
+              context.read<ProductCubit>().fetchVendeurProducts();
             }
           });
         },
@@ -95,7 +95,7 @@ class _MerchantAllProductsScreenState extends State<MerchantAllProductsScreen> {
                         const SizedBox(height: 8),
                         TextButton(
                           onPressed: () {
-                            context.read<ProductCubit>().fetchProducts();
+                            context.read<ProductCubit>().fetchVendeurProducts();
                           },
                           child: const Text('Réessayer'),
                         ),
@@ -105,6 +105,12 @@ class _MerchantAllProductsScreenState extends State<MerchantAllProductsScreen> {
                 }
 
                 if (state is ProductLoaded) {
+                  // Debug: afficher le nombre de produits reçus
+                  print('📊 MerchantAllProductsScreen: ${state.products.length} produits reçus');
+                  if (state.products.isNotEmpty) {
+                    print('📊 MerchantAllProductsScreen: Premier produit: ${state.products.first.name} (vendeurId: ${state.products.first.vendeurId})');
+                  }
+                  
                   final filtered = state.products.where((p) =>
                     p.name.toLowerCase().contains(_search.toLowerCase()) ||
                     p.description.toLowerCase().contains(_search.toLowerCase()) ||
@@ -142,6 +148,17 @@ class _MerchantAllProductsScreenState extends State<MerchantAllProductsScreen> {
                               ),
                             ),
                           ],
+                          if (_search.isEmpty && state.products.isEmpty) ...[
+                            const SizedBox(height: 16),
+                            Text(
+                              'Vérifiez les logs pour plus d\'informations',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey.shade400,
+                                fontStyle: FontStyle.italic,
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     );
@@ -149,7 +166,7 @@ class _MerchantAllProductsScreenState extends State<MerchantAllProductsScreen> {
 
                   return RefreshIndicator(
                     onRefresh: () async {
-                      await context.read<ProductCubit>().fetchProducts();
+                      await context.read<ProductCubit>().fetchVendeurProducts();
                     },
                     child: ListView.builder(
                       physics: const AlwaysScrollableScrollPhysics(),

@@ -2,6 +2,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:immo/services/storage_service.dart';
+import 'package:immo/services/order_service.dart';
 import 'package:dio/dio.dart';
 
 class OrderState {
@@ -31,22 +32,94 @@ class OrderState {
 class OrderListState {
   final bool isLoading;
   final String? error;
-  final List<dynamic> commandes;
+  final List<dynamic> orders; // Renommé de commandes à orders pour la nouvelle API
+  final Map<String, dynamic> stats; // Statistiques par statut
 
-  OrderListState({this.isLoading = false, this.error, this.commandes = const []});
+  OrderListState({
+    this.isLoading = false,
+    this.error,
+    this.orders = const [],
+    this.stats = const {},
+  });
 
-  OrderListState copyWith({bool? isLoading, String? error, List<dynamic>? commandes}) {
+  OrderListState copyWith({
+    bool? isLoading,
+    String? error,
+    List<dynamic>? orders,
+    Map<String, dynamic>? stats,
+  }) {
     return OrderListState(
       isLoading: isLoading ?? this.isLoading,
       error: error ?? this.error,
-      commandes: commandes ?? this.commandes,
+      orders: orders ?? this.orders,
+      stats: stats ?? this.stats,
     );
   }
+
+  // Propriété de compatibilité pour l'ancien code
+  List<dynamic> get commandes => orders;
 }
 
 class OrderCubit extends Cubit<OrderState> {
+  final OrderService _orderService = OrderService();
+  
   OrderCubit() : super(OrderState());
 
+  /// Initialise une commande multi-vendeurs avec calcul GPS des frais de livraison
+  /// Crée automatiquement des sous-commandes séparées par vendeur
+  Future<void> initializeOrder({
+    required List<Map<String, dynamic>> products,
+    required double latitude,
+    required double longitude,
+    required Map<String, dynamic> address,
+  }) async {
+    print('🎯 [OrderCubit] initializeOrder - Début');
+    print('   Products: ${products.length}');
+    print('   Latitude: $latitude, Longitude: $longitude');
+    print('   Address: $address');
+    
+    emit(state.copyWith(isLoading: true, error: null, success: false));
+
+    try {
+      print('📞 [OrderCubit] Appel du service...');
+      final result = await _orderService.initializeOrder(
+        products: products,
+        latitude: latitude,
+        longitude: longitude,
+        address: address,
+      );
+
+      print('📥 [OrderCubit] Résultat reçu');
+      print('   Success: ${result['success']}');
+      print('   Message: ${result['message']}');
+      print('   Orders: ${result['orders']?.length ?? 0}');
+      print('   Summary: ${result['summary']}');
+
+      if (result['success'] == true) {
+        print('✅ [OrderCubit] Succès - Émission de l\'état success');
+        emit(state.copyWith(isLoading: false, success: true));
+      } else {
+        print('❌ [OrderCubit] Échec - Erreur: ${result['message']}');
+        emit(state.copyWith(
+          isLoading: false,
+          error: result['message'] ?? 'Erreur lors de l\'initialisation de la commande',
+        ));
+      }
+    } catch (e, stackTrace) {
+      print('💥 [OrderCubit] Exception capturée');
+      print('   Error: $e');
+      print('   StackTrace: $stackTrace');
+      
+      emit(state.copyWith(
+        isLoading: false,
+        error: 'Erreur lors de l\'initialisation de la commande: $e',
+      ));
+    }
+  }
+
+  /// @deprecated Utilisez initializeOrder à la place
+  /// Crée une nouvelle commande (ancienne méthode)
+  @Deprecated('Utilisez initializeOrder à la place')
   Future<void> createOrder({
     required List<Map<String, dynamic>> produits,
     required String ville,
@@ -60,51 +133,23 @@ class OrderCubit extends Cubit<OrderState> {
     emit(state.copyWith(isLoading: true, error: null, success: false));
 
     try {
-      final token = await StorageService().getToken();
-      final headers = {
-        'Content-Type': 'application/json',
-        // 'Content-type' :"application/x-www-form-urlencoded",
-        'Authorization': 'Bearer $token',
-      };
-
-      final request = http.Request(
-        'POST',
-        Uri.parse('http://24.144.87.127:3333/commandes/store'),
+      final result = await _orderService.createOrder(
+        produits: produits,
+        ville: ville,
+        commune: commune,
+        quartier: quartier,
+        avenue: avenue,
+        numero: numero.isEmpty ? 'Non spécifié' : numero,
+        pays: pays,
+        codePostale: codePostale.isEmpty ? '' : codePostale,
       );
 
-      request.body = json.encode({
-        "produits": produits,
-        "ville": ville,
-        "commune": commune,
-        "quartier": quartier,
-        "avenue": avenue,
-        "codePostale": "12345",
-        "numero": numero == "Non spécifié" ? "Pas de détail adresse" : numero,
-        "isPrincipal": true,
-        "type": "livraison",
-        "pays": pays,
-      });
-
-      request.headers.addAll(headers);
-
-      print('URL: ${request.url}');
-      print('HEADERS: ${request.headers}');
-      print('BODY: ${request.body}');
-
-      final response = await request.send();
-      final responseBody = await response.stream.bytesToString();
-
-      print('STATUS: ${response.statusCode}');
-      print('RESPONSE: $responseBody');
-
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        // Purchase events are tracked in cart_screen.dart after successful order creation
-        // to have access to AuthCubit and cartItems
+      if (result['success'] == true) {
         emit(state.copyWith(isLoading: false, success: true));
       } else {
         emit(state.copyWith(
           isLoading: false,
-          error: 'Erreur lors de la création de la commande: ${response.reasonPhrase}',
+          error: result['message'] ?? 'Erreur lors de la création de la commande',
         ));
       }
     } catch (e) {
@@ -139,7 +184,7 @@ class OrderCubit extends Cubit<OrderState> {
         "commune": commune,
         "quartier": quartier,
         "avenue": avenue,
-        "codePostale": "12345",
+        "codePostale": "012",
         "numero": numero.isEmpty ? "Pas de détail adresse" : numero,
         "isPrincipal": true,
         "type": "livraison",
@@ -173,11 +218,14 @@ class OrderCubit extends Cubit<OrderState> {
   OrderListState _orderListState = OrderListState();
   OrderListState get orderListState => _orderListState;
 
-  Future<void> fetchOrders() async {
+  /// Récupère les commandes avec filtrage optionnel par statut
+  Future<void> fetchOrders({String? status}) async {
+    print('🔄 [OrderCubit] fetchOrders - Début');
+    print('   Status filter: ${status ?? 'Aucun'}');
+    
     _orderListState = _orderListState.copyWith(isLoading: true, error: null);
     emit(state.copyWith());
     try {
-      final token = await StorageService().getToken();
       final userDataStr = await StorageService().getUserData();
       String role = 'vendeur';
       if (userDataStr != null) {
@@ -186,32 +234,247 @@ class OrderCubit extends Cubit<OrderState> {
           role = userData['role'];
         }
       }
-      final headers = {
-        'Authorization': 'Bearer $token',
-      };
-      final endpoint = role == 'acheteur'
-          ? 'http://24.144.87.127:3333/commandes/acheteur'
-          :
-          role == 'livreur'
-          ? 'http://24.144.87.127:3333/livraison/ma-liste'
-          : 'http://24.144.87.127:3333/commandes/vendeur';
-      print('ROLE: $role, ENDPOINT: $endpoint');
-      final response = await http.get(
-        Uri.parse(endpoint),
-        headers: headers,
-      );
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        print('DATA: $data');
-        print(token);
-        _orderListState = _orderListState.copyWith(isLoading: false, commandes: role == 'livreur' ? data['livraison'] : data['commandes'], error: null);
+
+      print('👤 Role détecté: $role');
+
+      // Pour les acheteurs, utiliser le nouvel endpoint ecommerce
+      if (role == 'acheteur') {
+        print('📞 [OrderCubit] Appel de getBuyerOrders...');
+        final result = await _orderService.getBuyerOrders(status: status);
+        
+        print('📥 [OrderCubit] Résultat reçu');
+        print('   Success: ${result['success']}');
+        print('   Orders count: ${(result['orders'] ?? []).length}');
+        print('   Stats: ${result['stats']}');
+        
+        if (result['success'] == true) {
+          _orderListState = _orderListState.copyWith(
+            isLoading: false,
+            orders: result['orders'] ?? [],
+            stats: result['stats'] ?? {},
+            error: null,
+          );
+          print('✅ [OrderCubit] Commandes chargées avec succès');
+        } else {
+          print('❌ [OrderCubit] Erreur: ${result['message']}');
+          _orderListState = _orderListState.copyWith(
+            isLoading: false,
+            error: result['message'] ?? 'Erreur lors de la récupération des commandes',
+          );
+        }
       } else {
-        _orderListState = _orderListState.copyWith(isLoading: false, error: response.reasonPhrase);
+        // Pour vendeur et livreur, utiliser les anciens endpoints
+        final token = await StorageService().getToken();
+        final headers = {
+          'Authorization': 'Bearer $token',
+        };
+        final endpoint = role == 'livreur'
+            ? 'http://24.144.87.127:3333/livraison/ma-liste'
+            : 'http://24.144.87.127:3333/commandes/vendeur';
+        
+        final response = await http.get(
+          Uri.parse(endpoint),
+          headers: headers,
+        ).timeout(
+          const Duration(seconds: 15),
+          onTimeout: () {
+            throw Exception('Timeout: La connexion au serveur a pris trop de temps');
+          },
+        );
+        
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body);
+          // Pour compatibilité avec l'ancien format
+          final oldFormatOrders = role == 'livreur' ? data['livraison'] : data['commandes'];
+          _orderListState = _orderListState.copyWith(
+            isLoading: false,
+            orders: oldFormatOrders is List ? oldFormatOrders : [],
+            error: null,
+          );
+        } else {
+          _orderListState = _orderListState.copyWith(
+            isLoading: false,
+            error: response.reasonPhrase ?? 'Erreur lors de la récupération des commandes',
+          );
+        }
       }
       emit(state.copyWith());
     } catch (e) {
-      _orderListState = _orderListState.copyWith(isLoading: false, error: e.toString());
+      _orderListState = _orderListState.copyWith(
+        isLoading: false,
+        error: e.toString(),
+      );
       emit(state.copyWith());
+    }
+  }
+
+  /// Met à jour le moyen de paiement pour une commande spécifique
+  Future<void> updatePaymentMethod({
+    required int orderId,
+    required int paymentMethodId,
+    String? numeroPayment,
+  }) async {
+    emit(state.copyWith(isLoading: true, error: null, success: false));
+
+    try {
+      final result = await _orderService.updatePaymentMethod(
+        orderId: orderId,
+        paymentMethodId: paymentMethodId,
+        numeroPayment: numeroPayment,
+      );
+
+      if (result['success'] == true) {
+        // Rafraîchir les commandes après la mise à jour
+        await fetchOrders();
+        emit(state.copyWith(isLoading: false, success: true));
+      } else {
+        emit(state.copyWith(
+          isLoading: false,
+          error: result['message'] ?? 'Erreur lors de la mise à jour du moyen de paiement',
+        ));
+      }
+    } catch (e) {
+      emit(state.copyWith(
+        isLoading: false,
+        error: 'Erreur lors de la mise à jour du moyen de paiement: $e',
+      ));
+    }
+  }
+
+  /// Met à jour les moyens de paiement pour plusieurs commandes en batch
+  Future<void> batchUpdatePaymentMethods({
+    required List<Map<String, dynamic>> updates,
+  }) async {
+    emit(state.copyWith(isLoading: true, error: null, success: false));
+
+    try {
+      final result = await _orderService.batchUpdatePaymentMethods(
+        updates: updates,
+      );
+
+      if (result['success'] == true) {
+        // Rafraîchir les commandes après la mise à jour
+        await fetchOrders();
+        emit(state.copyWith(isLoading: false, success: true));
+      } else {
+        emit(state.copyWith(
+          isLoading: false,
+          error: result['message'] ?? 'Erreur lors de la mise à jour des moyens de paiement',
+        ));
+      }
+    } catch (e) {
+      emit(state.copyWith(
+        isLoading: false,
+        error: 'Erreur lors de la mise à jour des moyens de paiement: $e',
+      ));
+    }
+  }
+
+  /// Récupère les commandes du vendeur
+  Future<void> fetchVendeurOrders() async {
+    emit(state.copyWith(isLoading: true, error: null));
+    _orderListState = _orderListState.copyWith(isLoading: true, error: null);
+    emit(state.copyWith());
+
+    try {
+      final result = await _orderService.getVendeurOrders();
+
+      if (result['success'] == true) {
+        _orderListState = _orderListState.copyWith(
+          isLoading: false,
+          orders: result['orders'] ?? [],
+          error: null,
+        );
+        emit(state.copyWith());
+      } else {
+        _orderListState = _orderListState.copyWith(
+          isLoading: false,
+          error: result['message'] ?? 'Erreur lors de la récupération des commandes',
+        );
+        emit(state.copyWith());
+      }
+    } catch (e) {
+      _orderListState = _orderListState.copyWith(
+        isLoading: false,
+        error: 'Erreur de connexion: $e',
+      );
+      emit(state.copyWith());
+    }
+  }
+
+  /// Met à jour le statut d'une commande
+  Future<Map<String, dynamic>> updateOrderStatus({
+    required String orderId,
+    required String status,
+    String? reason,
+  }) async {
+    emit(state.copyWith(isLoading: true, error: null, success: false));
+
+    try {
+      final result = await _orderService.updateOrderStatus(
+        orderId: orderId,
+        status: status,
+        reason: reason,
+      );
+
+      if (result['success'] == true) {
+        // Rafraîchir les commandes après la mise à jour
+        await fetchVendeurOrders();
+        emit(state.copyWith(isLoading: false, success: true));
+        return result;
+      } else {
+        emit(state.copyWith(
+          isLoading: false,
+          error: result['message'] ?? 'Erreur lors de la mise à jour du statut',
+        ));
+        return result;
+      }
+    } catch (e) {
+      emit(state.copyWith(
+        isLoading: false,
+        error: 'Erreur lors de la mise à jour du statut: $e',
+      ));
+      return {
+        'success': false,
+        'message': 'Erreur: $e',
+      };
+    }
+  }
+
+  /// Upload la photo du colis
+  Future<Map<String, dynamic>> uploadPackagePhoto({
+    required String orderId,
+    required String imagePath,
+  }) async {
+    emit(state.copyWith(isLoading: true, error: null, success: false));
+
+    try {
+      final result = await _orderService.uploadPackagePhoto(
+        orderId: orderId,
+        imagePath: imagePath,
+      );
+
+      if (result['success'] == true) {
+        // Rafraîchir les commandes après l'upload
+        await fetchVendeurOrders();
+        emit(state.copyWith(isLoading: false, success: true));
+        return result;
+      } else {
+        emit(state.copyWith(
+          isLoading: false,
+          error: result['message'] ?? 'Erreur lors de l\'upload de la photo',
+        ));
+        return result;
+      }
+    } catch (e) {
+      emit(state.copyWith(
+        isLoading: false,
+        error: 'Erreur lors de l\'upload: $e',
+      ));
+      return {
+        'success': false,
+        'message': 'Erreur: $e',
+      };
     }
   }
 } 

@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:immo/constants.dart';
 import 'package:immo/cubit/auth_cubit.dart';
+import 'package:immo/cubit/order_cubit.dart';
 import 'package:immo/widgets/shimmer_loading.dart';
 import 'package:immo/widgets/app_logo.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -16,6 +17,7 @@ import 'dart:io';
 import 'package:camera/camera.dart';
 import 'package:immo/services/invoice_service.dart';
 import 'package:immo/services/merchant_service.dart';
+import 'package:image_picker/image_picker.dart';
 
 class CameraColisScreen extends StatefulWidget {
   final Function(String imagePath) onPictureTaken;
@@ -108,7 +110,12 @@ class _CameraColisScreenState extends State<CameraColisScreen> {
 
 class OrderScreen extends StatefulWidget {
   final bool backNavigation;
-  const OrderScreen({Key? key, required this.backNavigation}) : super(key: key);
+  final String? initialStatusFilter; // Filtre de statut initial (pour afficher pending_payment après initialisation)
+  const OrderScreen({
+    Key? key,
+    required this.backNavigation,
+    this.initialStatusFilter,
+  }) : super(key: key);
 
   @override
   State<OrderScreen> createState() => _OrderScreenState();
@@ -127,6 +134,11 @@ class _OrderScreenState extends State<OrderScreen> {
   void initState() {
     super.initState();
     _initializeCameras();
+    // Si un filtre initial est fourni, l'utiliser (ex: pending_payment après initialisation)
+    if (widget.initialStatusFilter != null) {
+      _selectedStatusFilter = widget.initialStatusFilter!;
+      print('📋 [OrderScreen] Filtre initial appliqué: ${widget.initialStatusFilter}');
+    }
   }
 
   Future<void> _initializeCameras() async {
@@ -170,18 +182,25 @@ class _OrderScreenState extends State<OrderScreen> {
 
   Color _statusColor(String status) {
     switch (status.toLowerCase()) {
+      case 'pending_payment':
+        return Colors.orange;
       case 'pending':
         return AppColors.buttonColor2;
+      case 'en_preparation':
+      case 'colis en cours de préparation':
+        return Colors.orange;
+      case 'pret_a_expedier':
+      case 'prêt à expédier':
+      case 'ready_to_ship':
+        return Colors.blue;
+      case 'en_route':
+      case 'en route pour livraison':
+      case 'in_delivery':
+        return Colors.green;
       case 'delivered':
         return Colors.green;
       case 'cancelled':
         return Colors.red;
-      case 'en route pour livraison':
-        return Colors.green;
-      case 'prêt à expédier':
-        return Colors.blue;
-      case 'colis en cours de préparation':
-        return Colors.orange;
       case 'rejected':
         return Colors.red;
       default:
@@ -189,30 +208,200 @@ class _OrderScreenState extends State<OrderScreen> {
     }
   }
 
-  String _formatDate(Timestamp? timestamp) {
-    if (timestamp == null) return '';
-    final date = timestamp.toDate();
-    return DateFormat('dd/MM/yyyy').format(date);
+  String _formatDate(dynamic date) {
+    if (date == null) return 'Date non disponible';
+    
+    // Si c'est un Timestamp Firestore
+    if (date is Timestamp) {
+      return DateFormat('dd/MM/yyyy à HH:mm').format(date.toDate());
+    }
+    
+    // Si c'est une String (format ISO)
+    if (date is String) {
+      try {
+        final parsedDate = DateTime.parse(date);
+        return DateFormat('dd/MM/yyyy à HH:mm').format(parsedDate);
+      } catch (e) {
+        return date;
+      }
+    }
+    
+    // Si c'est un DateTime
+    if (date is DateTime) {
+      return DateFormat('dd/MM/yyyy à HH:mm').format(date);
+    }
+    
+    return date.toString();
+  }
+
+  /// Widget pour afficher les statistiques des commandes
+  Widget _buildStatsSection(Map<String, dynamic> stats) {
+    final total = stats['total'] ?? 0;
+    final pendingPayment = stats['pending_payment'] ?? 0;
+    final pending = stats['pending'] ?? 0;
+    final inPreparation = stats['in_preparation'] ?? 0;
+    final readyToShip = stats['ready_to_ship'] ?? 0;
+    final inDelivery = stats['in_delivery'] ?? 0;
+    final delivered = stats['delivered'] ?? 0;
+    final cancelled = stats['cancelled'] ?? 0;
+    final rejected = stats['rejected'] ?? 0;
+
+    // Print pour debug (comme dans l'exemple JavaScript)
+    print('📊 Statistiques:');
+    print('   Total: $total commandes');
+    print('   En attente de paiement: $pendingPayment');
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: Colors.grey.shade200,
+          width: 0.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 4,
+            offset: const Offset(0, 1),
+            spreadRadius: 0,
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.bar_chart, size: 20, color: AppColors.primary),
+              const SizedBox(width: 8),
+              Text(
+                'Statistiques',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey.shade800,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _buildStatItem('Total', total.toString(), AppColors.primary),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildStatItem('En attente de paiement', pendingPayment.toString(), Colors.orange),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: _buildStatItem('En attente', pending.toString(), AppColors.buttonColor2),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildStatItem('En préparation', inPreparation.toString(), Colors.orange),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: _buildStatItem('Prêt à expédier', readyToShip.toString(), Colors.blue),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildStatItem('En route', inDelivery.toString(), Colors.green),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: _buildStatItem('Livré', delivered.toString(), Colors.green),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildStatItem('Annulé/Rejeté', (cancelled + rejected).toString(), Colors.red),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatItem(String label, String value, Color color) {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: color.withOpacity(0.2),
+          width: 0.5,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 10,
+              color: Colors.grey.shade600,
+            ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
+    );
   }
 
   String _translateStatus(String status) {
     switch (status.toLowerCase()) {
+      case 'pending_payment':
+        return 'EN ATTENTE DE PAIEMENT';
       case 'pending':
         return 'EN ATTENTE';
+      case 'en_preparation':
+      case 'colis en cours de préparation':
+        return 'EN PRÉPARATION';
+      case 'pret_a_expedier':
+      case 'prêt à expédier':
+      case 'ready_to_ship':
+        return 'PRÊT À EXPÉDIER';
+      case 'en_route':
+      case 'en route pour livraison':
+      case 'in_delivery':
+        return 'EN ROUTE';
       case 'delivered':
         return 'LIVRÉ';
       case 'cancelled':
         return 'ANNULÉ';
-      case 'en route pour livraison':
-        return 'EN ROUTE';
-      case 'prêt à expédier':
-        return 'PRÊT À EXPÉDIER';
-      case 'colis en cours de préparation':
-        return 'EN PRÉPARATION';
       case 'rejected':
         return 'REJETÉ';
       default:
-        return status.toUpperCase();
+        return status.toUpperCase().replaceAll('_', ' ');
     }
   }
 
@@ -602,7 +791,9 @@ class _OrderScreenState extends State<OrderScreen> {
                 onPressed: () => Navigator.pushNamed(context, AppRoutes.main),
               )
             : null,
-        title: 'Commandes',
+        title: _selectedStatusFilter == 'pending_payment' 
+            ? 'Commandes en attente de paiement'
+            : 'Commandes',
         centerTitle: true,
         backgroundColor: Colors.white,
         elevation: 0,
@@ -807,13 +998,15 @@ class _OrderScreenState extends State<OrderScreen> {
                               children: [
                                 _buildStatusFilterChip('Tous', 'Tous'),
                                 const SizedBox(width: 8),
+                                _buildStatusFilterChip('EN ATTENTE DE PAIEMENT', 'pending_payment'),
+                                const SizedBox(width: 8),
                                 _buildStatusFilterChip('EN ATTENTE', 'pending'),
                                 const SizedBox(width: 8),
-                                _buildStatusFilterChip('EN PRÉPARATION', 'colis en cours de préparation'),
+                                _buildStatusFilterChip('EN PRÉPARATION', 'en_preparation'),
                                 const SizedBox(width: 8),
-                                _buildStatusFilterChip('PRÊT À EXPÉDIER', 'prêt à expédier'),
+                                _buildStatusFilterChip('PRÊT À EXPÉDIER', 'pret_a_expedier'),
                                 const SizedBox(width: 8),
-                                _buildStatusFilterChip('EN ROUTE', 'en route pour livraison'),
+                                _buildStatusFilterChip('EN ROUTE', 'en_route'),
                                 const SizedBox(width: 8),
                                 _buildStatusFilterChip('LIVRÉ', 'delivered'),
                                 const SizedBox(width: 8),
@@ -941,16 +1134,22 @@ class _OrderScreenState extends State<OrderScreen> {
       );
     }
 
-    final userId = authState.user!['id']?.toString() ?? '';
+    return BlocBuilder<OrderCubit, OrderState>(
+      builder: (context, state) {
+        final orderListState = context.read<OrderCubit>().orderListState;
 
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('carts')
-          .where('idClient', isEqualTo: userId)
-          .snapshots(),
-      builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          print('Erreur Firestore: ${snapshot.error}');
+        // Charger les commandes si elles ne sont pas encore chargées
+        if (!orderListState.isLoading && orderListState.orders.isEmpty && orderListState.error == null) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            context.read<OrderCubit>().fetchOrders();
+          });
+        }
+
+        if (orderListState.isLoading) {
+          return _buildLoadingShimmer();
+        }
+
+        if (orderListState.error != null) {
           return Padding(
             padding: const EdgeInsets.all(32.0),
             child: Column(
@@ -959,20 +1158,21 @@ class _OrderScreenState extends State<OrderScreen> {
                 const Icon(Icons.error_outline, size: 50, color: Colors.red),
                 const SizedBox(height: 16),
                 Text(
-                  'Erreur: ${snapshot.error}',
+                  'Erreur: ${orderListState.error}',
                   style: const TextStyle(color: Colors.red),
                   textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: () => context.read<OrderCubit>().fetchOrders(),
+                  child: const Text('Réessayer'),
                 ),
               ],
             ),
           );
         }
 
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return _buildLoadingShimmer();
-        }
-
-        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+        if (orderListState.orders.isEmpty) {
           return Padding(
             padding: const EdgeInsets.all(32.0),
             child: Column(
@@ -994,47 +1194,63 @@ class _OrderScreenState extends State<OrderScreen> {
           );
         }
 
-        // Trier et filtrer les documents côté client
-        final allDocs = snapshot.data!.docs.toList();
-        
         // Filtrer par statut
         final filteredByStatus = _selectedStatusFilter == 'Tous'
-            ? allDocs
-            : allDocs.where((doc) {
-                final data = doc.data() as Map<String, dynamic>;
-                final status = data['status']?.toString().toLowerCase() ?? '';
-                return status == _selectedStatusFilter.toLowerCase();
+            ? orderListState.orders
+            : orderListState.orders.where((order) {
+                final status = order['status']?.toString().toLowerCase() ?? '';
+                final filterStatus = _selectedStatusFilter.toLowerCase();
+                // Gérer les correspondances de statuts
+                if (filterStatus == 'pending_payment') {
+                  return status == 'pending_payment';
+                } else if (filterStatus == 'pending') {
+                  return status == 'pending';
+                } else if (filterStatus == 'en_preparation') {
+                  return status == 'en_preparation' || status == 'colis en cours de préparation';
+                } else if (filterStatus == 'pret_a_expedier') {
+                  return status == 'pret_a_expedier' || status == 'prêt à expédier' || status == 'ready_to_ship';
+                } else if (filterStatus == 'en_route') {
+                  return status == 'en_route' || status == 'en route pour livraison' || status == 'in_delivery';
+                } else if (filterStatus == 'delivered') {
+                  return status == 'delivered';
+                } else if (filterStatus == 'cancelled') {
+                  return status == 'cancelled';
+                } else if (filterStatus == 'rejected') {
+                  return status == 'rejected';
+                }
+                return status == filterStatus;
               }).toList();
-        
+
         // Filtrer par recherche
         final searchQuery = _searchController.text.toLowerCase().trim();
-        final filteredDocs = searchQuery.isEmpty
+        final filteredCommandes = searchQuery.isEmpty
             ? filteredByStatus
-            : filteredByStatus.where((doc) {
-                final data = doc.data() as Map<String, dynamic>;
-                final items = data['items'] as List? ?? [];
-                return items.any((item) {
-                  final name = item['name']?.toString().toLowerCase() ?? '';
+            : filteredByStatus.where((order) {
+                final products = order['products'] as List? ?? [];
+                return products.any((product) {
+                  final name = product['name']?.toString().toLowerCase() ?? '';
                   return name.contains(searchQuery);
                 });
               }).toList();
-        
-        // Trier par date
-        final sortedDocs = filteredDocs.toList()
+
+        // Trier par date (plus récentes en premier)
+        final sortedCommandes = List.from(filteredCommandes)
           ..sort((a, b) {
-            final aData = a.data() as Map<String, dynamic>;
-            final bData = b.data() as Map<String, dynamic>;
-            final aTimestamp = aData['timestamp'] as Timestamp?;
-            final bTimestamp = bData['timestamp'] as Timestamp?;
-
-            if (aTimestamp == null && bTimestamp == null) return 0;
-            if (aTimestamp == null) return 1;
-            if (bTimestamp == null) return -1;
-
-            return bTimestamp.compareTo(aTimestamp); // Tri décroissant
+            final aDate = a['createdAt']?.toString() ?? '';
+            final bDate = b['createdAt']?.toString() ?? '';
+            if (aDate.isEmpty && bDate.isEmpty) return 0;
+            if (aDate.isEmpty) return 1;
+            if (bDate.isEmpty) return -1;
+            try {
+              final aDateTime = DateTime.parse(aDate);
+              final bDateTime = DateTime.parse(bDate);
+              return bDateTime.compareTo(aDateTime);
+            } catch (e) {
+              return 0;
+            }
           });
 
-        if (sortedDocs.isEmpty) {
+        if (sortedCommandes.isEmpty) {
           return Padding(
             padding: const EdgeInsets.all(32.0),
             child: Column(
@@ -1056,280 +1272,295 @@ class _OrderScreenState extends State<OrderScreen> {
           );
         }
 
-        return ListView(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          children: sortedDocs.map((doc) {
-            try {
-              final data = doc.data() as Map<String, dynamic>;
+        // Récupérer les statistiques
+        final stats = orderListState.stats;
+        
+        return RefreshIndicator(
+          onRefresh: () => context.read<OrderCubit>().fetchOrders(),
+          child: ListView(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            children: [
+              // Liste des commandes
+              ...sortedCommandes.map((order) {
+              try {
+                final orderId = order['orderId']?.toString() ?? '';
+                final orderIdNum = order['id']?.toString() ?? '';
+                final status = order['status']?.toString() ?? 'pending';
+                final products = order['products'] as List? ?? [];
+                final address = order['address'] as Map<String, dynamic>? ?? {};
+                
+                // Convertir total et deliveryFee qui peuvent être String ou double
+                final totalValue = order['total'];
+                final total = totalValue is double 
+                    ? totalValue 
+                    : (totalValue is String 
+                        ? double.tryParse(totalValue) ?? 0.0 
+                        : (totalValue is int 
+                            ? totalValue.toDouble() 
+                            : 0.0));
+                
+                final deliveryFeeValue = order['deliveryFee'];
+                final deliveryFee = deliveryFeeValue is double 
+                    ? deliveryFeeValue 
+                    : (deliveryFeeValue is String 
+                        ? double.tryParse(deliveryFeeValue) ?? 0.0 
+                        : (deliveryFeeValue is int 
+                            ? deliveryFeeValue.toDouble() 
+                            : 0.0));
+                
+                final totalAvecLivraisonValue = order['totalAvecLivraison'];
+                final totalAvecLivraison = totalAvecLivraisonValue is double 
+                    ? totalAvecLivraisonValue 
+                    : (totalAvecLivraisonValue is String 
+                        ? double.tryParse(totalAvecLivraisonValue) ?? (total + deliveryFee)
+                        : (totalAvecLivraisonValue is int 
+                            ? totalAvecLivraisonValue.toDouble() 
+                            : (total + deliveryFee)));
+                final distanceKm = order['distanceKm']?.toString() ?? '';
+                final vendeur = order['vendeur'] as Map<String, dynamic>? ?? {};
+                final vendeurFirstName = vendeur['firstName']?.toString() ?? '';
+                final vendeurLastName = vendeur['lastName']?.toString() ?? '';
+                final paymentMethod = order['paymentMethod'] as Map<String, dynamic>?;
+                final paymentMethodName = paymentMethod?['name']?.toString() ?? '';
+                final paymentMethodNumero = paymentMethod?['numeroCompte']?.toString() ?? '';
+                final createdAt = order['createdAt']?.toString() ?? '';
+                
+                // Print pour debug (comme dans l'exemple JavaScript)
+                print('📦 Commande #${orderIdNum.isNotEmpty ? orderIdNum : orderId}: ${total.toStringAsFixed(0)} FC + ${deliveryFee.toStringAsFixed(0)} FC livraison');
+                print('   Vendeur: $vendeurFirstName $vendeurLastName');
+                print('   Moyen de paiement: $paymentMethodName ($paymentMethodNumero)');
 
-              // Vérification et conversion sécurisée des items
-              List<Map<String, dynamic>> items = [];
-              if (data['items'] != null) {
-                if (data['items'] is List) {
-                  items = List<Map<String, dynamic>>.from(
-                    (data['items'] as List).map((item) {
-                      if (item is Map) {
-                        return Map<String, dynamic>.from(item);
-                      }
-                      return <String, dynamic>{};
-                    }),
-                  );
+                // Formater la date
+                String formattedDate = '';
+                if (createdAt.isNotEmpty) {
+                  try {
+                    final dateTime = DateTime.parse(createdAt);
+                    formattedDate = DateFormat('dd/MM/yyyy').format(dateTime);
+                  } catch (e) {
+                    formattedDate = createdAt;
+                  }
                 }
-              }
 
-              final status = data['status']?.toString() ?? 'pending';
-              final timestamp = data['timestamp'] as Timestamp?;
-              final shortCode = data['shortCode']?.toString() ?? '';
-              
-              // Calculer le total
-              double total = 0.0;
-              for (var item in items) {
-                final price = (item['price'] ?? 0.0) is double 
-                    ? item['price'] as double 
-                    : (item['price'] ?? 0).toDouble();
-                final quantity = (item['quantity'] ?? 1) is int 
-                    ? item['quantity'] as int 
-                    : int.tryParse(item['quantity']?.toString() ?? '1') ?? 1;
-                total += price * quantity;
-              }
-
-              return Container(
-                margin: const EdgeInsets.only(bottom: 8),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: Colors.grey.shade200,
-                    width: 0.5,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.02),
-                      blurRadius: 4,
-                      offset: const Offset(0, 1),
-                      spreadRadius: 0,
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: Colors.grey.shade200,
+                      width: 1,
                     ),
-                  ],
-                ),
-                child: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(10),
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => OrderDetailsScreen(
-                            orderData: data,
-                            orderId: doc.id,
-                          ),
-                        ),
-                      );
-                    },
-                    child: Padding(
-                      padding: const EdgeInsets.all(10),
-                      child: Row(
-                        children: [
-                          // Icône de commande avec gradient
-                          Container(
-                            width: 36,
-                            height: 36,
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [
-                                  AppColors.primary,
-                                  AppColors.primary.withOpacity(0.7),
-                                ],
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              ),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: const Icon(
-                              Icons.shopping_bag_outlined,
-                              color: Colors.white,
-                              size: 18,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.04),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                        spreadRadius: 0,
+                      ),
+                    ],
+                  ),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(14),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => OrderDetailsScreen(
+                              orderData: order,
+                              orderId: orderId,
                             ),
                           ),
-                          const SizedBox(width: 10),
-                          // Informations principales
-                          Expanded(
-                            child: Column(
+                        );
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.all(14),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // En-tête avec numéro de commande et statut
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
                                         children: [
-                                          if (shortCode.isNotEmpty)
-                                            Text(
-                                              'Commande #$shortCode',
-                                              style: TextStyle(
-                                                fontSize: 11,
-                                                fontWeight: FontWeight.w600,
-                                                color: Colors.grey.shade700,
-                                              ),
-                                            )
-                                          else
-                                            Text(
-                                              'Commande #${doc.id.substring(0, 8)}',
-                                              style: TextStyle(
-                                                fontSize: 11,
-                                                fontWeight: FontWeight.w600,
-                                                color: Colors.grey.shade700,
+                                          Container(
+                                            padding: const EdgeInsets.all(6),
+                                            decoration: BoxDecoration(
+                                              color: AppColors.primary.withOpacity(0.1),
+                                              borderRadius: BorderRadius.circular(8),
+                                            ),
+                                            child: Icon(
+                                              Icons.receipt_long,
+                                              size: 14,
+                                              color: AppColors.primary,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text(
+                                              'Commande #${orderIdNum.isNotEmpty ? orderIdNum : (orderId.length > 8 ? orderId.substring(0, 8) : orderId)}',
+                                              style: const TextStyle(
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.bold,
+                                                color: Colors.black87,
                                               ),
                                             ),
-                                          const SizedBox(height: 3),
-                                          Row(
-                                            children: [
-                                              Icon(
-                                                Icons.calendar_today,
-                                                size: 10,
-                                                color: Colors.grey.shade500,
-                                              ),
-                                              const SizedBox(width: 3),
-                                              Text(
-                                                _formatDate(timestamp),
-                                                style: TextStyle(
-                                                  fontSize: 10,
-                                                  color: Colors.grey.shade600,
-                                                ),
-                                              ),
-                                            ],
                                           ),
                                         ],
                                       ),
-                                    ),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 6,
-                                        vertical: 3,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: _statusColor(status).withOpacity(0.15),
-                                        borderRadius: BorderRadius.circular(6),
-                                        border: Border.all(
-                                          color: _statusColor(status).withOpacity(0.3),
-                                          width: 0.5,
-                                        ),
-                                      ),
-                                      child: Text(
-                                        _translateStatus(status),
-                                        style: TextStyle(
-                                          color: _statusColor(status),
-                                          fontSize: 9,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 6),
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        Icon(
-                                          Icons.inventory_2_outlined,
-                                          size: 12,
-                                          color: Colors.grey.shade600,
-                                        ),
-                                        const SizedBox(width: 3),
-                                        Text(
-                                          '${items.length} ${items.length > 1 ? 'produits' : 'produit'}',
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w600,
-                                            color: Colors.grey.shade700,
+                                      const SizedBox(height: 8),
+                                      // Date
+                                      Row(
+                                        children: [
+                                          Icon(
+                                            Icons.calendar_today_outlined,
+                                            size: 12,
+                                            color: Colors.grey.shade600,
                                           ),
-                                        ),
-                                      ],
+                                          const SizedBox(width: 6),
+                                          Text(
+                                            formattedDate,
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: Colors.grey.shade700,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 6,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: _statusColor(status).withOpacity(0.15),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: _statusColor(status).withOpacity(0.3),
+                                      width: 1,
                                     ),
-                                    Text(
-                                      '$total FC',
+                                  ),
+                                  child: Text(
+                                    _translateStatus(status),
+                                    style: TextStyle(
+                                      color: _statusColor(status),
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            Divider(height: 1, color: Colors.grey.shade200),
+                            const SizedBox(height: 12),
+                            // Informations vendeur et produits
+                            Row(
+                              children: [
+                                if (vendeur.isNotEmpty) ...[
+                                  Icon(
+                                    Icons.store_outlined,
+                                    size: 14,
+                                    color: Colors.grey.shade600,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: Text(
+                                      '$vendeurFirstName $vendeurLastName'.trim(),
                                       style: TextStyle(
-                                        fontSize: 14,
+                                        fontSize: 12,
+                                        color: Colors.grey.shade700,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                ],
+                                Icon(
+                                  Icons.inventory_2_outlined,
+                                  size: 14,
+                                  color: Colors.grey.shade600,
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  '${products.length} ${products.length > 1 ? 'produits' : 'produit'}',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.grey.shade700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            // Montant total
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Total',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: Colors.grey.shade600,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      '${totalAvecLivraison.toStringAsFixed(0)} FC',
+                                      style: const TextStyle(
+                                        fontSize: 16,
                                         fontWeight: FontWeight.bold,
                                         color: AppColors.primary,
                                       ),
                                     ),
                                   ],
                                 ),
+                                Icon(
+                                  Icons.chevron_right,
+                                  size: 20,
+                                  color: Colors.grey.shade400,
+                                ),
                               ],
                             ),
-                          ),
-                          const SizedBox(width: 6),
-                          // Bouton générer facture PDF
-                          Container(
-                            padding: const EdgeInsets.all(6),
-                            decoration: BoxDecoration(
-                              color: Colors.red.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(
-                                color: Colors.red.withOpacity(0.2),
-                                width: 0.5,
-                              ),
-                            ),
-                            child: InkWell(
-                              onTap: () {
-                                _generateInvoiceForClient(
-                                  context,
-                                  data,
-                                  doc.id,
-                                  items,
-                                );
-                              },
-                              child: Icon(
-                                Icons.picture_as_pdf,
-                                size: 14,
-                                color: Colors.red.shade700,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          // Bouton voir détails
-                          Container(
-                            padding: const EdgeInsets.all(6),
-                            decoration: BoxDecoration(
-                              color: AppColors.primary.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(
-                                color: AppColors.primary.withOpacity(0.2),
-                                width: 0.5,
-                              ),
-                            ),
-                            child: Icon(
-                              Icons.arrow_forward_ios,
-                              size: 14,
-                              color: AppColors.primary,
-                            ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                ),
-              );
-            } catch (e) {
-              print('Erreur lors de l\'affichage de la commande: $e');
-              return Container(
-                padding: const EdgeInsets.all(16),
-                margin: const EdgeInsets.only(bottom: 10),
-                decoration: BoxDecoration(
-                  color: Colors.red.shade50,
-                  borderRadius: BorderRadius.circular(18),
-                ),
-                child: const Text(
-                  'Erreur lors de l\'affichage de la commande',
-                  style: TextStyle(color: Colors.red),
-                ),
-              );
-            }
-          }).toList(),
+                );
+              } catch (e) {
+                print('Erreur lors de l\'affichage de la commande: $e');
+                return Container(
+                  padding: const EdgeInsets.all(16),
+                  margin: const EdgeInsets.only(bottom: 10),
+                  decoration: BoxDecoration(
+                    color: Colors.red.shade50,
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                  child: Text(
+                    'Erreur lors de l\'affichage de la commande: $e',
+                    style: const TextStyle(color: Colors.red),
+                  ),
+                );
+              }
+            }).toList(),
+            ],
+          ),
         );
       },
     );
@@ -1825,13 +2056,40 @@ class _OrderScreenState extends State<OrderScreen> {
       );
     }
 
-    final userId = authState.user!['id']?.toString() ?? '';
+    // Charger les commandes au premier build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final orderListState = context.read<OrderCubit>().orderListState;
+      if (!orderListState.isLoading && orderListState.orders.isEmpty && orderListState.error == null) {
+        context.read<OrderCubit>().fetchVendeurOrders();
+      }
+    });
 
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance.collection('carts').snapshots(),
-      builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          print('Erreur Firestore: ${snapshot.error}');
+    return BlocConsumer<OrderCubit, OrderState>(
+      listener: (context, state) {
+        if (state.error != null && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(state.error!),
+              backgroundColor: Colors.red,
+            ),
+          );
+        } else if (state.success && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Action effectuée avec succès'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      },
+      builder: (context, state) {
+        final orderListState = context.read<OrderCubit>().orderListState;
+        
+        if (orderListState.isLoading && orderListState.orders.isEmpty) {
+          return _buildLoadingShimmer();
+        }
+
+        if (orderListState.error != null && orderListState.orders.isEmpty) {
           return Padding(
             padding: const EdgeInsets.all(32.0),
             child: Column(
@@ -1840,60 +2098,27 @@ class _OrderScreenState extends State<OrderScreen> {
                 const Icon(Icons.error_outline, size: 50, color: Colors.red),
                 const SizedBox(height: 16),
                 Text(
-                  'Erreur: ${snapshot.error}',
+                  'Erreur: ${orderListState.error}',
                   style: const TextStyle(color: Colors.red),
                   textAlign: TextAlign.center,
                 ),
-              ],
-            ),
-          );
-        }
-
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return _buildLoadingShimmer();
-        }
-
-        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return Padding(
-            padding: const EdgeInsets.all(32.0),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.inbox,
-                    size: 80, color: AppColors.buttonColor.withOpacity(0.3)),
-                const SizedBox(height: 18),
-                const Text(
-                  'Aucune commande reçue',
-                  style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.primary),
-                  textAlign: TextAlign.center,
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: () => context.read<OrderCubit>().fetchVendeurOrders(),
+                  child: const Text('Réessayer'),
                 ),
               ],
             ),
           );
         }
 
-        // Filtrer les commandes par vendeur
-        var filteredDocs = snapshot.data!.docs.where((doc) {
-          final data = doc.data() as Map<String, dynamic>;
-          if (data['items'] == null) return false;
-
-          final items = data['items'] as List;
-          return items.any((item) {
-            if (item is Map) {
-              return item['idVendeur'] == userId;
-            }
-            return false;
-          });
-        }).toList();
-
+        final orders = orderListState.orders;
+        
         // Filtrer par statut
+        var filteredOrders = List<dynamic>.from(orders);
         if (_selectedStatusFilter != 'Tous') {
-          filteredDocs = filteredDocs.where((doc) {
-            final data = doc.data() as Map<String, dynamic>;
-            final status = data['status']?.toString().toLowerCase() ?? '';
+          filteredOrders = filteredOrders.where((order) {
+            final status = order['status']?.toString().toLowerCase() ?? '';
             return status == _selectedStatusFilter.toLowerCase();
           }).toList();
         }
@@ -1901,27 +2126,24 @@ class _OrderScreenState extends State<OrderScreen> {
         // Filtrer par recherche
         final searchQuery = _searchController.text.toLowerCase().trim();
         if (searchQuery.isNotEmpty) {
-          filteredDocs = filteredDocs.where((doc) {
-            final data = doc.data() as Map<String, dynamic>;
-            final clientName = (data['client']?.toString() ?? '').toLowerCase();
-            final shortCode = (data['shortCode']?.toString() ?? '').toLowerCase();
-            final orderId = doc.id.toLowerCase();
-            final items = data['items'] as List? ?? [];
-            final productNames = items.map((item) {
-              if (item is Map) {
-                return (item['name']?.toString() ?? '').toLowerCase();
-              }
-              return '';
-            }).join(' ');
-
-            return clientName.contains(searchQuery) ||
-                shortCode.contains(searchQuery) ||
+          filteredOrders = filteredOrders.where((order) {
+            final buyer = order['buyer'] as Map<String, dynamic>? ?? {};
+            // Adapter pour la nouvelle structure : buyer peut avoir email/phone ou firstName/lastName
+            final buyerName = buyer['email']?.toString().toLowerCase() ?? 
+                             '${buyer['firstName'] ?? ''} ${buyer['lastName'] ?? ''}'.toLowerCase();
+            final buyerPhone = buyer['phone']?.toString().toLowerCase() ?? '';
+            final orderId = order['orderId']?.toString().toLowerCase() ?? '';
+            final products = order['products'] as List? ?? [];
+            final productNames = products.map((p) => (p['name']?.toString() ?? '').toLowerCase()).join(' ');
+            
+            return buyerName.contains(searchQuery) ||
+                buyerPhone.contains(searchQuery) ||
                 orderId.contains(searchQuery) ||
                 productNames.contains(searchQuery);
           }).toList();
         }
 
-        if (filteredDocs.isEmpty) {
+        if (filteredOrders.isEmpty) {
           return Padding(
             padding: const EdgeInsets.all(32.0),
             child: Column(
@@ -1945,261 +2167,822 @@ class _OrderScreenState extends State<OrderScreen> {
           );
         }
 
-        // Trier les commandes par date
-        filteredDocs.sort((a, b) {
-          final aData = a.data() as Map<String, dynamic>;
-          final bData = b.data() as Map<String, dynamic>;
-          final aTimestamp = aData['timestamp'] as Timestamp?;
-          final bTimestamp = bData['timestamp'] as Timestamp?;
-
-          if (aTimestamp == null && bTimestamp == null) return 0;
-          if (aTimestamp == null) return 1;
-          if (bTimestamp == null) return -1;
-
-          return bTimestamp.compareTo(aTimestamp); // Tri décroissant
+        // Trier les commandes par date (plus récentes en premier)
+        filteredOrders.sort((a, b) {
+          final aCreatedAt = a['createdAt']?.toString() ?? '';
+          final bCreatedAt = b['createdAt']?.toString() ?? '';
+          if (aCreatedAt.isEmpty && bCreatedAt.isEmpty) return 0;
+          if (aCreatedAt.isEmpty) return 1;
+          if (bCreatedAt.isEmpty) return -1;
+          return bCreatedAt.compareTo(aCreatedAt);
         });
 
-        return ListView.builder(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: EdgeInsets.only(
-            left: 12,
-            right: 12,
-            top: 8,
-            bottom: MediaQuery.of(context).padding.bottom + 20,
-          ),
-          itemCount: filteredDocs.length,
-          itemBuilder: (context, index) {
-            try {
-              final doc = filteredDocs[index];
-              final data = doc.data() as Map<String, dynamic>;
-              final status = data['status']?.toString() ?? 'pending';
-              final timestamp = data['timestamp'] as Timestamp?;
-              final adresse =
-                  data['adresse']?.toString() ?? 'Adresse non spécifiée';
-
-              // Calculer le total
-              double total = 0.0;
-              final items = data['items'] as List? ?? [];
-              for (var item in items) {
-                if (item is Map) {
-                  final price = (item['price'] ?? 0.0) is double 
-                      ? item['price'] as double 
-                      : (item['price'] ?? 0).toDouble();
-                  final quantity = (item['quantity'] ?? 1) is int 
-                      ? item['quantity'] as int 
-                      : int.tryParse(item['quantity']?.toString() ?? '1') ?? 1;
-                  total += price * quantity;
+        return RefreshIndicator(
+          onRefresh: () async {
+            await context.read<OrderCubit>().fetchVendeurOrders();
+          },
+          child: ListView.builder(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: EdgeInsets.only(
+              left: 12,
+              right: 12,
+              top: 8,
+              bottom: MediaQuery.of(context).padding.bottom + 20,
+            ),
+            itemCount: filteredOrders.length,
+            itemBuilder: (context, index) {
+              try {
+                final order = filteredOrders[index] as Map<String, dynamic>;
+                final orderId = order['orderId']?.toString() ?? '';
+                final status = order['status']?.toString() ?? 'pending';
+                final createdAt = order['createdAt']?.toString() ?? '';
+                final buyer = order['buyer'] as Map<String, dynamic>? ?? {};
+                // Adapter pour la nouvelle structure : buyer peut avoir email/phone ou firstName/lastName
+                // Prioriser firstName/lastName, sinon extraire le nom de l'email
+                String buyerName = '${buyer['firstName'] ?? ''} ${buyer['lastName'] ?? ''}'.trim();
+                if (buyerName.isEmpty) {
+                  final email = buyer['email']?.toString().trim() ?? '';
+                  if (email.isNotEmpty) {
+                    // Extraire le nom depuis l'email (partie avant @)
+                    buyerName = email.split('@').first;
+                    // Capitaliser la première lettre
+                    if (buyerName.isNotEmpty) {
+                      buyerName = buyerName[0].toUpperCase() + buyerName.substring(1);
+                    }
+                  }
                 }
-              }
+                if (buyerName.isEmpty) {
+                  buyerName = 'Client';
+                }
+                final products = order['products'] as List? ?? [];
+                final totalProduit = _parseAmount(order['total'] ?? 0);
+                final deliveryFee = _parseAmount(order['deliveryFee'] ?? 0);
+                final totalAvecLivraison = _parseAmount(order['totalAvecLivraison'] ?? totalProduit + deliveryFee);
+                final address = order['address'] as Map<String, dynamic>? ?? {};
+                final packagePhoto = order['packagePhoto']?.toString();
 
-              final clientName = data['client']?.toString() ?? 'Client';
-              final productCount = items.length;
-
-              return Container(
-                margin: const EdgeInsets.only(bottom: 8),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: Colors.grey.shade200,
-                    width: 0.5,
+                return _buildVendeurOrderCard(
+                  order: order,
+                  orderId: orderId,
+                  status: status,
+                  createdAt: createdAt,
+                  buyerName: buyerName.isNotEmpty ? buyerName : 'Client',
+                  products: products,
+                  totalProduit: totalProduit,
+                  totalAvecLivraison: totalAvecLivraison,
+                  address: address,
+                  packagePhoto: packagePhoto,
+                );
+              } catch (e) {
+                print('Erreur lors de l\'affichage de la commande: $e');
+                return Container(
+                  padding: const EdgeInsets.all(16),
+                  margin: const EdgeInsets.only(bottom: 10),
+                  decoration: BoxDecoration(
+                    color: Colors.red.shade50,
+                    borderRadius: BorderRadius.circular(18),
                   ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.03),
-                      blurRadius: 4,
-                      offset: const Offset(0, 2),
-                      spreadRadius: 0,
+                  child: Text(
+                    'Erreur: $e',
+                    style: const TextStyle(color: Colors.red),
+                  ),
+                );
+              }
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  // Convertir total et deliveryFee qui peuvent être String ou double
+  double _parseAmount(dynamic value) {
+    if (value is double) return value;
+    if (value is int) return value.toDouble();
+    if (value is String) return double.tryParse(value) ?? 0.0;
+    return 0.0;
+  }
+
+  // Construire une carte de commande pour le vendeur - Design moderne
+  Widget _buildVendeurOrderCard({
+    required Map<String, dynamic> order,
+    required String orderId,
+    required String status,
+    required String createdAt,
+    required String buyerName,
+    required List products,
+    required double totalProduit,
+    required double totalAvecLivraison,
+    required Map<String, dynamic> address,
+    String? packagePhoto,
+  }) {
+    final productCount = products.length;
+    
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: Colors.grey.shade200,
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => OrderDetailsScreen(
+                  orderData: order,
+                  orderId: orderId,
+                ),
+              ),
+            );
+          },
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            child: Row(
+              children: [
+                // Icône client compacte
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    Icons.person_outline,
+                    size: 14,
+                    color: AppColors.primary,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                // Informations principales
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Nom client et statut sur une ligne
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              buyerName,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.black87,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: _statusColor(status).withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              _translateStatus(status),
+                              style: TextStyle(
+                                color: _statusColor(status),
+                                fontSize: 9,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      // Numéro commande et nombre de produits
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.receipt_long,
+                            size: 11,
+                            color: Colors.grey.shade600,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '#${orderId.length > 6 ? orderId.substring(0, 6) : orderId}',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Icon(
+                            Icons.shopping_bag_outlined,
+                            size: 11,
+                            color: Colors.grey.shade600,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '$productCount ${productCount > 1 ? 'articles' : 'article'}',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                // Montant total et flèche
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      '${totalAvecLivraison.toStringAsFixed(0)} FC',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Icon(
+                      Icons.chevron_right,
+                      size: 18,
+                      color: Colors.grey.shade400,
                     ),
                   ],
                 ),
-                child: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(10),
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => OrderDetailsScreen(
-                            orderData: data,
-                            orderId: doc.id,
-                          ),
-                        ),
-                      );
-                    },
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+
+  // Uploader la photo du colis
+  Future<void> _uploadPackagePhoto(String orderId) async {
+    try {
+      final ImagePicker picker = ImagePicker();
+      final XFile? image = await picker.pickImage(
+        source: ImageSource.camera,
+        imageQuality: 85,
+      );
+
+      if (image == null) return;
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Upload de la photo en cours...'),
+            backgroundColor: Colors.blue,
+          ),
+        );
+      }
+
+      final result = await context.read<OrderCubit>().uploadPackagePhoto(
+        orderId: orderId,
+        imagePath: image.path,
+      );
+
+      if (mounted) {
+        if (result['success'] == true) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Photo uploadée avec succès'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(result['message'] ?? 'Erreur lors de l\'upload'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  // Widget pour gérer les actions de commande (Accepter, Rejeter, Commencer)
+  Widget _OrderActionsWidget({
+    required String orderId,
+    required Map<String, dynamic> order,
+    required VoidCallback onStatusChanged,
+  }) {
+    return _OrderActionsStatefulWidget(
+      orderId: orderId,
+      order: order,
+      onStatusChanged: onStatusChanged,
+    );
+  }
+
+  // Marquer prêt à expédier
+  Future<void> _markReadyToShip(String orderId) async {
+    final result = await context.read<OrderCubit>().updateOrderStatus(
+      orderId: orderId,
+      status: 'pret_a_expedier',
+      reason: 'Colis prêt pour livraison',
+    );
+
+    if (mounted) {
+      if (result['success'] == true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Commande marquée comme prête à expédier'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['message'] ?? 'Erreur lors de la mise à jour'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Widget _buildLoadingShimmer() {
+    return ListView.separated(
+      padding: const EdgeInsets.all(16),
+      separatorBuilder: (_, __) => const SizedBox(height: 10),
+      itemCount: 4,
+      itemBuilder: (context, index) {
+        return Stack(
+          children: [
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(18),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.06),
+                    blurRadius: 10,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 80,
+                    height: 80,
+                    margin: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  Expanded(
                     child: Padding(
-                      padding: const EdgeInsets.all(10),
-                      child: Row(
+                      padding: const EdgeInsets.all(12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Icône de commande
                           Container(
-                            width: 40,
-                            height: 40,
+                            width: double.infinity,
+                            height: 16,
                             decoration: BoxDecoration(
-                              color: AppColors.primary.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Icon(
-                              Icons.shopping_bag_outlined,
-                              color: AppColors.primary,
-                              size: 20,
+                              color: Colors.grey.shade300,
+                              borderRadius: BorderRadius.circular(4),
                             ),
                           ),
-                          const SizedBox(width: 12),
-                          // Informations principales
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Text(
-                                            clientName,
-                                            style: const TextStyle(
-                                              fontSize: 13,
-                                              fontWeight: FontWeight.w600,
-                                              color: Colors.black87,
-                                            ),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                          const SizedBox(height: 4),
-                                          Row(
-                                            children: [
-                                              Icon(
-                                                Icons.inventory_2_outlined,
-                                                size: 12,
-                                                color: Colors.grey.shade600,
-                                              ),
-                                              const SizedBox(width: 4),
-                                              Text(
-                                                '$productCount ${productCount > 1 ? 'produits' : 'produit'}',
-                                                style: TextStyle(
-                                                  fontSize: 11,
-                                                  color: Colors.grey.shade600,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 6,
-                                        vertical: 3,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: _statusColor(status).withOpacity(0.15),
-                                        borderRadius: BorderRadius.circular(6),
-                                        border: Border.all(
-                                          color: _statusColor(status).withOpacity(0.3),
-                                          width: 0.5,
-                                        ),
-                                      ),
-                                      child: Text(
-                                        _translateStatus(status),
-                                        style: TextStyle(
-                                          color: _statusColor(status),
-                                          fontSize: 9,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 6),
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  children: [
-                                    Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Text(
-                                          '${total.toStringAsFixed(0)} FC',
-                                          style: const TextStyle(
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.bold,
-                                            color: AppColors.primary,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 2),
-                                        Row(
-                                          children: [
-                                            Icon(
-                                              Icons.calendar_today,
-                                              size: 10,
-                                              color: Colors.grey.shade500,
-                                            ),
-                                            const SizedBox(width: 3),
-                                            Text(
-                                              _formatDate(timestamp),
-                                              style: TextStyle(
-                                                fontSize: 10,
-                                                color: Colors.grey.shade600,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ],
-                                    ),
-                                    Container(
-                                      padding: const EdgeInsets.all(6),
-                                      decoration: BoxDecoration(
-                                        color: AppColors.primary.withOpacity(0.1),
-                                        borderRadius: BorderRadius.circular(6),
-                                        border: Border.all(
-                                          color: AppColors.primary.withOpacity(0.2),
-                                          width: 0.5,
-                                        ),
-                                      ),
-                                      child: Icon(
-                                        Icons.arrow_forward_ios,
-                                        size: 12,
-                                        color: AppColors.primary,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
+                          const SizedBox(height: 8),
+                          Container(
+                            width: 150,
+                            height: 12,
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade300,
+                              borderRadius: BorderRadius.circular(4),
                             ),
                           ),
                         ],
                       ),
                     ),
                   ),
-                ),
-              );
-            } catch (e) {
-              print('Erreur lors de l\'affichage de la commande: $e');
-              return Container(
-                padding: const EdgeInsets.all(16),
-                margin: const EdgeInsets.only(bottom: 10),
-                decoration: BoxDecoration(
-                  color: Colors.red.shade50,
-                  borderRadius: BorderRadius.circular(18),
-                ),
-                child: const Text(
-                  'Erreur lors de l\'affichage de la commande',
-                  style: TextStyle(color: Colors.red),
-                ),
-              );
-            }
-          },
+                ],
+              ),
+            ),
+          ],
         );
       },
     );
+  }
+}
+
+// Widget Stateful pour gérer l'état d'acceptation
+class _OrderActionsStatefulWidget extends StatefulWidget {
+  final String orderId;
+  final Map<String, dynamic> order;
+  final VoidCallback onStatusChanged;
+
+  const _OrderActionsStatefulWidget({
+    required this.orderId,
+    required this.order,
+    required this.onStatusChanged,
+  });
+
+  @override
+  State<_OrderActionsStatefulWidget> createState() => _OrderActionsStatefulWidgetState();
+}
+
+class _OrderActionsStatefulWidgetState extends State<_OrderActionsStatefulWidget> {
+  bool _isAccepted = false;
+  bool _isRejected = false;
+  bool _isProcessing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Vérifier si la commande est déjà acceptée ou rejetée
+    final status = widget.order['status']?.toString() ?? 'pending';
+    _isAccepted = status == 'accepted' || status == 'en_preparation';
+    _isRejected = status == 'rejected' || status == 'cancelled';
+  }
+
+  Future<void> _acceptOrder() async {
+    if (_isProcessing) return;
+    
+    setState(() {
+      _isProcessing = true;
+    });
+
+    try {
+      final result = await context.read<OrderCubit>().updateOrderStatus(
+        orderId: widget.orderId,
+        status: 'accepted',
+        reason: 'Commande acceptée',
+      );
+
+      if (mounted) {
+        if (result['success'] == true) {
+          setState(() {
+            _isAccepted = true;
+            _isRejected = false;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Commande acceptée'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          widget.onStatusChanged();
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(result['message'] ?? 'Erreur lors de l\'acceptation'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isProcessing = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _rejectOrder() async {
+    if (_isProcessing) return;
+
+    // Demander une raison pour le rejet
+    final TextEditingController reasonController = TextEditingController();
+    final bool? confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: const Text('Rejeter la commande'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Veuillez indiquer la raison du rejet :'),
+              const SizedBox(height: 12),
+              TextField(
+                controller: reasonController,
+                decoration: const InputDecoration(
+                  hintText: 'Raison du rejet...',
+                  border: OutlineInputBorder(),
+                ),
+                maxLines: 3,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Annuler'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                if (reasonController.text.trim().isNotEmpty) {
+                  Navigator.pop(context, true);
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Rejeter'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true || reasonController.text.trim().isEmpty) {
+      return;
+    }
+
+    setState(() {
+      _isProcessing = true;
+    });
+
+    try {
+      final result = await context.read<OrderCubit>().updateOrderStatus(
+        orderId: widget.orderId,
+        status: 'rejected',
+        reason: reasonController.text.trim(),
+      );
+
+      if (mounted) {
+        if (result['success'] == true) {
+          setState(() {
+            _isRejected = true;
+            _isAccepted = false;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Commande rejetée'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+          widget.onStatusChanged();
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(result['message'] ?? 'Erreur lors du rejet'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isProcessing = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _startPreparation() async {
+    if (_isProcessing || !_isAccepted) return;
+
+    setState(() {
+      _isProcessing = true;
+    });
+
+    try {
+      final result = await context.read<OrderCubit>().updateOrderStatus(
+        orderId: widget.orderId,
+        status: 'en_preparation',
+        reason: 'Commande prise en charge',
+      );
+
+      if (mounted) {
+        if (result['success'] == true) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Préparation de la commande commencée'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          widget.onStatusChanged();
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(result['message'] ?? 'Erreur lors de la mise à jour'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isProcessing = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        // Boutons Accepter et Rejeter alignés
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: _isAccepted || _isRejected || _isProcessing
+                    ? null
+                    : _acceptOrder,
+                icon: Icon(
+                  Icons.check_circle_outline,
+                  size: 18,
+                  color: _isAccepted
+                      ? Colors.green
+                      : (_isRejected || _isProcessing
+                          ? Colors.grey
+                          : AppColors.primary),
+                ),
+                label: Text(
+                  _isAccepted ? 'Acceptée' : 'Accepter',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: _isAccepted
+                        ? Colors.green
+                        : (_isRejected || _isProcessing
+                            ? Colors.grey
+                            : AppColors.primary),
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  side: BorderSide(
+                    color: _isAccepted
+                        ? Colors.green
+                        : (_isRejected || _isProcessing
+                            ? Colors.grey.shade300
+                            : AppColors.primary),
+                    width: 1.5,
+                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: _isAccepted || _isRejected || _isProcessing
+                    ? null
+                    : _rejectOrder,
+                icon: Icon(
+                  Icons.cancel_outlined,
+                  size: 18,
+                  color: _isRejected
+                      ? Colors.red
+                      : (_isAccepted || _isProcessing
+                          ? Colors.grey
+                          : Colors.red.shade600),
+                ),
+                label: Text(
+                  _isRejected ? 'Rejetée' : 'Rejeter',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: _isRejected
+                        ? Colors.red
+                        : (_isAccepted || _isProcessing
+                            ? Colors.grey
+                            : Colors.red.shade600),
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  side: BorderSide(
+                    color: _isRejected
+                        ? Colors.red
+                        : (_isAccepted || _isProcessing
+                            ? Colors.grey.shade300
+                            : Colors.red.shade600),
+                    width: 1.5,
+                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        // Bouton Commencer la préparation
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: _isAccepted && !_isProcessing
+                ? _startPreparation
+                : null,
+            icon: const Icon(Icons.play_arrow, size: 18),
+            label: const Text('Commencer la préparation'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              disabledBackgroundColor: Colors.grey.shade300,
+              disabledForegroundColor: Colors.grey.shade600,
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // Marquer prêt à expédier
+  Future<void> _markReadyToShip(String orderId) async {
+    final result = await context.read<OrderCubit>().updateOrderStatus(
+      orderId: orderId,
+      status: 'pret_a_expedier',
+      reason: 'Colis prêt pour livraison',
+    );
+
+    if (mounted) {
+      if (result['success'] == true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Commande marquée comme prête à expédier'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['message'] ?? 'Erreur lors de la mise à jour'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   Widget _buildLoadingShimmer() {

@@ -16,7 +16,10 @@ import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:http/http.dart' as http;
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:immo/services/payment_method_service.dart';
 import 'payment_method_selection_screen.dart';
+import 'address_selection_screen.dart';
+import '../order_screen.dart';
 
 class CartScreen extends StatefulWidget {
   final bool backNavigaton;
@@ -358,22 +361,6 @@ class _CartScreenState extends State<CartScreen> {
       return;
     }
 
-    // Récupérer le nom du vendeur si disponible
-    String vendeurName = 'Vendeur';
-    if (firstItem['vendeurName'] != null) {
-      vendeurName = firstItem['vendeurName'].toString();
-    } else if (firstItem['vendeur'] != null) {
-      final vendeur = firstItem['vendeur'] as Map<String, dynamic>?;
-      if (vendeur != null) {
-        final firstName = vendeur['firstName']?.toString() ?? '';
-        final lastName = vendeur['lastName']?.toString() ?? '';
-        vendeurName = '$firstName $lastName'.trim();
-        if (vendeurName.isEmpty) {
-          vendeurName = 'Vendeur';
-        }
-      }
-    }
-
     // Convertir vendeurId en int
     int? vendeurIdInt;
     if (vendeurId is int) {
@@ -394,23 +381,50 @@ class _CartScreenState extends State<CartScreen> {
       return;
     }
 
-    // Afficher l'écran de sélection des moyens de paiement
-    final selectedPaymentMethod = await Navigator.push<Map<String, dynamic>>(
-      context,
-      MaterialPageRoute(
-        builder: (context) => PaymentMethodSelectionScreen(
-          vendeurId: vendeurIdInt!,
-          vendeurName: vendeurName,
-        ),
-      ),
-    );
+      // Charger les moyens de paiement du vendeur
+      try {
+        final paymentMethodService = PaymentMethodService();
+        final result = await paymentMethodService.getVendeurPaymentMethodsForClient(vendeurIdInt);
+      
+      if (result['success'] != true || (result['paymentMethods'] as List?)?.isEmpty == true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Aucun moyen de paiement disponible pour ce vendeur'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        return;
+      }
 
-    // Si un moyen de paiement a été sélectionné, afficher l'écran d'adresse
-    if (selectedPaymentMethod != null && mounted) {
-      setState(() {
-        _selectedPaymentMethod = selectedPaymentMethod;
-      });
-      _showAddressBottomSheet(context, cartItems, selectedPaymentMethod);
+      final paymentMethods = List<Map<String, dynamic>>.from(result['paymentMethods'] ?? []);
+
+      // Afficher l'écran de sélection des moyens de paiement
+      final selectedPaymentMethod = await Navigator.push<Map<String, dynamic>>(
+        context,
+        MaterialPageRoute(
+          builder: (context) => PaymentMethodSelectionScreen(
+            vendeurId: vendeurIdInt!,
+            paymentMethods: paymentMethods,
+            currentPaymentMethod: null,
+            orderIds: [], // Pas encore de commandes, liste vide
+          ),
+        ),
+      );
+
+      // Si un moyen de paiement a été sélectionné, afficher l'écran d'adresse
+      if (selectedPaymentMethod != null && mounted) {
+        setState(() {
+          _selectedPaymentMethod = selectedPaymentMethod;
+        });
+        _showAddressBottomSheet(context, cartItems, selectedPaymentMethod);
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erreur lors du chargement des moyens de paiement: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
@@ -433,13 +447,24 @@ class _CartScreenState extends State<CartScreen> {
             if (state.success) {
               Navigator.pop(context);
               context.read<CartCubit>().clearCart();
+              // Rafraîchir les commandes
+              context.read<OrderCubit>().fetchOrders();
+              // Naviguer vers l'écran des commandes avec filtre sur pending_payment
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const OrderScreen(
+                    backNavigation: true,
+                    initialStatusFilter: 'pending_payment', // Afficher les commandes initialisées
+                  ),
+                ),
+              );
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text('Commande créée avec succès!'),
+                  content: Text('Commande(s) initialisée(s) avec succès!'),
                   backgroundColor: AppColors.success,
                 ),
               );
-              context.read<CartCubit>().clearCart();
             } else if (state.error != null) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
@@ -571,7 +596,7 @@ class _CartScreenState extends State<CartScreen> {
                                             child: ElevatedButton(
                                               onPressed: state.isLoading
                                                   ? null
-                                                  : () {
+                                                  : () async {
                                                       // Utiliser exactement les champs de la collection delivery_addresses
                                                       final ville =
                                                           address['ville'] ??
@@ -604,35 +629,103 @@ class _CartScreenState extends State<CartScreen> {
                                                           '   Numero: $numero');
                                                       print('   Pays: $pays');
 
+                                                      // Obtenir les coordonnées GPS depuis l'adresse
+                                                      final latitude = address['latitude']?.toDouble() ?? 0.0;
+                                                      final longitude = address['longitude']?.toDouble() ?? 0.0;
+
+                                                      // Si les coordonnées ne sont pas disponibles, les obtenir depuis l'adresse
+                                                      double finalLatitude = latitude;
+                                                      double finalLongitude = longitude;
+                                                      
+                                                      if (latitude == 0.0 || longitude == 0.0) {
+                                                        try {
+                                                          String fullAddress = '$quartier, $commune, $ville, $numero, RDC';
+                                                          final coordinates = await getCoordinatesFromGoogle(fullAddress);
+                                                          finalLatitude = coordinates['latitude']?.toDouble() ?? 0.0;
+                                                          finalLongitude = coordinates['longitude']?.toDouble() ?? 0.0;
+                                                        } catch (e) {
+                                                          print('Erreur lors de la récupération des coordonnées: $e');
+                                                        }
+                                                      }
+
+                                                      // Vérifier que les coordonnées sont valides
+                                                      if (finalLatitude == 0.0 || finalLongitude == 0.0) {
+                                                        if (context.mounted) {
+                                                          ScaffoldMessenger.of(context).showSnackBar(
+                                                            const SnackBar(
+                                                              content: Text('Impossible d\'obtenir les coordonnées GPS. Veuillez réessayer.'),
+                                                              backgroundColor: Colors.red,
+                                                            ),
+                                                          );
+                                                        }
+                                                        return;
+                                                      }
+
+                                                      // Préparer les produits pour l'initialisation (avec quantite au lieu de quantity)
+                                                      final productsToSend = cartItems
+                                                          .map((item) {
+                                                        return {
+                                                          "productId": int.parse(
+                                                              item['id']
+                                                                  .toString()),
+                                                          "quantite": item[
+                                                              'quantity'] is int 
+                                                              ? item['quantity'] 
+                                                              : int.tryParse(item['quantity'].toString()) ?? 1,
+                                                        };
+                                                      }).toList();
+
+                                                      // Préparer l'adresse complète
+                                                      final addressToSend = {
+                                                        "pays": pays.isNotEmpty ? pays : "RDC",
+                                                        "ville": ville.isNotEmpty ? ville : "",
+                                                        "commune": commune.isNotEmpty ? commune : "",
+                                                        "quartier": quartier.isNotEmpty ? quartier : "",
+                                                        "avenue": avenue.isNotEmpty ? avenue : "",
+                                                        "numero": numero.isNotEmpty ? numero : "",
+                                                        "codePostale": "012",
+                                                      };
+
+                                                      // Print du body avant initialisation
+                                                      print('═══════════════════════════════════════════════════════');
+                                                      print('🛑 BREAKPOINT: Avant initialisation de la commande');
+                                                      print('📍 Coordonnées GPS:');
+                                                      print('   Latitude: $finalLatitude');
+                                                      print('   Longitude: $finalLongitude');
+                                                      print('📦 Produits à envoyer:');
+                                                      for (var product in productsToSend) {
+                                                        print('   - ProductId: ${product['productId']}, Quantite: ${product['quantite']}');
+                                                      }
+                                                      print('🏠 Adresse:');
+                                                      print('   Pays: ${addressToSend['pays']}');
+                                                      print('   Ville: ${addressToSend['ville']}');
+                                                      print('   Commune: ${addressToSend['commune']}');
+                                                      print('   Quartier: ${addressToSend['quartier']}');
+                                                      print('   Avenue: ${addressToSend['avenue']}');
+                                                      print('   Numero: ${addressToSend['numero']}');
+                                                      print('📋 Body JSON qui sera envoyé:');
+                                                      print(jsonEncode({
+                                                        'products': productsToSend,
+                                                        'latitude': finalLatitude,
+                                                        'longitude': finalLongitude,
+                                                        'address': addressToSend,
+                                                      }));
+                                                      print('═══════════════════════════════════════════════════════');
+                                                      
+                                                      // Breakpoint virtuel
+                                                      assert(() {
+                                                        print('🛑 BREAKPOINT: Cliquez ici pour déboguer avant initialisation');
+                                                        return true;
+                                                      }());
+
+                                                      // Initialiser la commande avec la nouvelle API multi-vendeurs
                                                       context
                                                           .read<OrderCubit>()
-                                                          .createOrder(
-                                                            produits: cartItems
-                                                                .map((item) {
-                                                              return {
-                                                                "id": int.parse(
-                                                                    item['id']
-                                                                        .toString()),
-                                                                "quantity": item[
-                                                                    'quantity'],
-                                                              };
-                                                            }).toList(),
-                                                            // ville: ville,
-                                                            // commune: commune,
-                                                            // quartier: quartier,
-                                                            // avenue: avenue,
-                                                            // codePostale: '',
-                                                            // numero: numero,
-                                                            // pays: pays,
-                                                            ville: "ville",
-                                                            commune: "commune",
-                                                            quartier:
-                                                                "quartier",
-                                                            avenue: "avenue",
-                                                            codePostale:
-                                                                '12345',
-                                                            numero: "numero",
-                                                            pays: "pays",
+                                                          .initializeOrder(
+                                                            products: productsToSend,
+                                                            latitude: finalLatitude,
+                                                            longitude: finalLongitude,
+                                                            address: addressToSend,
                                                           );
 
                                                       saveCart(
@@ -644,10 +737,8 @@ class _CartScreenState extends State<CartScreen> {
                                                         avenue,
                                                         numero,
                                                         pays,
-                                                        address['longitude'] ??
-                                                            0.0,
-                                                        address['latitude'] ??
-                                                            0.0,
+                                                        finalLongitude,
+                                                        finalLatitude,
                                                       );
                                                     },
                                               style: ElevatedButton.styleFrom(
@@ -756,9 +847,21 @@ class _CartScreenState extends State<CartScreen> {
                   
                   Navigator.pop(context);
                   context.read<CartCubit>().clearCart();
+                  // Rafraîchir les commandes
+                  context.read<OrderCubit>().fetchOrders();
+                  // Naviguer vers l'écran des commandes avec filtre sur pending_payment
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const OrderScreen(
+                        backNavigation: true,
+                        initialStatusFilter: 'pending_payment', // Afficher les commandes initialisées
+                      ),
+                    ),
+                  );
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text('Commande créée avec succès!'),
+                      content: Text('Commande(s) initialisée(s) avec succès!'),
                       backgroundColor: AppColors.success,
                     ),
                   );
@@ -1562,44 +1665,95 @@ class _CartScreenState extends State<CartScreen> {
                                     print('   Avenue: $avenue');
                                     print('   Détail: $detailAdresse');
 
-                                    context.read<OrderCubit>().createOrder(
-                                          produits: cartItems.map((item) {
-                                            return {
-                                              "id": int.parse(
-                                                  item['id'].toString()),
-                                              "quantity": item['quantity'],
-                                            };
-                                          }).toList(),
-                                          // ville:
-                                          //     ville.isNotEmpty ? ville : 'N/A',
-                                          // commune: commune.isNotEmpty
-                                          //     ? commune
-                                          //     : 'N/A',
-                                          // quartier: quartier.isNotEmpty
-                                          //     ? quartier
-                                          //     : 'N/A',
-                                          // avenue: avenue.isNotEmpty
-                                          //     ? avenue
-                                          //     : 'N/A',
-                                          // codePostale: '',
-                                          // numero: detailAdresse,
-                                          // pays: 'RDC',
-
-                                          ville: "ville",
-                                          commune: "commune",
-                                          quartier: "quartier",
-                                          avenue: "avenue",
-                                          codePostale: '12345',
-                                          numero: "numero",
-                                          pays: "pays",
-                                        );
-
-                                    // Obtenir les coordonnées depuis l'adresse complète
+                                    // Obtenir les coordonnées GPS depuis l'adresse complète
                                     String fullAddress =
                                         '$quartier, $commune, $ville, $detailAdresse, RDC';
                                     final coordinates =
                                         await getCoordinatesFromGoogle(
                                             fullAddress);
+
+                                    final latitude = coordinates['latitude']?.toDouble() ?? 0.0;
+                                    final longitude = coordinates['longitude']?.toDouble() ?? 0.0;
+
+                                    // Vérifier que les coordonnées sont valides
+                                    if (latitude == 0.0 || longitude == 0.0) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text('Impossible d\'obtenir les coordonnées GPS. Veuillez réessayer.'),
+                                          backgroundColor: Colors.red,
+                                        ),
+                                      );
+                                      return;
+                                    }
+
+                                    // Préparer les produits pour l'initialisation (avec quantite au lieu de quantity)
+                                    final productsToSend = cartItems.map((item) {
+                                      // Convertir la quantité en int
+                                      int quantite = 1;
+                                      if (item['quantity'] != null) {
+                                        if (item['quantity'] is int) {
+                                          quantite = item['quantity'] as int;
+                                        } else {
+                                          quantite = int.tryParse(item['quantity'].toString()) ?? 1;
+                                        }
+                                      }
+                                      
+                                      return {
+                                        "productId": int.parse(item['id'].toString()),
+                                        "quantite": quantite,
+                                      };
+                                    }).toList();
+
+                                    // Préparer l'adresse complète
+                                    final addressToSend = {
+                                      "pays": "RDC",
+                                      "ville": ville.isNotEmpty ? ville : "",
+                                      "commune": commune.isNotEmpty ? commune : "",
+                                      "quartier": quartier.isNotEmpty ? quartier : "",
+                                      "avenue": avenue.isNotEmpty ? avenue : "",
+                                      "numero": detailAdresse.isNotEmpty ? detailAdresse : "",
+                                      "codePostale": "012",
+                                    };
+
+                                    // Print du body avant initialisation
+                                    print('═══════════════════════════════════════════════════════');
+                                    print('🛑 BREAKPOINT: Avant initialisation de la commande (Formulaire)');
+                                    print('📍 Coordonnées GPS:');
+                                    print('   Latitude: $latitude');
+                                    print('   Longitude: $longitude');
+                                    print('📦 Produits à envoyer:');
+                                    for (var product in productsToSend) {
+                                      print('   - ProductId: ${product['productId']}, Quantite: ${product['quantite']}');
+                                    }
+                                    print('🏠 Adresse:');
+                                    print('   Pays: ${addressToSend['pays']}');
+                                    print('   Ville: ${addressToSend['ville']}');
+                                    print('   Commune: ${addressToSend['commune']}');
+                                    print('   Quartier: ${addressToSend['quartier']}');
+                                    print('   Avenue: ${addressToSend['avenue']}');
+                                    print('   Numero: ${addressToSend['numero']}');
+                                    print('📋 Body JSON qui sera envoyé:');
+                                    print(jsonEncode({
+                                      'products': productsToSend,
+                                      'latitude': latitude,
+                                      'longitude': longitude,
+                                      'address': addressToSend,
+                                    }));
+                                    print('═══════════════════════════════════════════════════════');
+                                    
+                                    // Breakpoint virtuel
+                                    assert(() {
+                                      print('🛑 BREAKPOINT: Cliquez ici pour déboguer avant initialisation');
+                                      return true;
+                                    }());
+
+                                    // Initialiser la commande avec la nouvelle API multi-vendeurs
+                                    context.read<OrderCubit>().initializeOrder(
+                                          products: productsToSend,
+                                          latitude: latitude,
+                                          longitude: longitude,
+                                          address: addressToSend,
+                                        );
 
                                     saveCart(
                                         context,
@@ -2954,7 +3108,14 @@ class _CartScreenState extends State<CartScreen> {
                             height: 52,
                             child: ElevatedButton(
                               onPressed: () {
-                                _showPaymentMethodSelection(context, cartItems);
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => AddressSelectionScreen(
+                                      cartItems: cartItems,
+                                    ),
+                                  ),
+                                );
                               },
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: AppColors.primary,
@@ -2968,10 +3129,10 @@ class _CartScreenState extends State<CartScreen> {
                               child: Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  const Icon(Icons.lock_rounded, size: 18),
+                                  const Icon(Icons.arrow_forward, size: 18),
                                   const SizedBox(width: 8),
                                   const Text(
-                                    'PROCÉDER AU PAIEMENT',
+                                    'SUIVANT',
                                     style: TextStyle(
                                       fontWeight: FontWeight.bold,
                                       fontSize: 15,

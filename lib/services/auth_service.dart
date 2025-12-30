@@ -215,6 +215,19 @@ class AuthService {
       );
 
       final data = jsonDecode(response.body);
+      
+      // Print du token si présent dans la réponse
+      if (data['token'] != null) {
+        final token = data['token'] is Map 
+            ? data['token']['token'] 
+            : data['token'];
+        print('🔑 [AuthService] Token reçu lors de la connexion:');
+        print('   Token: $token');
+        if (data['token'] is Map && data['token']['expiresAt'] != null) {
+          print('   ExpiresAt: ${data['token']['expiresAt']}');
+        }
+      }
+      
       if (response.statusCode == 400) {
         if (data['message']?.contains('password') ?? false) {
           throw 'Mot de passe incorrect';

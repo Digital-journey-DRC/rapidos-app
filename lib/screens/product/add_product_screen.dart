@@ -253,7 +253,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
 
       if (response.statusCode == 201) {
         if (mounted) {
-          context.read<ProductCubit>().fetchProducts();
+          // Rafraîchir les produits du vendeur après ajout
+          context.read<ProductCubit>().fetchVendeurProducts();
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Produit ajouté avec succès !'),
