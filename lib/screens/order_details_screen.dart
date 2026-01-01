@@ -10,7 +10,6 @@ import 'package:immo/services/invoice_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'dart:io';
-import 'dart:math';
 import 'package:camera/camera.dart';
 import 'package:image_picker/image_picker.dart';
 import 'order_screen.dart'; // Pour accéder à CameraColisScreen
@@ -34,6 +33,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
   Map<String, dynamic>? _currentOrderData; // Pour stocker les données mises à jour
   bool _isUploadingPhoto = false; // Pour le loader du bouton upload photo
   bool _isMarkingReady = false; // Pour le loader du bouton prêt à expédier
+  bool _isAcceptingLivraison = false; // Pour le loader du bouton accepter livraison
 
   @override
   void initState() {
@@ -67,12 +67,6 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     }
   }
 
-
-  String _generate4DigitCode() {
-    final random = Random();
-    int code = 1000 + random.nextInt(9000); // Génère un nombre entre 1000 et 9999
-    return code.toString();
-  }
 
   void _showCodeConfirmationDialog(BuildContext context, String docId, String shortCode, String livreurId) {
     final TextEditingController codeController = TextEditingController();
@@ -1417,70 +1411,125 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                           ],
                         ),
                         padding: const EdgeInsets.all(10),
-                        child: ElevatedButton.icon(
-                          onPressed: () async {
-                            final authState = context.read<AuthCubit>().state;
-                            if (authState is! AuthSuccess || authState.user == null) return;
-                            
-                            // Mettre à jour la localisation
-                            // _updateClientLocation et _saveCurrentLocation seraient appelés ici
-                            // mais ces méthodes sont dans order_screen.dart
-                            
-                            try {
-                              await FirebaseFirestore.instance
-                                  .collection('carts')
-                                  .doc(widget.orderId)
-                                  .update({
-                                'status': 'en route pour livraison',
-                                'livreur': authState.user!['id'].toString(),
-                                'shortCode': _generate4DigitCode(),
-                                'timestamp': FieldValue.serverTimestamp(),
-                              });
-
-                              if (mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Colis reçu avec succès'),
-                                    backgroundColor: Colors.green,
-                                    behavior: SnackBarBehavior.floating,
-                                  ),
-                                );
-                                Navigator.pop(context);
-                              }
-                            } catch (e) {
-                              if (mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text('Erreur: $e'),
-                                    backgroundColor: Colors.red,
-                                    behavior: SnackBarBehavior.floating,
-                                  ),
-                                );
-                              }
-                            }
-                          },
+                        child: ElevatedButton(
+                          onPressed: _isAcceptingLivraison
+                              ? null
+                              : () async {
+                                  setState(() {
+                                    _isAcceptingLivraison = true;
+                                  });
+                                  
+                                  try {
+                                    // Utiliser l'ID de la commande comme livraisonId
+                                    // Le backend peut utiliser orderId ou id selon la structure
+                                    // Essayer d'abord 'id' si disponible, sinon utiliser orderId
+                                    final livraisonId = orderData['id']?.toString() ?? 
+                                                       orderData['orderId']?.toString() ?? 
+                                                       widget.orderId;
+                                    
+                                    print('🚚 [OrderDetailsScreen] Acceptation livraison - livraisonId: $livraisonId');
+                                    
+                                    final result = await context.read<OrderCubit>().acceptLivraison(livraisonId);
+                                    
+                                    if (mounted) {
+                                      if (result['success'] == true) {
+                                        // Mettre à jour les données localement
+                                        if (result['order'] != null) {
+                                          setState(() {
+                                            _currentOrderData = Map<String, dynamic>.from(result['order']);
+                                          });
+                                        }
+                                        
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(
+                                            content: Text(result['message'] ?? 'Livraison acceptée avec succès'),
+                                            backgroundColor: Colors.green,
+                                            behavior: SnackBarBehavior.floating,
+                                          ),
+                                        );
+                                        // Rester sur la même page - les données sont déjà mises à jour via setState
+                                      } else {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(
+                                            content: Text(result['message'] ?? 'Erreur lors de l\'acceptation'),
+                                            backgroundColor: Colors.red,
+                                            behavior: SnackBarBehavior.floating,
+                                          ),
+                                        );
+                                      }
+                                    }
+                                  } catch (e) {
+                                    if (mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text('Erreur: $e'),
+                                          backgroundColor: Colors.red,
+                                          behavior: SnackBarBehavior.floating,
+                                        ),
+                                      );
+                                    }
+                                  } finally {
+                                    if (mounted) {
+                                      setState(() {
+                                        _isAcceptingLivraison = false;
+                                      });
+                                    }
+                                  }
+                                },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.transparent,
                             shadowColor: Colors.transparent,
+                            disabledBackgroundColor: Colors.grey.shade300,
+                            disabledForegroundColor: Colors.grey.shade600,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(8),
                             ),
                             padding: const EdgeInsets.symmetric(vertical: 10),
                           ),
-                          icon: const Icon(
-                            Icons.check_circle_outline,
-                            color: Colors.white,
-                            size: 16,
-                          ),
-                          label: const Text(
-                            'Recevoir colis',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: 0.3,
-                            ),
-                          ),
+                          child: _isAcceptingLivraison
+                              ? Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    const Text(
+                                      'Traitement...',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                        letterSpacing: 0.3,
+                                      ),
+                                    ),
+                                  ],
+                                )
+                              : const Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.check_circle_outline,
+                                      color: Colors.white,
+                                      size: 16,
+                                    ),
+                                    SizedBox(width: 8),
+                                    Text(
+                                      'Recevoir colis',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                        letterSpacing: 0.3,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                         ),
                       ),
                     if (status == 'en route pour livraison')

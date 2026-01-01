@@ -1,5 +1,4 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:immo/services/storage_service.dart';
 import 'package:immo/services/order_service.dart';
@@ -262,39 +261,43 @@ class OrderCubit extends Cubit<OrderState> {
             error: result['message'] ?? 'Erreur lors de la récupération des commandes',
           );
         }
-      } else {
-        // Pour vendeur et livreur, utiliser les anciens endpoints
-        final token = await StorageService().getToken();
-        final headers = {
-          'Authorization': 'Bearer $token',
-        };
-        final endpoint = role == 'livreur'
-            ? 'http://24.144.87.127:3333/livraison/ma-liste'
-            : 'http://24.144.87.127:3333/commandes/vendeur';
+      } else if (role == 'livreur') {
+        // Pour le livreur, utiliser le nouvel endpoint
+        print('🚚 [OrderCubit] Appel de getLivreurOrders...');
+        final result = await _orderService.getLivreurOrders();
         
-        final response = await http.get(
-          Uri.parse(endpoint),
-          headers: headers,
-        ).timeout(
-          const Duration(seconds: 15),
-          onTimeout: () {
-            throw Exception('Timeout: La connexion au serveur a pris trop de temps');
-          },
-        );
+        print('📥 [OrderCubit] Résultat reçu pour livreur');
+        print('   Success: ${result['success']}');
+        print('   Orders count: ${(result['orders'] ?? []).length}');
         
-        if (response.statusCode == 200) {
-          final data = jsonDecode(response.body);
-          // Pour compatibilité avec l'ancien format
-          final oldFormatOrders = role == 'livreur' ? data['livraison'] : data['commandes'];
+        if (result['success'] == true) {
           _orderListState = _orderListState.copyWith(
             isLoading: false,
-            orders: oldFormatOrders is List ? oldFormatOrders : [],
+            orders: result['orders'] ?? [],
+            error: null,
+          );
+          print('✅ [OrderCubit] Commandes livreur chargées avec succès');
+        } else {
+          print('❌ [OrderCubit] Erreur: ${result['message']}');
+          _orderListState = _orderListState.copyWith(
+            isLoading: false,
+            error: result['message'] ?? 'Erreur lors de la récupération des commandes',
+          );
+        }
+      } else {
+        // Pour vendeur, utiliser l'endpoint vendeur
+        final result = await _orderService.getVendeurOrders();
+        
+        if (result['success'] == true) {
+          _orderListState = _orderListState.copyWith(
+            isLoading: false,
+            orders: result['orders'] ?? [],
             error: null,
           );
         } else {
           _orderListState = _orderListState.copyWith(
             isLoading: false,
-            error: response.reasonPhrase ?? 'Erreur lors de la récupération des commandes',
+            error: result['message'] ?? 'Erreur lors de la récupération des commandes',
           );
         }
       }
@@ -433,6 +436,37 @@ class OrderCubit extends Cubit<OrderState> {
       emit(state.copyWith(
         isLoading: false,
         error: 'Erreur lors de la mise à jour du statut: $e',
+      ));
+      return {
+        'success': false,
+        'message': 'Erreur: $e',
+      };
+    }
+  }
+
+  /// Accepte une livraison
+  Future<Map<String, dynamic>> acceptLivraison(String livraisonId) async {
+    emit(state.copyWith(isLoading: true, error: null, success: false));
+
+    try {
+      final result = await _orderService.acceptLivraison(livraisonId);
+
+      if (result['success'] == true) {
+        // Rafraîchir les commandes après l'acceptation
+        await fetchOrders();
+        emit(state.copyWith(isLoading: false, success: true));
+        return result;
+      } else {
+        emit(state.copyWith(
+          isLoading: false,
+          error: result['message'] ?? 'Erreur lors de l\'acceptation de la livraison',
+        ));
+        return result;
+      }
+    } catch (e) {
+      emit(state.copyWith(
+        isLoading: false,
+        error: 'Erreur lors de l\'acceptation de la livraison: $e',
       ));
       return {
         'success': false,

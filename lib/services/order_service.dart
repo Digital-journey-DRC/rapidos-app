@@ -803,5 +803,133 @@ class OrderService {
       };
     }
   }
+
+  /// Récupère toutes les commandes du livreur
+  /// Endpoint: GET /livraison/ma-liste
+  /// Authentification: REQUISE
+  Future<Map<String, dynamic>> getLivreurOrders() async {
+    print('🔄 [OrderService] getLivreurOrders - Début');
+    
+    try {
+      final token = await StorageService().getToken();
+
+      if (token == null) {
+        print('❌ [OrderService] Token manquant');
+        return {
+          'success': false,
+          'message': 'Token d\'authentification manquant',
+          'orders': [],
+        };
+      }
+
+      final response = await http.get(
+        Uri.parse('$baseUrl/livraison/ma-liste'),
+        headers: {
+          'Content-Type': 'application/json',
+          'accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(
+        const Duration(seconds: 15),
+        onTimeout: () {
+          throw Exception('Timeout: La connexion au serveur a pris trop de temps');
+        },
+      );
+
+      print('📥 [OrderService] Réponse reçue - Status: ${response.statusCode}');
+      print('📥 [OrderService] Réponse body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(response.body);
+        // Le backend peut retourner 'livraison' ou 'orders' ou directement un tableau
+        final orders = responseData['livraison'] ?? 
+                       responseData['orders'] ?? 
+                       (responseData is List ? responseData : []);
+        
+        print('✅ [OrderService] ${orders.length} commandes récupérées pour le livreur');
+        
+        return {
+          'success': true,
+          'orders': orders is List ? orders : [],
+          'message': responseData['message'] ?? 'Commandes récupérées avec succès',
+        };
+      } else {
+        final errorData = jsonDecode(response.body);
+        print('❌ [OrderService] Erreur (${response.statusCode})');
+        return {
+          'success': false,
+          'message': errorData['message'] ?? 'Erreur lors de la récupération des commandes',
+          'orders': [],
+        };
+      }
+    } catch (e) {
+      print('💥 [OrderService] Exception: $e');
+      return {
+        'success': false,
+        'message': 'Erreur de connexion: $e',
+        'orders': [],
+      };
+    }
+  }
+
+  /// Accepte une livraison
+  /// Endpoint: POST /livraison/accept/{livraisonId}
+  /// Authentification: REQUISE
+  Future<Map<String, dynamic>> acceptLivraison(String livraisonId) async {
+    print('🔄 [OrderService] acceptLivraison - Début');
+    print('   📦 LivraisonId: $livraisonId');
+    
+    try {
+      final token = await StorageService().getToken();
+
+      if (token == null) {
+        print('❌ [OrderService] Token manquant');
+        return {
+          'success': false,
+          'message': 'Token d\'authentification manquant',
+        };
+      }
+
+      final response = await http.post(
+        Uri.parse('$baseUrl/livraison/accept/$livraisonId'),
+        headers: {
+          'Content-Type': 'application/json',
+          'accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(
+        const Duration(seconds: 15),
+        onTimeout: () {
+          throw Exception('Timeout: La connexion au serveur a pris trop de temps');
+        },
+      );
+
+      print('📥 [OrderService] Réponse reçue - Status: ${response.statusCode}');
+      print('📥 [OrderService] Réponse body: ${response.body}');
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final responseData = jsonDecode(response.body);
+        print('✅ [OrderService] Livraison acceptée avec succès');
+        return {
+          'success': true,
+          'message': responseData['message'] ?? 'Livraison acceptée avec succès',
+          'order': responseData['order'] ?? responseData['livraison'],
+        };
+      } else {
+        final errorData = jsonDecode(response.body);
+        print('❌ [OrderService] Erreur (${response.statusCode})');
+        return {
+          'success': false,
+          'message': errorData['message'] ?? 'Erreur lors de l\'acceptation de la livraison',
+        };
+      }
+    } catch (e) {
+      print('💥 [OrderService] Exception: $e');
+      return {
+        'success': false,
+        'message': 'Erreur de connexion: $e',
+      };
+    }
+  }
 }
 
