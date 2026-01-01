@@ -597,7 +597,7 @@ class OrderService {
   }
 
   /// Upload la photo du colis
-  /// Endpoint: POST /ecommerce/upload/package-photo
+  /// Endpoint: POST /ecommerce/commandes/:orderId/upload-package-photo
   /// Authentification: REQUISE
   Future<Map<String, dynamic>> uploadPackagePhoto({
     required String orderId,
@@ -620,15 +620,13 @@ class OrderService {
 
       final request = http.MultipartRequest(
         'POST',
-        Uri.parse('$baseUrl/ecommerce/upload/package-photo'),
+        Uri.parse('$baseUrl/ecommerce/commandes/$orderId/upload-package-photo'),
       );
 
       request.headers.addAll({
         'Authorization': 'Bearer $token',
         'accept': 'application/json',
       });
-
-      request.fields['orderId'] = orderId;
       
       final file = await http.MultipartFile.fromPath(
         'packagePhoto',

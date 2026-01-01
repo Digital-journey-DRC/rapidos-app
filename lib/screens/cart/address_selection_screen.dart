@@ -5,11 +5,10 @@ import 'package:immo/constants.dart';
 import 'package:immo/cubit/auth_cubit.dart';
 import 'package:immo/cubit/order_cubit.dart';
 import 'package:immo/cubit/cart_cubit.dart';
-import 'package:immo/widgets/ecommerce_loading.dart';
-// import 'package:geolocator/geolocator.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-// import 'dart:async';
+import 'dart:async';
 import 'pending_payment_screen.dart';
 
 class AddressSelectionScreen extends StatefulWidget {
@@ -26,21 +25,21 @@ class AddressSelectionScreen extends StatefulWidget {
 
 class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
   // Variables pour la recherche d'adresse
-  // final TextEditingController _searchAddressController = TextEditingController();
-  // final FocusNode _searchFocusNode = FocusNode();
-  // List<Map<String, dynamic>> _searchResults = [];
-  // Timer? _searchDebounceTimer;
-  // bool _isSearching = false;
-  // bool _isGettingCurrentLocation = false;
+  final TextEditingController _searchAddressController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
+  List<Map<String, dynamic>> _searchResults = [];
+  Timer? _searchDebounceTimer;
+  bool _isSearching = false;
+  bool _isGettingCurrentLocation = false;
 
   // Variable pour suivre l'adresse sélectionnée depuis Google
-  // Map<String, dynamic>? _selectedGoogleAddress;
+  Map<String, dynamic>? _selectedGoogleAddress;
 
   // Variable pour stocker les données extraites de manière persistante
-  // Map<String, String> _extractedAddressData = {};
+  Map<String, String> _extractedAddressData = {};
 
   // Contrôleur pour le champ détail adresse
-  // final TextEditingController _numeroController = TextEditingController();
+  final TextEditingController _numeroController = TextEditingController();
 
   // Variable pour stocker l'adresse sélectionnée
   Map<String, dynamic>? selectedAddress;
@@ -48,125 +47,363 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
   
   // Flag pour éviter les appels multiples du listener
   bool _isProcessingRedirect = false;
+  // Flag local pour gérer le chargement du bouton
+  bool _isInitializing = false;
 
   @override
   void initState() {
     super.initState();
-    // _searchAddressController.addListener(_onSearchChanged);
+    _searchAddressController.addListener(_onSearchChanged);
   }
 
   @override
   void dispose() {
-    // _searchDebounceTimer?.cancel();
-    // _searchAddressController.dispose();
-    // _searchFocusNode.dispose();
-    // _numeroController.dispose();
+    _searchDebounceTimer?.cancel();
+    _searchAddressController.dispose();
+    _searchFocusNode.dispose();
+    _numeroController.dispose();
     super.dispose();
   }
 
-  // void _onSearchChanged() {
-  //   _searchDebounceTimer?.cancel();
-  //   _searchDebounceTimer = Timer(const Duration(milliseconds: 500), () {
-  //     final query = _searchAddressController.text;
-  //     if (query.length > 1) {
-  //       setState(() {
-  //         _isSearching = true;
-  //       });
-  //       _searchAddress(query);
-  //     } else {
-  //       setState(() {
-  //         _searchResults.clear();
-  //         _isSearching = false;
-  //       });
-  //     }
-  //   });
-  // }
+  void _onSearchChanged() {
+    _searchDebounceTimer?.cancel();
+    _searchDebounceTimer = Timer(const Duration(milliseconds: 500), () {
+      final query = _searchAddressController.text;
+      if (query.length > 1) {
+        setState(() {
+          _isSearching = true;
+        });
+        _searchAddress(query);
+      } else {
+        setState(() {
+          _searchResults.clear();
+          _isSearching = false;
+        });
+      }
+    });
+  }
 
-  // Future<void> _searchAddress(String query) async {
-  //   const apiKey = 'AIzaSyCpJzuEa7jLAcP8ub8AVM8flT2aK5cPdh0';
-  //   final url =
-  //       'https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${Uri.encodeComponent(query)}&key=$apiKey&components=country:cd&language=fr';
+  Future<void> _searchAddress(String query) async {
+    const apiKey = 'AIzaSyCpJzuEa7jLAcP8ub8AVM8flT2aK5cPdh0';
+    final url =
+        'https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${Uri.encodeComponent(query)}&key=$apiKey&components=country:cd&language=fr';
 
-  //   try {
-  //     final response = await http.get(Uri.parse(url));
-  //     if (response.statusCode == 200) {
-  //       final data = jsonDecode(response.body);
-  //       if (data['status'] == 'OK') {
-  //         setState(() {
-  //           _searchResults = List<Map<String, dynamic>>.from(
-  //             data['predictions'].map((prediction) => {
-  //               'description': prediction['description'],
-  //               'place_id': prediction['place_id'],
-  //               'source_type': 'autocomplete',
-  //               'relevance_score': 1.0,
-  //             }),
-  //           );
-  //           _isSearching = false;
-  //         });
-  //       } else {
-  //         setState(() {
-  //           _searchResults = [];
-  //           _isSearching = false;
-  //         });
-  //       }
-  //     }
-  //   } catch (e) {
-  //     setState(() {
-  //       _isSearching = false;
-  //     });
-  //   }
-  // }
+    try {
+      final response = await http.get(Uri.parse(url));
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['status'] == 'OK') {
+          setState(() {
+            _searchResults = List<Map<String, dynamic>>.from(
+              data['predictions'].map((prediction) => {
+                'description': prediction['description'],
+                'place_id': prediction['place_id'],
+                'source_type': 'autocomplete',
+                'relevance_score': 1.0,
+              }),
+            );
+            _isSearching = false;
+          });
+        } else {
+          setState(() {
+            _searchResults = [];
+            _isSearching = false;
+          });
+        }
+      }
+    } catch (e) {
+      setState(() {
+        _isSearching = false;
+      });
+    }
+  }
 
-  // Future<void> _selectAddress(Map<String, dynamic> result) async {
-  //   const apiKey = 'AIzaSyCpJzuEa7jLAcP8ub8AVM8flT2aK5cPdh0';
-  //   final url =
-  //       'https://maps.googleapis.com/maps/api/place/details/json?place_id=${result['place_id']}&key=$apiKey&language=fr';
+  Future<void> _selectAddress(Map<String, dynamic> result) async {
+    const apiKey = 'AIzaSyCpJzuEa7jLAcP8ub8AVM8flT2aK5cPdh0';
+    final url =
+        'https://maps.googleapis.com/maps/api/place/details/json?place_id=${result['place_id']}&key=$apiKey&language=fr';
 
-  //   try {
-  //     final response = await http.get(Uri.parse(url));
-  //     if (response.statusCode == 200) {
-  //       final data = jsonDecode(response.body);
-  //       if (data['status'] == 'OK') {
-  //         final resultData = data['result'];
-  //         final addressComponents = resultData['address_components'] as List;
+    try {
+      final response = await http.get(Uri.parse(url));
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['status'] == 'OK') {
+          final resultData = data['result'];
+          final addressComponents = resultData['address_components'] as List;
+          final location = resultData['geometry']['location'];
 
-  //         String ville = '';
-  //         String commune = '';
-  //         String quartier = '';
-  //         String avenue = '';
+          String ville = '';
+          String commune = '';
+          String quartier = '';
+          String avenue = '';
 
-  //         for (var component in addressComponents) {
-  //           final types = component['types'] as List;
-  //           if (types.contains('locality') ||
-  //               types.contains('administrative_area_level_1')) {
-  //             ville = component['long_name'];
-  //           } else if (types.contains('administrative_area_level_2')) {
-  //             commune = component['long_name'];
-  //           } else if (types.contains('sublocality') ||
-  //               types.contains('neighborhood')) {
-  //             quartier = component['long_name'];
-  //           } else if (types.contains('route')) {
-  //             avenue = component['long_name'];
-  //           }
-  //         }
+          for (var component in addressComponents) {
+            final types = component['types'] as List;
+            if (types.contains('locality') ||
+                types.contains('administrative_area_level_1')) {
+              ville = component['long_name'];
+            } else if (types.contains('administrative_area_level_2')) {
+              commune = component['long_name'];
+            } else if (types.contains('sublocality') ||
+                types.contains('neighborhood')) {
+              quartier = component['long_name'];
+            } else if (types.contains('route')) {
+              avenue = component['long_name'];
+            }
+          }
 
-  //         setState(() {
-  //           _extractedAddressData = {
-  //             'ville': ville,
-  //             'commune': commune,
-  //             'quartier': quartier,
-  //             'avenue': avenue,
-  //           };
-  //           _selectedGoogleAddress = result;
-  //           _searchResults.clear();
-  //           _searchAddressController.clear();
-  //         });
-  //       }
-  //     }
-  //   } catch (e) {
-  //     print('Erreur lors de la sélection de l\'adresse: $e');
-  //   }
-  // }
+          setState(() {
+            _extractedAddressData = {
+              'ville': ville,
+              'commune': commune,
+              'quartier': quartier,
+              'avenue': avenue,
+            };
+            _selectedGoogleAddress = result;
+            _searchResults.clear();
+            _searchAddressController.clear();
+          });
+
+          // Sauvegarder l'adresse avec coordonnées
+          await _saveAddressFromGoogle(
+            ville,
+            commune,
+            quartier,
+            avenue,
+            location['lat'].toDouble(),
+            location['lng'].toDouble(),
+            result['description'],
+          );
+        }
+      }
+    } catch (e) {
+      print('Erreur lors de la sélection de l\'adresse: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _getCurrentLocation() async {
+    setState(() {
+      _isGettingCurrentLocation = true;
+    });
+
+    try {
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          setState(() {
+            _isGettingCurrentLocation = false;
+          });
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Permission de localisation refusée'),
+                backgroundColor: Colors.orange,
+              ),
+            );
+          }
+          return;
+        }
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        setState(() {
+          _isGettingCurrentLocation = false;
+        });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Permission de localisation refusée définitivement'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+
+      // Obtenir l'adresse depuis les coordonnées
+      final addressData = await getAddressFromGoogleAPI(
+        position.latitude,
+        position.longitude,
+      );
+
+      if (addressData.isNotEmpty) {
+        // Sauvegarder l'adresse avec coordonnées
+        await _saveAddressFromGoogle(
+          addressData['ville'] ?? '',
+          addressData['commune'] ?? '',
+          addressData['quartier'] ?? '',
+          addressData['avenue'] ?? '',
+          position.latitude,
+          position.longitude,
+          '',
+        );
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Impossible de récupérer l\'adresse depuis la position'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      print('Erreur lors de la récupération de la position: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isGettingCurrentLocation = false;
+        });
+      }
+    }
+  }
+
+  Future<Map<String, String>> getAddressFromGoogleAPI(
+      double lat, double lng) async {
+    const apiKey = 'AIzaSyCpJzuEa7jLAcP8ub8AVM8flT2aK5cPdh0';
+    final url =
+        'https://maps.googleapis.com/maps/api/geocode/json?latlng=$lat,$lng&key=$apiKey&language=fr';
+
+    try {
+      final response = await http.get(Uri.parse(url));
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['status'] == 'OK') {
+          final results = data['results'];
+          if (results.isNotEmpty) {
+            final addressComponents = results[0]['address_components'];
+
+            String ville = '';
+            String commune = '';
+            String quartier = '';
+            String avenue = '';
+
+            for (var component in addressComponents) {
+              final types = component['types'] as List;
+              if (types.contains('locality') ||
+                  types.contains('administrative_area_level_1')) {
+                ville = component['long_name'];
+              } else if (types.contains('administrative_area_level_2')) {
+                commune = component['long_name'];
+              } else if (types.contains('sublocality') ||
+                  types.contains('neighborhood')) {
+                quartier = component['long_name'];
+              } else if (types.contains('route')) {
+                avenue = component['long_name'];
+              }
+            }
+
+            return {
+              'ville': ville,
+              'commune': commune,
+              'quartier': quartier,
+              'avenue': avenue,
+            };
+          }
+        }
+      }
+      return {};
+    } catch (e) {
+      return {};
+    }
+  }
+
+  Future<void> _saveAddressFromGoogle(
+    String ville,
+    String commune,
+    String quartier,
+    String avenue,
+    double latitude,
+    double longitude,
+    String fullAddress,
+  ) async {
+    final authState = context.read<AuthCubit>().state;
+    if (authState is! AuthSuccess || authState.user == null) {
+      return;
+    }
+
+    final userId = authState.user!['id']?.toString() ?? '';
+    final userName =
+        '${authState.user!['firstName'] ?? ''} ${authState.user!['lastName'] ?? ''}'.trim();
+
+    try {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+
+      final docRef = await FirebaseFirestore.instance
+          .collection('delivery_addresses')
+          .add({
+        'timestamp': FieldValue.serverTimestamp(),
+        'userId': userId,
+        'userName': userName,
+        'ville': ville,
+        'commune': commune,
+        'quartier': quartier,
+        'avenue': avenue,
+        'numero': _numeroController.text.trim(),
+        'pays': 'RDC',
+        'phone': authState.user!['phone'] ?? '',
+        'latitude': latitude,
+        'longitude': longitude,
+        'fullAddress': fullAddress.isNotEmpty ? fullAddress : '$quartier, $commune, $ville',
+        'source': 'google',
+      });
+
+      if (mounted) {
+        Navigator.pop(context); // Fermer le loader
+      }
+
+      // Récupérer l'adresse créée
+      final addressDoc = await docRef.get();
+      final addressData = addressDoc.data() as Map<String, dynamic>;
+      final addressId = addressDoc.id;
+
+      // Demander confirmation
+      if (mounted) {
+        _showAddressConfirmationDialog(
+          context,
+          addressId,
+          addressData,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context); // Fermer le loader en cas d'erreur
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur lors de la sauvegarde: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
 
   Future<Map<String, double>> getCoordinatesFromGoogle(String address) async {
     const apiKey = 'AIzaSyCpJzuEa7jLAcP8ub8AVM8flT2aK5cPdh0';
@@ -241,7 +478,657 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
   //   }
   // }
 
+  // Widget affiché quand aucune adresse n'est trouvée
+  Widget _buildNoAddressWidget(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(24),
+          margin: const EdgeInsets.only(bottom: 16),
+          decoration: BoxDecoration(
+            color: Colors.orange.shade50,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: Colors.orange.shade200,
+              width: 1.5,
+            ),
+          ),
+          child: Column(
+            children: [
+              Icon(
+                Icons.location_off_outlined,
+                size: 48,
+                color: Colors.orange.shade700,
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Aucune adresse de livraison trouvée',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Créez une adresse de livraison pour continuer votre commande.',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey.shade700,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+        // Recherche d'adresse Google
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.grey.shade200),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.search, color: AppColors.primary),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'Rechercher une adresse',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _searchAddressController,
+                focusNode: _searchFocusNode,
+                decoration: InputDecoration(
+                  hintText: 'Tapez une adresse...',
+                  prefixIcon: const Icon(Icons.location_on),
+                  suffixIcon: _isSearching
+                      ? const Padding(
+                          padding: EdgeInsets.all(12.0),
+                          child: SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        )
+                      : _searchAddressController.text.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear),
+                              onPressed: () {
+                                _searchAddressController.clear();
+                                setState(() {
+                                  _searchResults.clear();
+                                });
+                              },
+                            )
+                          : null,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+              if (_searchResults.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Container(
+                  constraints: const BoxConstraints(maxHeight: 200),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.grey.shade200),
+                  ),
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: _searchResults.length,
+                    itemBuilder: (context, index) {
+                      final result = _searchResults[index];
+                      return ListTile(
+                        leading: const Icon(Icons.place, color: AppColors.primary),
+                        title: Text(result['description']),
+                        onTap: () => _selectAddress(result),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        // Bouton position actuelle
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: _isGettingCurrentLocation ? null : _getCurrentLocation,
+            icon: _isGettingCurrentLocation
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.my_location),
+            label: Text(_isGettingCurrentLocation
+                ? 'Récupération de la position...'
+                : 'Utiliser ma position actuelle'),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        // Divider avec "OU"
+        Row(
+          children: [
+            Expanded(child: Divider(color: Colors.grey.shade300)),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Text(
+                'OU',
+                style: TextStyle(
+                  color: Colors.grey.shade600,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            Expanded(child: Divider(color: Colors.grey.shade300)),
+          ],
+        ),
+        const SizedBox(height: 12),
+        // Bouton créer manuellement
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: () => _showCreateAddressDialog(context),
+            icon: const Icon(Icons.add_location_alt),
+            label: const Text('Créer une adresse manuellement'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // Widget pour le bouton "Ajouter une nouvelle adresse" (quand des adresses existent)
+  Widget _buildAddNewAddressButton(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Recherche d'adresse Google
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.grey.shade200),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.search, color: AppColors.primary),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'Rechercher une adresse',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _searchAddressController,
+                focusNode: _searchFocusNode,
+                decoration: InputDecoration(
+                  hintText: 'Tapez une adresse...',
+                  prefixIcon: const Icon(Icons.location_on),
+                  suffixIcon: _isSearching
+                      ? const Padding(
+                          padding: EdgeInsets.all(12.0),
+                          child: SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        )
+                      : _searchAddressController.text.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear),
+                              onPressed: () {
+                                _searchAddressController.clear();
+                                setState(() {
+                                  _searchResults.clear();
+                                });
+                              },
+                            )
+                          : null,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+              if (_searchResults.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Container(
+                  constraints: const BoxConstraints(maxHeight: 200),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.grey.shade200),
+                  ),
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: _searchResults.length,
+                    itemBuilder: (context, index) {
+                      final result = _searchResults[index];
+                      return ListTile(
+                        leading: const Icon(Icons.place, color: AppColors.primary),
+                        title: Text(result['description']),
+                        onTap: () => _selectAddress(result),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        // Bouton position actuelle
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: _isGettingCurrentLocation ? null : _getCurrentLocation,
+            icon: _isGettingCurrentLocation
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.my_location),
+            label: Text(_isGettingCurrentLocation
+                ? 'Récupération de la position...'
+                : 'Utiliser ma position actuelle'),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        // Divider avec "OU"
+        Row(
+          children: [
+            Expanded(child: Divider(color: Colors.grey.shade300)),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Text(
+                'OU',
+                style: TextStyle(
+                  color: Colors.grey.shade600,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            Expanded(child: Divider(color: Colors.grey.shade300)),
+          ],
+        ),
+        const SizedBox(height: 12),
+        // Bouton créer manuellement
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: () => _showCreateAddressDialog(context),
+            icon: const Icon(Icons.add_location_alt),
+            label: const Text('Créer une adresse manuellement'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // Affiche le dialogue de création d'adresse
+  Future<void> _showCreateAddressDialog(BuildContext context) async {
+    final TextEditingController villeController = TextEditingController();
+    final TextEditingController communeController = TextEditingController();
+    final TextEditingController quartierController = TextEditingController();
+    final TextEditingController avenueController = TextEditingController();
+    final TextEditingController numeroController = TextEditingController();
+    final TextEditingController paysController = TextEditingController(text: 'RDC');
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: const Row(
+            children: [
+              Icon(Icons.add_location_alt, color: AppColors.primary),
+              SizedBox(width: 8),
+              Text('Nouvelle adresse'),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: paysController,
+                  decoration: const InputDecoration(
+                    labelText: 'Pays',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.flag),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: villeController,
+                  decoration: const InputDecoration(
+                    labelText: 'Ville *',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.location_city),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: communeController,
+                  decoration: const InputDecoration(
+                    labelText: 'Commune *',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.business),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: quartierController,
+                  decoration: const InputDecoration(
+                    labelText: 'Quartier *',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.home),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: avenueController,
+                  decoration: const InputDecoration(
+                    labelText: 'Avenue',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.streetview),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: numeroController,
+                  decoration: const InputDecoration(
+                    labelText: 'Numéro',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.numbers),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Annuler'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                if (villeController.text.trim().isEmpty ||
+                    communeController.text.trim().isEmpty ||
+                    quartierController.text.trim().isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Veuillez remplir les champs obligatoires (*)'),
+                      backgroundColor: Colors.orange,
+                    ),
+                  );
+                  return;
+                }
+                Navigator.pop(context);
+                _createAddress(
+                  context,
+                  villeController.text.trim(),
+                  communeController.text.trim(),
+                  quartierController.text.trim(),
+                  avenueController.text.trim(),
+                  numeroController.text.trim(),
+                  paysController.text.trim(),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Créer'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // Crée une adresse dans Firestore
+  Future<void> _createAddress(
+    BuildContext context,
+    String ville,
+    String commune,
+    String quartier,
+    String avenue,
+    String numero,
+    String pays,
+  ) async {
+    final authState = context.read<AuthCubit>().state;
+    if (authState is! AuthSuccess || authState.user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Erreur: Utilisateur non connecté'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    final userId = authState.user!['id']?.toString() ?? '';
+    final userName =
+        '${authState.user!['firstName'] ?? ''} ${authState.user!['lastName'] ?? ''}'.trim();
+
+    try {
+      // Afficher un loader
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+
+      final docRef = await FirebaseFirestore.instance
+          .collection('delivery_addresses')
+          .add({
+        'timestamp': FieldValue.serverTimestamp(),
+        'userId': userId,
+        'userName': userName,
+        'ville': ville,
+        'commune': commune,
+        'quartier': quartier,
+        'avenue': avenue,
+        'numero': numero,
+        'pays': pays,
+        'phone': authState.user!['phone'] ?? '',
+        'latitude': 0.0,
+        'longitude': 0.0,
+      });
+
+      // Fermer le loader
+      if (context.mounted) {
+        Navigator.pop(context);
+      }
+
+      // Récupérer l'adresse créée
+      final addressDoc = await docRef.get();
+      final addressData = addressDoc.data() as Map<String, dynamic>;
+      final addressId = addressDoc.id;
+
+      // Fermer le loader et demander confirmation
+      if (context.mounted) {
+        _showAddressConfirmationDialog(
+          context,
+          addressId,
+          addressData,
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        Navigator.pop(context); // Fermer le loader en cas d'erreur
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur lors de la création: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  // Affiche le dialogue de confirmation pour utiliser l'adresse ou en créer une autre
+  Future<void> _showAddressConfirmationDialog(
+    BuildContext context,
+    String addressId,
+    Map<String, dynamic> addressData,
+  ) async {
+    final addressString =
+        '${addressData['quartier'] ?? ''}, ${addressData['commune'] ?? ''}, ${addressData['ville'] ?? ''}';
+
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: const Row(
+            children: [
+              Icon(Icons.check_circle_outline, color: Colors.green),
+              SizedBox(width: 8),
+              Text('Adresse créée'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Votre adresse a été créée avec succès !',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  addressString,
+                  style: const TextStyle(fontSize: 14),
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Voulez-vous utiliser cette adresse pour votre commande ?',
+                style: TextStyle(fontSize: 14),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Créer une autre adresse'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Utiliser cette adresse'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (result == true) {
+      // Utiliser l'adresse créée
+      setState(() {
+        selectedAddress = {
+          ...addressData,
+          'id': addressId,
+        };
+        selectedAddressId = addressId;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Adresse sélectionnée avec succès'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } else if (result == false) {
+      // Créer une autre adresse
+      _showCreateAddressDialog(context);
+    }
+  }
+
   Future<void> _initializeOrder() async {
+    // Empêcher les appels multiples
+    if (_isInitializing) {
+      print('⚠️ [AddressSelectionScreen] Initialisation déjà en cours');
+      return;
+    }
+    
+    setState(() {
+      _isInitializing = true;
+    });
+    
     print('🚀 [AddressSelectionScreen] _initializeOrder - Début');
     print('   Selected Address: ${selectedAddress != null ? 'Oui' : 'Non'}');
     // print('   Extracted Address Data: ${_extractedAddressData.isNotEmpty ? 'Oui' : 'Non'}');
@@ -315,6 +1202,9 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
     //   };
     // } 
     else {
+      setState(() {
+        _isInitializing = false;
+      });
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Veuillez sélectionner une adresse'),
@@ -325,6 +1215,9 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
     }
 
     if (latitude == 0.0 || longitude == 0.0) {
+      setState(() {
+        _isInitializing = false;
+      });
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Impossible d\'obtenir les coordonnées GPS. Veuillez réessayer.'),
@@ -358,13 +1251,31 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
 
     // Initialiser la commande
     print('🔄 [AddressSelectionScreen] Appel de initializeOrder...');
-    await context.read<OrderCubit>().initializeOrder(
-          products: productsToSend,
-          latitude: latitude,
-          longitude: longitude,
-          address: addressToUse,
+    try {
+      await context.read<OrderCubit>().initializeOrder(
+            products: productsToSend,
+            latitude: latitude,
+            longitude: longitude,
+            address: addressToUse,
+          );
+      print('✅ [AddressSelectionScreen] initializeOrder appelé');
+    } catch (e) {
+      print('❌ [AddressSelectionScreen] Erreur lors de l\'initialisation: $e');
+      // Réinitialiser le loader en cas d'erreur
+      if (mounted) {
+        setState(() {
+          _isInitializing = false;
+        });
+      }
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur lors de l\'initialisation: $e'),
+            backgroundColor: Colors.red,
+          ),
         );
-    print('✅ [AddressSelectionScreen] initializeOrder appelé');
+      }
+    }
   }
 
   @override
@@ -383,38 +1294,19 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
           // Marquer comme en cours de traitement pour éviter les appels multiples
           _isProcessingRedirect = true;
           
-          // Afficher un loader simple
-          showDialog(
-            context: context,
-            barrierDismissible: false,
-            builder: (BuildContext dialogContext) {
-              return WillPopScope(
-                onWillPop: () async => false,
-                child: const Center(
-                  child: CircularProgressIndicator(
-                    color: AppColors.primary,
-                  ),
-                ),
-              );
-            },
-          );
-
+          // Réinitialiser le flag local
+          _isInitializing = false;
+          
           // Vider le panier
           print('🛒 [AddressSelectionScreen] Vidage du panier...');
           context.read<CartCubit>().clearCart();
           
-          // Rafraîchir les commandes de manière asynchrone
+          // Rafraîchir les commandes et naviguer directement
           print('📥 [AddressSelectionScreen] Récupération des commandes...');
           context.read<OrderCubit>().fetchOrders(status: 'pending_payment').then((_) {
             print('✅ [AddressSelectionScreen] Commandes récupérées avec succès');
             
-            // Fermer le loader si le contexte est encore monté
-            if (context.mounted) {
-              Navigator.of(context, rootNavigator: true).pop();
-              print('🚪 [AddressSelectionScreen] Loader fermé');
-            }
-            
-            // Naviguer vers l'écran de paiement en attente
+            // Naviguer directement vers l'écran de paiement en attente
             if (context.mounted) {
               print('🧭 [AddressSelectionScreen] Navigation vers PendingPaymentScreen...');
               Navigator.pushAndRemoveUntil(
@@ -435,10 +1327,8 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
             }
           }).catchError((error) {
             print('❌ [AddressSelectionScreen] Erreur lors de la récupération des commandes: $error');
-            // Fermer le loader même en cas d'erreur
+            // Naviguer quand même vers l'écran de paiement en attente
             if (context.mounted) {
-              Navigator.of(context, rootNavigator: true).pop();
-              // Naviguer quand même vers l'écran de paiement en attente
               Navigator.pushAndRemoveUntil(
                 context,
                 MaterialPageRoute(
@@ -448,14 +1338,30 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
               );
             }
           });
-        } else if (state.error != null) {
+        }
+        
+        // Gérer les erreurs
+        if (state.error != null) {
           print('❌ [AddressSelectionScreen] Erreur détectée: ${state.error}');
+          if (_isInitializing) {
+            setState(() {
+              _isInitializing = false;
+            });
+          }
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(state.error!),
               backgroundColor: Colors.red,
             ),
           );
+        }
+        
+        // Si l'état n'est plus en chargement et qu'on était en train d'initialiser, réinitialiser le flag
+        if (!state.isLoading && _isInitializing && !state.success && state.error == null) {
+          // L'état a changé mais sans succès ni erreur explicite, réinitialiser quand même
+          setState(() {
+            _isInitializing = false;
+          });
         }
       },
       builder: (context, orderState) {
@@ -499,7 +1405,8 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
                     }
 
                     if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                      return const SizedBox.shrink();
+                      // Aucune adresse trouvée - proposer d'en créer une
+                      return _buildNoAddressWidget(context);
                     }
 
                     return Column(
@@ -531,6 +1438,7 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
                           ],
                         ),
                         const SizedBox(height: 16),
+                        // Liste des adresses
                         ...snapshot.data!.docs.map((doc) {
                           final address =
                               doc.data() as Map<String, dynamic>;
@@ -677,7 +1585,10 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
                             ),
                           );
                         }).toList(),
-                        const SizedBox(height: 32),
+                        const SizedBox(height: 16),
+                        // Bouton ajouter une nouvelle adresse
+                        _buildAddNewAddressButton(context),
+                        const SizedBox(height: 16),
                       ],
                     );
                   },
@@ -1166,10 +2077,11 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
           // Bouton SUIVANT fixe en bas
           bottomNavigationBar: BlocBuilder<OrderCubit, OrderState>(
             builder: (context, currentOrderState) {
-              // Le bouton est toujours actif sauf pendant le chargement
-              final isButtonEnabled = !currentOrderState.isLoading && !_isProcessingRedirect;
+              // Le bouton est toujours actif, mais désactivé pendant le chargement
+              final isLoading = currentOrderState.isLoading || _isInitializing;
+              final isButtonEnabled = !isLoading && !_isProcessingRedirect;
               
-              print('🔘 [AddressSelectionScreen] Bouton - isLoading: ${currentOrderState.isLoading}, enabled: $isButtonEnabled');
+              print('🔘 [AddressSelectionScreen] Bouton - isLoading: $isLoading, enabled: $isButtonEnabled');
               
               return Container(
                 padding: EdgeInsets.only(
@@ -1209,6 +2121,7 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
                               return;
                             }
                             
+                            // Initialiser la commande (le loader sera géré dans _initializeOrder)
                             _initializeOrder();
                           }
                         : null,
@@ -1223,8 +2136,29 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    child: currentOrderState.isLoading
-                        ? const EcommerceLoading.inline(color: Colors.white)
+                    child: isLoading
+                        ? Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              const Text(
+                                'Traitement...',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 16,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ],
+                          )
                         : const Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [

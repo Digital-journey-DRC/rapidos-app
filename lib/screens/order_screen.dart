@@ -187,15 +187,13 @@ class _OrderScreenState extends State<OrderScreen> {
       case 'pending':
         return AppColors.buttonColor2;
       case 'en_preparation':
-      case 'colis en cours de préparation':
+      case 'in_preparation':
         return Colors.orange;
       case 'pret_a_expedier':
-      case 'prêt à expédier':
       case 'ready_to_ship':
         return Colors.blue;
-      case 'en_route':
-      case 'en route pour livraison':
       case 'in_delivery':
+      case 'en_route':
         return Colors.green;
       case 'delivered':
         return Colors.green;
@@ -237,10 +235,13 @@ class _OrderScreenState extends State<OrderScreen> {
   /// Widget pour afficher les statistiques des commandes
   Widget _buildStatsSection(Map<String, dynamic> stats) {
     final total = stats['total'] ?? 0;
+    // Harmoniser avec les statuts réels du backend
     final pendingPayment = stats['pending_payment'] ?? 0;
     final pending = stats['pending'] ?? 0;
-    final inPreparation = stats['in_preparation'] ?? 0;
-    final readyToShip = stats['ready_to_ship'] ?? 0;
+    // Les stats peuvent utiliser 'in_preparation' mais les commandes utilisent 'en_preparation'
+    final inPreparation = (stats['in_preparation'] ?? 0) + (stats['en_preparation'] ?? 0);
+    // Les stats peuvent utiliser 'ready_to_ship' mais les commandes utilisent 'pret_a_expedier'
+    final readyToShip = (stats['ready_to_ship'] ?? 0) + (stats['pret_a_expedier'] ?? 0);
     final inDelivery = stats['in_delivery'] ?? 0;
     final delivered = stats['delivered'] ?? 0;
     final cancelled = stats['cancelled'] ?? 0;
@@ -384,15 +385,13 @@ class _OrderScreenState extends State<OrderScreen> {
       case 'pending':
         return 'EN ATTENTE';
       case 'en_preparation':
-      case 'colis en cours de préparation':
+      case 'in_preparation':
         return 'EN PRÉPARATION';
       case 'pret_a_expedier':
-      case 'prêt à expédier':
       case 'ready_to_ship':
         return 'PRÊT À EXPÉDIER';
-      case 'en_route':
-      case 'en route pour livraison':
       case 'in_delivery':
+      case 'en_route':
         return 'EN ROUTE';
       case 'delivered':
         return 'LIVRÉ';
@@ -851,11 +850,11 @@ class _OrderScreenState extends State<OrderScreen> {
                             children: [
                               _buildStatusFilterChip('Tous', 'Tous'),
                               const SizedBox(width: 8),
-                              _buildStatusFilterChip('Prêt à expédier', 'prêt à expédier'),
+                              _buildStatusFilterChip('PRÊT À EXPÉDIER', 'pret_a_expedier'),
                               const SizedBox(width: 8),
-                              _buildStatusFilterChip('En route', 'en route pour livraison'),
+                              _buildStatusFilterChip('EN ROUTE', 'in_delivery'),
                               const SizedBox(width: 8),
-                              _buildStatusFilterChip('Livré', 'delivered'),
+                              _buildStatusFilterChip('LIVRÉ', 'delivered'),
                             ],
                           ),
                         ),
@@ -919,17 +918,19 @@ class _OrderScreenState extends State<OrderScreen> {
                             children: [
                               _buildStatusFilterChip('Tous', 'Tous'),
                               const SizedBox(width: 8),
-                              _buildStatusFilterChip('En attente', 'pending'),
+                              _buildStatusFilterChip('EN ATTENTE', 'pending'),
                               const SizedBox(width: 8),
-                              _buildStatusFilterChip('En préparation', 'colis en cours de préparation'),
+                              _buildStatusFilterChip('EN PRÉPARATION', 'en_preparation'),
                               const SizedBox(width: 8),
-                              _buildStatusFilterChip('Prêt à expédier', 'prêt à expédier'),
+                              _buildStatusFilterChip('PRÊT À EXPÉDIER', 'pret_a_expedier'),
                               const SizedBox(width: 8),
-                              _buildStatusFilterChip('En route', 'en route pour livraison'),
+                              _buildStatusFilterChip('EN ROUTE', 'in_delivery'),
                               const SizedBox(width: 8),
-                              _buildStatusFilterChip('Livré', 'delivered'),
+                              _buildStatusFilterChip('LIVRÉ', 'delivered'),
                               const SizedBox(width: 8),
-                              _buildStatusFilterChip('Rejeté', 'rejected'),
+                              _buildStatusFilterChip('ANNULÉ', 'cancelled'),
+                              const SizedBox(width: 8),
+                              _buildStatusFilterChip('REJETÉ', 'rejected'),
                             ],
                           ),
                         ),
@@ -1006,11 +1007,13 @@ class _OrderScreenState extends State<OrderScreen> {
                                 const SizedBox(width: 8),
                                 _buildStatusFilterChip('PRÊT À EXPÉDIER', 'pret_a_expedier'),
                                 const SizedBox(width: 8),
-                                _buildStatusFilterChip('EN ROUTE', 'en_route'),
+                                _buildStatusFilterChip('EN ROUTE', 'in_delivery'),
                                 const SizedBox(width: 8),
                                 _buildStatusFilterChip('LIVRÉ', 'delivered'),
                                 const SizedBox(width: 8),
                                 _buildStatusFilterChip('ANNULÉ', 'cancelled'),
+                                const SizedBox(width: 8),
+                                _buildStatusFilterChip('REJETÉ', 'rejected'),
                               ],
                             ),
                           ),
@@ -1200,17 +1203,23 @@ class _OrderScreenState extends State<OrderScreen> {
             : orderListState.orders.where((order) {
                 final status = order['status']?.toString().toLowerCase() ?? '';
                 final filterStatus = _selectedStatusFilter.toLowerCase();
-                // Gérer les correspondances de statuts
-                if (filterStatus == 'pending_payment') {
+                
+                // Gérer les correspondances de statuts (harmoniser avec les statuts réels du backend)
+                if (filterStatus == 'tous' || filterStatus == 'all') {
+                  return true;
+                } else if (filterStatus == 'pending_payment') {
                   return status == 'pending_payment';
                 } else if (filterStatus == 'pending') {
                   return status == 'pending';
                 } else if (filterStatus == 'en_preparation') {
-                  return status == 'en_preparation' || status == 'colis en cours de préparation';
+                  // Accepter les deux variantes
+                  return status == 'en_preparation' || status == 'in_preparation';
                 } else if (filterStatus == 'pret_a_expedier') {
-                  return status == 'pret_a_expedier' || status == 'prêt à expédier' || status == 'ready_to_ship';
-                } else if (filterStatus == 'en_route') {
-                  return status == 'en_route' || status == 'en route pour livraison' || status == 'in_delivery';
+                  // Accepter les deux variantes
+                  return status == 'pret_a_expedier' || status == 'ready_to_ship';
+                } else if (filterStatus == 'in_delivery' || filterStatus == 'en_route') {
+                  // Accepter les deux variantes
+                  return status == 'in_delivery' || status == 'en_route';
                 } else if (filterStatus == 'delivered') {
                   return status == 'delivered';
                 } else if (filterStatus == 'cancelled') {
@@ -1505,7 +1514,7 @@ class _OrderScreenState extends State<OrderScreen> {
                               ],
                             ),
                             const SizedBox(height: 12),
-                            // Montant total
+                            // Montant total et actions
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
@@ -1530,10 +1539,47 @@ class _OrderScreenState extends State<OrderScreen> {
                                     ),
                                   ],
                                 ),
-                                Icon(
-                                  Icons.chevron_right,
-                                  size: 20,
-                                  color: Colors.grey.shade400,
+                                Row(
+                                  children: [
+                                    // Bouton générer PDF
+                                    Container(
+                                      padding: const EdgeInsets.all(6),
+                                      decoration: BoxDecoration(
+                                        color: Colors.red.withOpacity(0.1),
+                                        borderRadius: BorderRadius.circular(6),
+                                        border: Border.all(
+                                          color: Colors.red.withOpacity(0.2),
+                                          width: 1,
+                                        ),
+                                      ),
+                                      child: InkWell(
+                                        onTap: () {
+                                          final productsList = List<Map<String, dynamic>>.from(
+                                            products.map((product) => product is Map 
+                                              ? Map<String, dynamic>.from(product) 
+                                              : <String, dynamic>{}),
+                                          );
+                                          _generateInvoiceForClient(
+                                            context,
+                                            order,
+                                            orderId,
+                                            productsList,
+                                          );
+                                        },
+                                        child: Icon(
+                                          Icons.picture_as_pdf,
+                                          size: 16,
+                                          color: Colors.red.shade700,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Icon(
+                                      Icons.chevron_right,
+                                      size: 20,
+                                      color: Colors.grey.shade400,
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),

@@ -31,11 +31,15 @@ class OrderDetailsScreen extends StatefulWidget {
 
 class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
   List<CameraDescription>? cameras;
+  Map<String, dynamic>? _currentOrderData; // Pour stocker les données mises à jour
+  bool _isUploadingPhoto = false; // Pour le loader du bouton upload photo
+  bool _isMarkingReady = false; // Pour le loader du bouton prêt à expédier
 
   @override
   void initState() {
     super.initState();
     _initializeCameras();
+    _currentOrderData = widget.orderData; // Initialiser avec les données du widget
   }
 
   Future<void> _initializeCameras() async {
@@ -500,15 +504,18 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     final authState = context.read<AuthCubit>().state;
     final String? userRole = (authState is AuthSuccess) ? authState.user != null ? authState.user!['role'] : null : null;
     
+    // Utiliser _currentOrderData si disponible, sinon widget.orderData
+    final orderData = _currentOrderData ?? widget.orderData;
+    
     // Nouvelle structure de données
-    final items = widget.orderData['items'] as List? ?? widget.orderData['products'] as List? ?? [];
-    final status = widget.orderData['status']?.toString() ?? 'pending';
-    final createdAt = widget.orderData['createdAt']?.toString() ?? '';
-    final updatedAt = widget.orderData['updatedAt']?.toString() ?? '';
-    final address = widget.orderData['address'] as Map<String, dynamic>? ?? {};
-    final phone = widget.orderData['phone']?.toString() ?? '';
+    final items = orderData['items'] as List? ?? orderData['products'] as List? ?? [];
+    final status = orderData['status']?.toString() ?? 'pending';
+    final createdAt = orderData['createdAt']?.toString() ?? '';
+    final updatedAt = orderData['updatedAt']?.toString() ?? '';
+    final address = orderData['address'] as Map<String, dynamic>? ?? {};
+    final phone = orderData['phone']?.toString() ?? '';
     // Extraire le nom du client depuis l'email ou utiliser une valeur par défaut
-    final clientEmail = widget.orderData['client']?.toString() ?? '';
+    final clientEmail = orderData['client']?.toString() ?? '';
     String clientName = 'Client';
     if (clientEmail.isNotEmpty) {
       // Extraire le nom depuis l'email (partie avant @)
@@ -517,15 +524,15 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
         clientName = nameFromEmail[0].toUpperCase() + nameFromEmail.substring(1);
       }
     }
-    final packagePhoto = widget.orderData['packagePhoto']?.toString();
-    final paymentMethod = widget.orderData['paymentMethod'] as Map<String, dynamic>? ?? {};
-    final numeroPayment = widget.orderData['numeroPayment']?.toString();
-    final codeColis = widget.orderData['codeColis']?.toString();
-    final distanceKm = widget.orderData['distanceKm']?.toString() ?? '';
+    final packagePhoto = orderData['packagePhoto']?.toString();
+    final paymentMethod = orderData['paymentMethod'] as Map<String, dynamic>? ?? {};
+    final numeroPayment = orderData['numeroPayment']?.toString();
+    final codeColis = orderData['codeColis']?.toString();
+    final distanceKm = orderData['distanceKm']?.toString() ?? '';
     
     // Calculer les totaux
-    final totalProduit = _parseAmount(widget.orderData['total'] ?? 0);
-    final deliveryFee = _parseAmount(widget.orderData['deliveryFee'] ?? 0);
+    final totalProduit = _parseAmount(orderData['total'] ?? 0);
+    final deliveryFee = _parseAmount(orderData['deliveryFee'] ?? 0);
     final totalAvecLivraison = totalProduit + deliveryFee;
     
     // Formater l'adresse
@@ -1319,8 +1326,8 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                         orderId: widget.orderId,
                         orderData: widget.orderData,
                         onStatusChanged: () {
-                          // Rafraîchir les données si nécessaire
-                          Navigator.pop(context);
+                          // Ne pas naviguer, juste rafraîchir les données
+                          // Les données sont déjà mises à jour via setState dans les méthodes
                         },
                       ),
                     // Boutons pour en_preparation (workflow séquentiel)
@@ -1330,7 +1337,8 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                         widget.orderId, 
                         packagePhoto,
                         onStatusChanged: () {
-                          Navigator.pop(context, true);
+                          // Ne pas naviguer, juste rafraîchir les données
+                          // Les données sont déjà mises à jour via setState dans les méthodes
                         },
                       ),
                     ],
@@ -1732,26 +1740,67 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
           if (packagePhoto == null || packagePhoto.isEmpty)
             SizedBox(
               width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: () async {
-                  await _uploadPackagePhoto(context, orderId);
-                  if (onStatusChanged != null) {
-                    onStatusChanged();
-                  }
-                },
-                icon: const Icon(Icons.camera_alt, size: 16),
-                label: const Text(
-                  'Prendre une photo du colis',
-                  style: TextStyle(fontSize: 12),
-                ),
+              child: ElevatedButton(
+                onPressed: _isUploadingPhoto
+                    ? null
+                    : () async {
+                        setState(() {
+                          _isUploadingPhoto = true;
+                        });
+                        await _uploadPackagePhoto(context, orderId);
+                        setState(() {
+                          _isUploadingPhoto = false;
+                        });
+                        if (onStatusChanged != null) {
+                          onStatusChanged();
+                        }
+                      },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.blue,
                   foregroundColor: Colors.white,
+                  disabledBackgroundColor: Colors.grey.shade300,
+                  disabledForegroundColor: Colors.grey.shade600,
                   padding: const EdgeInsets.symmetric(vertical: 10),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),
                   ),
                 ),
+                child: _isUploadingPhoto
+                    ? Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          const Text(
+                            'Traitement...',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      )
+                    : const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.camera_alt, size: 16),
+                          SizedBox(width: 8),
+                          Text(
+                            'Prendre une photo du colis',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
               ),
             )
           else ...[
@@ -1783,28 +1832,67 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
           ],
           SizedBox(
             width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: packagePhoto != null && packagePhoto.isNotEmpty
+            child: ElevatedButton(
+              onPressed: (packagePhoto != null && packagePhoto.isNotEmpty && !_isMarkingReady)
                   ? () async {
+                      setState(() {
+                        _isMarkingReady = true;
+                      });
                       await _markReadyToShip(context, orderId);
+                      setState(() {
+                        _isMarkingReady = false;
+                      });
                       if (onStatusChanged != null) {
                         onStatusChanged();
                       }
                     }
                   : null,
-              icon: const Icon(Icons.local_shipping, size: 16),
-              label: const Text(
-                'Marquer prêt à expédier',
-                style: TextStyle(fontSize: 12),
-              ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.orange,
                 foregroundColor: Colors.white,
+                disabledBackgroundColor: Colors.grey.shade300,
+                disabledForegroundColor: Colors.grey.shade600,
                 padding: const EdgeInsets.symmetric(vertical: 10),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
                 ),
               ),
+              child: _isMarkingReady
+                  ? Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        const Text(
+                          'Traitement...',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    )
+                  : const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.local_shipping, size: 16),
+                        SizedBox(width: 8),
+                        Text(
+                          'Marquer prêt à expédier',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
             ),
           ),
         ],
@@ -1825,6 +1913,11 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
 
       if (image == null) {
         print('❌ [OrderDetailsScreen] Aucune image sélectionnée');
+        if (mounted) {
+          setState(() {
+            _isUploadingPhoto = false;
+          });
+        }
         return;
       }
 
@@ -1847,6 +1940,15 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
       if (context.mounted) {
         if (result['success'] == true) {
           print('✅ [OrderDetailsScreen] Photo uploadée avec succès');
+          
+          // Mettre à jour les données localement avec les nouvelles données de la commande
+          if (result['order'] != null) {
+            setState(() {
+              _currentOrderData = Map<String, dynamic>.from(result['order']);
+            });
+            print('🔄 [OrderDetailsScreen] Données de la commande mises à jour localement');
+          }
+          
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Photo uploadée avec succès. Vous pouvez maintenant marquer la commande comme prête à expédier.'),
@@ -1854,10 +1956,14 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
               duration: Duration(seconds: 3),
             ),
           );
-          // Rafraîchir les données pour afficher l'étape suivante
-          Navigator.pop(context, true);
+          // Rester sur la même page - les données sont déjà mises à jour via setState
         } else {
           print('❌ [OrderDetailsScreen] Erreur: ${result['message']}');
+          if (mounted) {
+            setState(() {
+              _isUploadingPhoto = false;
+            });
+          }
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(result['message'] ?? 'Erreur lors de l\'upload'),
@@ -1869,6 +1975,9 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     } catch (e) {
       print('💥 [OrderDetailsScreen] Exception: $e');
       if (context.mounted) {
+        setState(() {
+          _isUploadingPhoto = false;
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Erreur: $e'),
@@ -1895,16 +2004,29 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
       if (context.mounted) {
         if (result['success'] == true) {
           print('✅ [OrderDetailsScreen] Commande marquée comme prête à expédier');
+          
+          // Mettre à jour les données localement avec les nouvelles données de la commande
+          if (result['order'] != null) {
+            setState(() {
+              _currentOrderData = Map<String, dynamic>.from(result['order']);
+            });
+            print('🔄 [OrderDetailsScreen] Données de la commande mises à jour localement');
+          }
+          
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Commande marquée comme prête à expédier'),
               backgroundColor: Colors.green,
             ),
           );
-          // Rafraîchir les données
-          Navigator.pop(context, true);
+          // Rester sur la même page - les données sont déjà mises à jour via setState
         } else {
           print('❌ [OrderDetailsScreen] Erreur: ${result['message']}');
+          if (mounted) {
+            setState(() {
+              _isMarkingReady = false;
+            });
+          }
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(result['message'] ?? 'Erreur lors de la mise à jour'),
@@ -1916,6 +2038,9 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     } catch (e) {
       print('💥 [OrderDetailsScreen] Exception: $e');
       if (context.mounted) {
+        setState(() {
+          _isMarkingReady = false;
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Erreur: $e'),
@@ -1944,73 +2069,10 @@ class _VendeurOrderActionsWidget extends StatefulWidget {
 }
 
 class _VendeurOrderActionsWidgetState extends State<_VendeurOrderActionsWidget> {
-  bool _isAccepted = false;
-  bool _isRejected = false;
   bool _isProcessing = false;
+  String? _processingAction; // Pour savoir quel bouton est en cours de traitement
 
-  @override
-  void initState() {
-    super.initState();
-    final status = widget.orderData['status']?.toString() ?? 'pending';
-    _isAccepted = status == 'accepted' || status == 'en_preparation';
-    _isRejected = status == 'rejected' || status == 'cancelled';
-  }
-
-  Future<void> _acceptOrder() async {
-    if (_isProcessing) return;
-    
-    setState(() {
-      _isProcessing = true;
-    });
-
-    try {
-      final result = await context.read<OrderCubit>().updateOrderStatus(
-        orderId: widget.orderId,
-        status: 'accepted',
-        reason: 'Commande acceptée',
-      );
-
-      if (mounted) {
-        if (result['success'] == true) {
-          setState(() {
-            _isAccepted = true;
-            _isRejected = false;
-          });
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Commande acceptée'),
-              backgroundColor: Colors.green,
-            ),
-          );
-          widget.onStatusChanged();
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(result['message'] ?? 'Erreur lors de l\'acceptation'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erreur: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isProcessing = false;
-        });
-      }
-    }
-  }
-
-  Future<void> _rejectOrder() async {
+  Future<void> _cancelOrder() async {
     if (_isProcessing) return;
 
     final TextEditingController reasonController = TextEditingController();
@@ -2021,16 +2083,16 @@ class _VendeurOrderActionsWidgetState extends State<_VendeurOrderActionsWidget> 
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
-          title: const Text('Rejeter la commande'),
+          title: const Text('Annuler la commande'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text('Veuillez indiquer la raison du rejet :'),
+              const Text('Veuillez indiquer la raison de l\'annulation :'),
               const SizedBox(height: 12),
               TextField(
                 controller: reasonController,
                 decoration: const InputDecoration(
-                  hintText: 'Raison du rejet...',
+                  hintText: 'Raison de l\'annulation...',
                   border: OutlineInputBorder(),
                 ),
                 maxLines: 3,
@@ -2040,7 +2102,7 @@ class _VendeurOrderActionsWidgetState extends State<_VendeurOrderActionsWidget> 
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context, false),
-              child: const Text('Annuler'),
+              child: const Text('Retour'),
             ),
             ElevatedButton(
               onPressed: () {
@@ -2052,7 +2114,7 @@ class _VendeurOrderActionsWidgetState extends State<_VendeurOrderActionsWidget> 
                 backgroundColor: Colors.red,
                 foregroundColor: Colors.white,
               ),
-              child: const Text('Rejeter'),
+              child: const Text('Annuler la commande'),
             ),
           ],
         );
@@ -2065,24 +2127,21 @@ class _VendeurOrderActionsWidgetState extends State<_VendeurOrderActionsWidget> 
 
     setState(() {
       _isProcessing = true;
+      _processingAction = 'cancel';
     });
 
     try {
       final result = await context.read<OrderCubit>().updateOrderStatus(
         orderId: widget.orderId,
-        status: 'rejected',
+        status: 'cancelled',
         reason: reasonController.text.trim(),
       );
 
       if (mounted) {
         if (result['success'] == true) {
-          setState(() {
-            _isRejected = true;
-            _isAccepted = false;
-          });
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Commande rejetée'),
+              content: Text('Commande annulée'),
               backgroundColor: Colors.orange,
             ),
           );
@@ -2090,7 +2149,7 @@ class _VendeurOrderActionsWidgetState extends State<_VendeurOrderActionsWidget> 
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(result['message'] ?? 'Erreur lors du rejet'),
+              content: Text(result['message'] ?? 'Erreur lors de l\'annulation'),
               backgroundColor: Colors.red,
             ),
           );
@@ -2109,6 +2168,7 @@ class _VendeurOrderActionsWidgetState extends State<_VendeurOrderActionsWidget> 
       if (mounted) {
         setState(() {
           _isProcessing = false;
+          _processingAction = null;
         });
       }
     }
@@ -2119,6 +2179,7 @@ class _VendeurOrderActionsWidgetState extends State<_VendeurOrderActionsWidget> 
 
     setState(() {
       _isProcessing = true;
+      _processingAction = 'start';
     });
 
     try {
@@ -2219,112 +2280,13 @@ class _VendeurOrderActionsWidgetState extends State<_VendeurOrderActionsWidget> 
             ],
           ),
           const SizedBox(height: 12),
-          // Boutons Accepter et Rejeter alignés
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: _isAccepted || _isRejected || _isProcessing
-                      ? null
-                      : _acceptOrder,
-                  icon: Icon(
-                    Icons.check_circle_outline,
-                    size: 16,
-                    color: _isAccepted
-                        ? Colors.green
-                        : (_isRejected || _isProcessing
-                            ? Colors.grey
-                            : AppColors.primary),
-                  ),
-                  label: Text(
-                    _isAccepted ? 'Acceptée' : 'Accepter',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: _isAccepted
-                          ? Colors.green
-                          : (_isRejected || _isProcessing
-                              ? Colors.grey
-                              : AppColors.primary),
-                    ),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    side: BorderSide(
-                      color: _isAccepted
-                          ? Colors.green
-                          : (_isRejected || _isProcessing
-                              ? Colors.grey.shade300
-                              : AppColors.primary),
-                      width: 1.5,
-                    ),
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: _isAccepted || _isRejected || _isProcessing
-                      ? null
-                      : _rejectOrder,
-                  icon: Icon(
-                    Icons.cancel_outlined,
-                    size: 16,
-                    color: _isRejected
-                        ? Colors.red
-                        : (_isAccepted || _isProcessing
-                            ? Colors.grey
-                            : Colors.red.shade600),
-                  ),
-                  label: Text(
-                    _isRejected ? 'Rejetée' : 'Rejeter',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: _isRejected
-                          ? Colors.red
-                          : (_isAccepted || _isProcessing
-                              ? Colors.grey
-                              : Colors.red.shade600),
-                    ),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    side: BorderSide(
-                      color: _isRejected
-                          ? Colors.red
-                          : (_isAccepted || _isProcessing
-                              ? Colors.grey.shade300
-                              : Colors.red.shade600),
-                      width: 1.5,
-                    ),
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          // Bouton Commencer la préparation (toujours actif)
+          // Bouton Commencer la préparation (en haut)
           SizedBox(
             width: double.infinity,
-            child: ElevatedButton.icon(
+            child: ElevatedButton(
               onPressed: !_isProcessing
                   ? _startPreparation
                   : null,
-              icon: const Icon(Icons.play_arrow, size: 18),
-              label: const Text(
-                'Commencer la préparation',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
@@ -2336,6 +2298,101 @@ class _VendeurOrderActionsWidgetState extends State<_VendeurOrderActionsWidget> 
                 ),
                 elevation: 2,
               ),
+              child: _isProcessing && _processingAction == 'start'
+                  ? Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        const Text(
+                          'Traitement...',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    )
+                  : const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.play_arrow, size: 18),
+                        SizedBox(width: 8),
+                        Text(
+                          'Commencer la préparation',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          // Bouton Annuler (en bas)
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton(
+              onPressed: !_isProcessing
+                  ? _cancelOrder
+                  : null,
+              style: OutlinedButton.styleFrom(
+                side: BorderSide(
+                  color: Colors.red.shade600,
+                  width: 1.5,
+                ),
+                foregroundColor: Colors.red.shade600,
+                disabledForegroundColor: Colors.grey.shade600,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              child: _isProcessing && _processingAction == 'cancel'
+                  ? Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(Colors.red.shade600),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Text(
+                          'Traitement...',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.red.shade600,
+                          ),
+                        ),
+                      ],
+                    )
+                  : const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.cancel_outlined, size: 18),
+                        SizedBox(width: 8),
+                        Text(
+                          'Annuler',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
             ),
           ),
         ],

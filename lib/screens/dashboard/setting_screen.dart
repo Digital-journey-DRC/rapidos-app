@@ -1549,38 +1549,61 @@ class _SettingScreenState extends State<SettingScreen>
                               });
                             },
                           ),
-                          FutureBuilder<Map<String, dynamic>>(
-                            future: PromotionService().getPromotions(),
-                            builder: (context, snapshot) {
-                              if (snapshot.hasData && snapshot.data!['success'] == true) {
-                                final promotions = snapshot.data!['promotions'] as List<Promotion>;
-                                final activePromos = promotions.where((p) => p.isActive).length;
-                                if (mounted && _promoProductsCount != activePromos) {
-                                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                                    if (mounted) {
-                                      setState(() {
-                                        _promoProductsCount = activePromos;
-                                      });
-                                    }
-                                  });
+                          Builder(
+                            builder: (context) {
+                              // Récupérer l'ID du marchand connecté
+                              final authState = context.read<AuthCubit>().state;
+                              int? merchantId;
+                              
+                              if (authState is AuthSuccess && authState.user != null) {
+                                final userId = authState.user!['id'];
+                                if (userId != null) {
+                                  if (userId is int) {
+                                    merchantId = userId;
+                                  } else if (userId is String) {
+                                    merchantId = int.tryParse(userId);
+                                  } else if (userId is num) {
+                                    merchantId = userId.toInt();
+                                  }
                                 }
                               }
                               
-                              return MerchantSectionCard(
-                                title: 'Produits en promotions',
-                                subtitle: 'Gérer vos produits en promotion',
-                                icon: Icons.local_offer_outlined,
-                                iconColor: Colors.red,
-                                count: _isLoadingCounts ? null : _promoProductsCount,
-                                onTap: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => const MerchantPromoProductsScreen(),
-                                    ),
-                                  ).then((_) {
-                                    _loadMerchantCounts();
-                                  });
+                              return FutureBuilder<Map<String, dynamic>>(
+                                future: merchantId != null
+                                    ? PromotionService().getMerchantPromotions(merchantId)
+                                    : Future.value({'success': false, 'promotions': <Promotion>[]}),
+                                builder: (context, snapshot) {
+                                  if (snapshot.hasData && snapshot.data!['success'] == true) {
+                                    final promotions = snapshot.data!['promotions'] as List<Promotion>;
+                                    final activePromos = promotions.where((p) => p.isActive).length;
+                                    if (mounted && _promoProductsCount != activePromos) {
+                                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                                        if (mounted) {
+                                          setState(() {
+                                            _promoProductsCount = activePromos;
+                                          });
+                                        }
+                                      });
+                                    }
+                                  }
+                                  
+                                  return MerchantSectionCard(
+                                    title: 'Produits en promotions',
+                                    subtitle: 'Gérer vos produits en promotion',
+                                    icon: Icons.local_offer_outlined,
+                                    iconColor: Colors.red,
+                                    count: _isLoadingCounts ? null : _promoProductsCount,
+                                    onTap: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) => const MerchantPromoProductsScreen(),
+                                        ),
+                                      ).then((_) {
+                                        _loadMerchantCounts();
+                                      });
+                                    },
+                                  );
                                 },
                               );
                             },
