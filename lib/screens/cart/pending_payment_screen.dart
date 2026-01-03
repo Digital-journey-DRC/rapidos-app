@@ -1291,9 +1291,7 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> {
                                                       const Spacer(),
                                                       IconButton(
                                                         icon: const Icon(Icons.edit, size: 16),
-                                                        onPressed: selectedPaymentMethod != null
-                                                            ? () => _showPaymentMethodSelection(vendeurId, selectedPaymentMethod, vendeurOrders)
-                                                            : null,
+                                                        onPressed: () => _showPaymentMethodSelection(vendeurId, selectedPaymentMethod ?? {}, vendeurOrders),
                                                         color: AppColors.primary,
                                                         padding: EdgeInsets.zero,
                                                         constraints: const BoxConstraints(),

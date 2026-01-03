@@ -306,6 +306,167 @@ class ProductService {
     }
   }
 
+  /// Récupère les produits de la catégorie Mode
+  /// Endpoint: GET /category/mode/mode
+  /// Accessible à: Clients authentifiés
+  Future<Map<String, dynamic>> getModeProducts() async {
+    try {
+      print('🔍 product_service.getModeProducts - Récupération des produits Mode');
+      print('🔍 product_service.getModeProducts - URL: $baseUrl/category/mode/mode');
+      
+      final token = await StorageService().getToken();
+      
+      if (token == null) {
+        throw Exception('Token d\'authentification manquant');
+      }
+
+      final response = await http.get(
+        Uri.parse('$baseUrl/category/mode/mode'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      ).timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          throw Exception('Timeout: La connexion au serveur a pris trop de temps');
+        },
+      );
+
+      print('🔍 product_service.getModeProducts - Status code: ${response.statusCode}');
+      final responseData = jsonDecode(response.body);
+      print('🔍 product_service.getModeProducts - Response keys: ${responseData.keys.toList()}');
+
+      if (response.statusCode == 200) {
+        final List<dynamic> productsJson = responseData['products'] ?? responseData['data'] ?? [];
+        List<Product> products = [];
+        
+        print('🔍 product_service.getModeProducts - Nombre de produits reçus: ${productsJson.length}');
+        
+        for (var json in productsJson) {
+          try {
+            final productId = json['id']?.toString() ?? 'unknown';
+            print('🔍 product_service.getModeProducts - Parsing product ID: $productId');
+            final product = Product.fromJson(json);
+            products.add(product);
+            print('🔍 product_service.getModeProducts - Product $productId parsé avec succès');
+          } catch (e, stackTrace) {
+            print('🔍 product_service.getModeProducts - Erreur parsing product: $e');
+            print('🔍 product_service.getModeProducts - Stack trace: $stackTrace');
+            print('🔍 product_service.getModeProducts - JSON: $json');
+          }
+        }
+        
+        print('🔍 product_service.getModeProducts - Nombre de produits parsés avec succès: ${products.length}');
+        
+        return {
+          'success': true,
+          'products': products,
+        };
+      } else {
+        throw Exception(
+          responseData['message'] ?? 
+          'Erreur lors de la récupération des produits Mode: ${response.statusCode}'
+        );
+      }
+    } on http.ClientException catch (e) {
+      print('🔍 product_service.getModeProducts - ClientException: $e');
+      return {
+        'success': false,
+        'error': 'Impossible de se connecter au serveur. Vérifiez votre connexion internet.',
+        'products': <Product>[],
+      };
+    } catch (e) {
+      print('🔍 product_service.getModeProducts - Exception: $e');
+      return {
+        'success': false,
+        'error': e.toString(),
+        'products': <Product>[],
+      };
+    }
+  }
+
+  /// Récupère les produits par catégorie
+  /// Endpoint: GET /products/by-category/:categorySlug
+  /// Accessible à: Clients authentifiés
+  Future<Map<String, dynamic>> getProductsByCategory(String categorySlug) async {
+    try {
+      print('🔍 product_service.getProductsByCategory - Récupération des produits pour: $categorySlug');
+      print('🔍 product_service.getProductsByCategory - URL: $baseUrl/products/by-category/$categorySlug');
+      
+      final token = await StorageService().getToken();
+      
+      if (token == null) {
+        throw Exception('Token d\'authentification manquant');
+      }
+
+      final response = await http.get(
+        Uri.parse('$baseUrl/products/by-category/$categorySlug'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      ).timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          throw Exception('Timeout: La connexion au serveur a pris trop de temps');
+        },
+      );
+
+      print('🔍 product_service.getProductsByCategory - Status code: ${response.statusCode}');
+      final responseData = jsonDecode(response.body);
+      print('🔍 product_service.getProductsByCategory - Response keys: ${responseData.keys.toList()}');
+
+      if (response.statusCode == 200) {
+        final List<dynamic> productsJson = responseData['products'] ?? responseData['data'] ?? [];
+        List<Product> products = [];
+        
+        print('🔍 product_service.getProductsByCategory - Nombre de produits reçus: ${productsJson.length}');
+        
+        for (var json in productsJson) {
+          try {
+            final productId = json['id']?.toString() ?? 'unknown';
+            print('🔍 product_service.getProductsByCategory - Parsing product ID: $productId');
+            final product = Product.fromJson(json);
+            products.add(product);
+            print('🔍 product_service.getProductsByCategory - Product $productId parsé avec succès');
+          } catch (e, stackTrace) {
+            print('🔍 product_service.getProductsByCategory - Erreur parsing product: $e');
+            print('🔍 product_service.getProductsByCategory - Stack trace: $stackTrace');
+            print('🔍 product_service.getProductsByCategory - JSON: $json');
+            // Continuer avec les autres produits même si un échoue
+          }
+        }
+        
+        print('🔍 product_service.getProductsByCategory - Nombre de produits parsés avec succès: ${products.length}');
+        
+        return {
+          'success': true,
+          'products': products,
+        };
+      } else {
+        throw Exception(
+          responseData['message'] ?? 
+          'Erreur lors de la récupération des produits par catégorie: ${response.statusCode}'
+        );
+      }
+    } on http.ClientException catch (e) {
+      print('🔍 product_service.getProductsByCategory - ClientException: $e');
+      return {
+        'success': false,
+        'error': 'Impossible de se connecter au serveur. Vérifiez votre connexion internet.',
+        'products': <Product>[],
+      };
+    } catch (e) {
+      print('🔍 product_service.getProductsByCategory - Exception: $e');
+      return {
+        'success': false,
+        'error': e.toString(),
+        'products': <Product>[],
+      };
+    }
+  }
+
   /// Récupère un produit par son ID avec toutes les informations détaillées
   /// Endpoint: GET /products/get-products/:productId
   /// Retourne: product avec id, name, description, price, stock, category, image, images, vendeur, commandes

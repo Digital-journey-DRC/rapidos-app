@@ -40,6 +40,7 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
 
   // Contrôleur pour le champ détail adresse
   final TextEditingController _numeroController = TextEditingController();
+  final TextEditingController _refAdresseController = TextEditingController();
 
   // Variable pour stocker l'adresse sélectionnée
   Map<String, dynamic>? selectedAddress;
@@ -62,6 +63,7 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
     _searchAddressController.dispose();
     _searchFocusNode.dispose();
     _numeroController.dispose();
+    _refAdresseController.dispose();
     super.dispose();
   }
 
@@ -367,6 +369,7 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
         'quartier': quartier,
         'avenue': avenue,
         'numero': _numeroController.text.trim(),
+        'refAdresse': _refAdresseController.text.trim(),
         'pays': 'RDC',
         'phone': authState.user!['phone'] ?? '',
         'latitude': latitude,
@@ -827,6 +830,7 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
     final TextEditingController quartierController = TextEditingController();
     final TextEditingController avenueController = TextEditingController();
     final TextEditingController numeroController = TextEditingController();
+    final TextEditingController refAdresseController = TextEditingController();
     final TextEditingController paysController = TextEditingController(text: 'RDC');
 
     await showDialog(
@@ -901,6 +905,16 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
                     prefixIcon: Icon(Icons.numbers),
                   ),
                 ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: refAdresseController,
+                  decoration: const InputDecoration(
+                    labelText: 'Référence de l\'adresse',
+                    hintText: 'Ex: Près du marché, en face de...',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.info_outline),
+                  ),
+                ),
               ],
             ),
           ),
@@ -931,6 +945,7 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
                   avenueController.text.trim(),
                   numeroController.text.trim(),
                   paysController.text.trim(),
+                  refAdresseController.text.trim(),
                 );
               },
               style: ElevatedButton.styleFrom(
@@ -954,6 +969,7 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
     String avenue,
     String numero,
     String pays,
+    String refAdresse,
   ) async {
     final authState = context.read<AuthCubit>().state;
     if (authState is! AuthSuccess || authState.user == null) {
@@ -991,6 +1007,7 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
         'quartier': quartier,
         'avenue': avenue,
         'numero': numero,
+        'refAdresse': refAdresse,
         'pays': pays,
         'phone': authState.user!['phone'] ?? '',
         'latitude': 0.0,

@@ -62,6 +62,9 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
   List<dynamic> _commandes = [];
   http.Client? _httpClient;
   Future<Map<String, dynamic>>? _randomProductsFuture;
+  Future<Map<String, dynamic>>? _telephoneProductsFuture;
+  Future<Map<String, dynamic>>? _restaurantProductsFuture;
+  Future<Map<String, dynamic>>? _modeProductsFuture;
 
   /// Retourne le widget icône approprié pour une catégorie, ou Icons.category par défaut
   Widget _getCategoryIconWidget(String categoryName, Color color, double size) {
@@ -330,6 +333,9 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
       if (mounted) {
         setState(() {
           _randomProductsFuture = ProductService().getRandomProducts();
+          _telephoneProductsFuture = ProductService().getProductsByCategory('telephones');
+          _restaurantProductsFuture = ProductService().getProductsByCategory('restaurants');
+          _modeProductsFuture = ProductService().getModeProducts();
         });
       }
     } catch (e) {
@@ -527,10 +533,13 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
           context.read<FeaturedProductCubit>().fetchFeaturedProducts();
           context.read<CategoryCubit>().fetchCategories();
           context.read<MerchantCubit>().fetchMerchants(context);
-          // Recharger les produits aléatoires
+          // Recharger les produits aléatoires, téléphones, restaurants et mode
           if (mounted) {
             setState(() {
               _randomProductsFuture = ProductService().getRandomProducts();
+              _telephoneProductsFuture = ProductService().getProductsByCategory('telephones');
+              _restaurantProductsFuture = ProductService().getProductsByCategory('restaurants');
+              _modeProductsFuture = ProductService().getModeProducts();
             });
           }
         },
@@ -932,21 +941,73 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                   // Espacement entre sections
                   const SizedBox(height: 24),
 
-                  // Section Restaurants & Repas
-                  BlocBuilder<FeaturedProductCubit, FeaturedProductState>(
-                    builder: (context, state) {
-                      if (state is FeaturedProductLoaded && state.products.isNotEmpty) {
-                        final allProducts = state.products;
-                        // Utiliser les 6 premiers produits pour l'affichage
-                        final displayProducts = allProducts.take(6).toList();
+                  // Section Restaurants & Repas (via API /products/by-category/restaurants)
+                  FutureBuilder<Map<String, dynamic>>(
+                    future: _restaurantProductsFuture ?? ProductService().getProductsByCategory('restaurants'),
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        // Afficher un shimmer pendant le chargement
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Restaurants & Repas',
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black87,
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              SizedBox(
+                                height: 220,
+                                child: ListView.separated(
+                                  scrollDirection: Axis.horizontal,
+                                  itemCount: 3,
+                                  separatorBuilder: (_, __) => const SizedBox(width: 12),
+                                  itemBuilder: (context, index) {
+                                    return Container(
+                                      width: 180,
+                                      decoration: BoxDecoration(
+                                        color: Colors.grey.shade200,
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: const Center(
+                                        child: EcommerceLoading.simple(size: 80),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }
+                      
+                      if (snapshot.hasError) {
+                        return const SizedBox.shrink();
+                      }
+                      
+                      if (snapshot.hasData && snapshot.data!['success'] == true) {
+                        final products = snapshot.data!['products'] as List<Product>;
+                        if (products.isEmpty) {
+                          return const SizedBox.shrink();
+                        }
+                        
+                        // Limiter à 6 produits pour l'affichage
+                        final displayProducts = products.take(6).toList();
+                        
                         return _buildCategorySection(
                           title: 'Restaurants & Repas',
                           products: displayProducts,
-                          allProducts: allProducts, // Tous les produits pour "Voir tout"
+                          allProducts: products, // Tous les produits pour "Voir tout"
                           cardBuilder: _buildRestaurantCard,
                           categoryName: 'Restaurants & Repas',
                         );
                       }
+                      
                       return const SizedBox.shrink();
                     },
                   ),
@@ -954,25 +1015,73 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                   // Espacement entre sections
                   const SizedBox(height: 24),
 
-                  // Section Mode, Beauté & Accessoires
-                  BlocBuilder<FeaturedProductCubit, FeaturedProductState>(
-                    builder: (context, state) {
-                      if (state is FeaturedProductLoaded && state.products.isNotEmpty) {
-                        final allProducts = state.products;
-                        // Utiliser les produits suivants pour l'affichage
-                        final startIndex = allProducts.length > 6 ? 6 : 0;
-                        final endIndex = allProducts.length > 12 ? 12 : allProducts.length;
-                        if (startIndex < endIndex) {
-                          final displayProducts = allProducts.sublist(startIndex, endIndex);
-                          return _buildCategorySection(
-                            title: 'Mode, Beauté & Accessoires',
-                            products: displayProducts,
-                            allProducts: allProducts, // Tous les produits pour "Voir tout"
-                            cardBuilder: _buildFashionCard,
-                            categoryName: 'Mode, Beauté & Accessoires',
-                          );
-                        }
+                  // Section Mode, Beauté & Accessoires (via API /category/mode/mode)
+                  FutureBuilder<Map<String, dynamic>>(
+                    future: _modeProductsFuture ?? ProductService().getModeProducts(),
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        // Afficher un shimmer pendant le chargement
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Mode, Beauté & Accessoires',
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black87,
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              SizedBox(
+                                height: 240,
+                                child: ListView.separated(
+                                  scrollDirection: Axis.horizontal,
+                                  itemCount: 3,
+                                  separatorBuilder: (_, __) => const SizedBox(width: 12),
+                                  itemBuilder: (context, index) {
+                                    return Container(
+                                      width: 160,
+                                      decoration: BoxDecoration(
+                                        color: Colors.grey.shade200,
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: const Center(
+                                        child: EcommerceLoading.simple(size: 80),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
                       }
+                      
+                      if (snapshot.hasError) {
+                        return const SizedBox.shrink();
+                      }
+                      
+                      if (snapshot.hasData && snapshot.data!['success'] == true) {
+                        final products = snapshot.data!['products'] as List<Product>;
+                        if (products.isEmpty) {
+                          return const SizedBox.shrink();
+                        }
+                        
+                        // Limiter à 6 produits pour l'affichage
+                        final displayProducts = products.take(6).toList();
+                        
+                        return _buildCategorySection(
+                          title: 'Mode, Beauté & Accessoires',
+                          products: displayProducts,
+                          allProducts: products, // Tous les produits pour "Voir tout"
+                          cardBuilder: _buildFashionCard,
+                          categoryName: 'Mode, Beauté & Accessoires',
+                        );
+                      }
+                      
                       return const SizedBox.shrink();
                     },
                   ),
@@ -980,25 +1089,73 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                   // Espacement entre sections
                   const SizedBox(height: 24),
 
-                  // Section Téléphones & Accessoires
-                  BlocBuilder<FeaturedProductCubit, FeaturedProductState>(
-                    builder: (context, state) {
-                      if (state is FeaturedProductLoaded && state.products.isNotEmpty) {
-                        final allProducts = state.products;
-                        // Utiliser les produits suivants pour l'affichage
-                        final startIndex = allProducts.length > 12 ? 12 : 0;
-                        final endIndex = allProducts.length > 18 ? 18 : allProducts.length;
-                        if (startIndex < endIndex) {
-                          final displayProducts = allProducts.sublist(startIndex, endIndex);
-                          return _buildCategorySection(
-                            title: 'Téléphones & Accessoires',
-                            products: displayProducts,
-                            allProducts: allProducts, // Tous les produits pour "Voir tout"
-                            cardBuilder: _buildPhoneCard,
-                            categoryName: 'Téléphones & Accessoires',
-                          );
-                        }
+                  // Section Téléphones & Accessoires (via API /products/by-category/telephones)
+                  FutureBuilder<Map<String, dynamic>>(
+                    future: _telephoneProductsFuture ?? ProductService().getProductsByCategory('telephones'),
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        // Afficher un shimmer pendant le chargement
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Téléphones & Accessoires',
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black87,
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              SizedBox(
+                                height: 220,
+                                child: ListView.separated(
+                                  scrollDirection: Axis.horizontal,
+                                  itemCount: 3,
+                                  separatorBuilder: (_, __) => const SizedBox(width: 12),
+                                  itemBuilder: (context, index) {
+                                    return Container(
+                                      width: 160,
+                                      decoration: BoxDecoration(
+                                        color: Colors.grey.shade200,
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: const Center(
+                                        child: EcommerceLoading.simple(size: 80),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
                       }
+                      
+                      if (snapshot.hasError) {
+                        return const SizedBox.shrink();
+                      }
+                      
+                      if (snapshot.hasData && snapshot.data!['success'] == true) {
+                        final products = snapshot.data!['products'] as List<Product>;
+                        if (products.isEmpty) {
+                          return const SizedBox.shrink();
+                        }
+                        
+                        // Limiter à 6 produits pour l'affichage
+                        final displayProducts = products.take(6).toList();
+                        
+                        return _buildCategorySection(
+                          title: 'Téléphones & Accessoires',
+                          products: displayProducts,
+                          allProducts: products, // Tous les produits pour "Voir tout"
+                          cardBuilder: _buildPhoneCard,
+                          categoryName: 'Téléphones & Accessoires',
+                        );
+                      }
+                      
                       return const SizedBox.shrink();
                     },
                   ),
