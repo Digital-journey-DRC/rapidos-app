@@ -152,7 +152,10 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
 
                                 try {
                                   final currentOrderData = _currentOrderData ?? widget.orderData;
-                                  final orderId = currentOrderData['orderId']?.toString() ?? widget.orderId;
+                                  print('🔍 [DEBUG] currentOrderData keys: ${currentOrderData.keys.toList()}');
+                                  print('🔍 [DEBUG] id: ${currentOrderData['id']}');
+                                  print('🔍 [DEBUG] orderId: ${currentOrderData['orderId']}');
+                                  final orderId = currentOrderData['id']?.toString() ?? widget.orderId;
                                   final codeColis = codeController.text.trim();
 
                                   print('🚚 [OrderDetailsScreen] Mise à jour statut - orderId: $orderId, status: $targetStatus, codeColis: $codeColis');
@@ -275,15 +278,19 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
   /// Envoie la localisation du livreur en background après récupération du colis
   Future<void> _sendLivreurLocationInBackground(String orderId) async {
     try {
+      print('📍 [Location] Début envoi localisation livreur pour orderId: $orderId');
+      
       // Récupérer la position GPS actuelle
       Position position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
       );
+      
+      print('📍 [Location] Position récupérée: lat=${position.latitude}, lng=${position.longitude}');
 
       // Récupérer le token
       final token = await StorageService().getToken();
       if (token == null) {
-        print('⚠️ [OrderDetailsScreen] Token manquant pour envoyer la localisation');
+        print('⚠️ [Location] Token manquant pour envoyer la localisation');
         return;
       }
 
@@ -293,6 +300,9 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
         'latitude': position.latitude,
         'longitude': position.longitude,
       };
+
+      print('📤 [Location] POST /ecommerce/location/livreur');
+      print('📤 [Location] Body: ${jsonEncode(body)}');
 
       // Envoyer la requête POST en background
       final response = await http.post(
@@ -310,14 +320,39 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
         },
       );
 
+      print('📥 [Location] Réponse: ${response.statusCode}');
+      
       if (response.statusCode == 200 || response.statusCode == 201) {
-        print('✅ [OrderDetailsScreen] Localisation du livreur envoyée avec succès');
+        print('✅ [Location] Localisation du livreur envoyée avec succès');
+        print('📥 [Location] Body: ${response.body}');
+        
+        // Mettre à jour Firestore avec l'orderId pour le tracking en temps réel
+        final authState = context.read<AuthCubit>().state;
+        if (authState is AuthSuccess && authState.user != null) {
+          final userId = authState.user!['id'].toString();
+          final userPhone = authState.user!['phone'] as String?;
+          
+          await FirebaseFirestore.instance
+              .collection('locations')
+              .doc(userId)
+              .set({
+                'userId': userId,
+                'role': 'livreur',
+                'orderId': orderId,
+                'latitude': position.latitude,
+                'longitude': position.longitude,
+                'phone': userPhone ?? '',
+                'timestamp': FieldValue.serverTimestamp(),
+              }, SetOptions(merge: true));
+          
+          print('✅ [Location] Firestore mis à jour avec orderId: $orderId');
+        }
       } else {
-        print('⚠️ [OrderDetailsScreen] Erreur lors de l\'envoi de la localisation: ${response.statusCode}');
+        print('⚠️ [Location] Erreur: ${response.statusCode} - ${response.body}');
       }
     } catch (e) {
       // Ne pas afficher d'erreur à l'utilisateur car c'est en background
-      print('⚠️ [OrderDetailsScreen] Erreur lors de l\'envoi de la localisation en background: $e');
+      print('⚠️ [Location] Erreur lors de l\'envoi: $e');
     }
   }
 

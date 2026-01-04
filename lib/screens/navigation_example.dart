@@ -270,234 +270,245 @@ class _NavigationExampleState extends State<NavigationExample> {
     final userRole = authState.user!['role'];
     final userId = authState.user!['id'].toString();
 
-    print('User Role: $userRole, User ID: $userId');
+    print('📍 [Navigation] User Role: $userRole, User ID: $userId');
 
-    // Filtrer les commandes selon le rôle de l'utilisateur connecté
-    Query cartQuery = FirebaseFirestore.instance
-        .collection('carts')
-        .where('status', isEqualTo: 'en route pour livraison');
-
+    // Écouter directement la collection locations basée sur le rôle et orderId
     if (userRole == 'acheteur') {
-      cartQuery = cartQuery.where('idClient', isEqualTo: userId);
-    } else if (userRole == 'livreur') {
-      cartQuery = cartQuery.where('livreur', isEqualTo: userId);
-    }
-
-    // Écouter les commandes filtrées
-    cartQuery.snapshots().listen((cartSnapshot) {
-      print('Received ${cartSnapshot.docs.length} cart updates for user $userId with role $userRole');
-      
-      setState(() {
-        _hasActiveOrders = cartSnapshot.docs.isNotEmpty;
-        _isLoading = false;
-      });
-      
-      if (cartSnapshot.docs.isNotEmpty) {
-        print('Active orders found, setting up location tracking...');
-        
-        if (userRole == 'acheteur') {
-          // Pour un acheteur, récupérer l'ID du livreur depuis la commande
-          final livreurIds = cartSnapshot.docs
-              .map((doc) => (doc.data() as Map<String, dynamic>)['livreur'] as String?)
-              .where((id) => id != null && id.isNotEmpty)
-              .map((id) => id)
-              .toSet();
-          
-          if (livreurIds.isNotEmpty) {
-            FirebaseFirestore.instance
-                .collection('locations')
-                .where('userId', whereIn: livreurIds.toList())
-                .where('role', isEqualTo: 'livreur')
-                .snapshots()
-                .listen((locationSnapshot) {
-                  _updateMarkers(locationSnapshot.docs, userRole, cartSnapshot.docs);
-                });
-          }
-        } else if (userRole == 'livreur') {
-          // Pour un livreur, récupérer l'ID du client depuis la commande
-          final clientIds = cartSnapshot.docs
-              .map((doc) => (doc.data() as Map<String, dynamic>)['idClient'] as String?)
-              .where((id) => id != null && id.isNotEmpty)
-              .map((id) => id)
-              .toSet();
-          
-          if (clientIds.isNotEmpty) {
-            FirebaseFirestore.instance
-                .collection('locations')
-                .where('userId', whereIn: clientIds.toList())
-                .where('role', isEqualTo: 'acheteur')
-                .snapshots()
-                .listen((locationSnapshot) {
-                  _updateMarkers(locationSnapshot.docs, userRole, cartSnapshot.docs);
-                });
-          }
-        }
-      } else {
-        setState(() {
-          _markers.clear();
-          _polylines.clear();
-          _livreurPosition = null;
-          _acheteurPosition = null;
-          _routeDistance = null;
-          _routeDuration = null;
-        });
-        print('No active orders, cleared map data');
-      }
-    });
-  }
-
-  void _updateMarkers(List<QueryDocumentSnapshot> otherLocations, String userRole, List<QueryDocumentSnapshot> carts) {
-    final markers = <Marker>{};
-    final authState = context.read<AuthCubit>().state;
-    if (authState is! AuthSuccess || authState.user == null) return;
-    
-    final userId = authState.user!['id'].toString();
-
-    // Filtrer les positions pour n'avoir qu'une seule position par utilisateur
-    final Map<String, QueryDocumentSnapshot> latestPositions = {};
-    for (var doc in otherLocations) {
-      final data = doc.data() as Map<String, dynamic>;
-      final locationUserId = data['userId'] as String;
-      latestPositions[locationUserId] = doc;
-    }
-
-    if (userRole == 'acheteur') {
-      // Pour un acheteur, afficher la position du livreur
-      for (var doc in latestPositions.values) {
-        final data = doc.data() as Map<String, dynamic>;
-        final locationUserId = data['userId'] as String;
-        final phone = data['phone'] as String?;
-        
-        _livreurPhone = phone;
-        
-        final livreurPosition = LatLng(
-          data['latitude'] as double,
-          data['longitude'] as double,
-        );
-
-        _livreurPosition = livreurPosition;
-
-        markers.add(
-          Marker(
-            markerId: MarkerId('livreur_$locationUserId'),
-            position: livreurPosition,
-            icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
-            infoWindow: InfoWindow(
-              title: 'Position du livreur',
-              snippet: phone != null ? 'Tél: $phone' : 'En route vers vous',
-            ),
-          ),
-        );
-      }
-
-      // Afficher la position de l'acheteur connecté
+      // D'abord, écouter ma propre position pour obtenir l'orderId actuel
       FirebaseFirestore.instance
           .collection('locations')
           .where('userId', isEqualTo: userId)
           .where('role', isEqualTo: 'acheteur')
-          .limit(1)
-          .get()
-          .then((acheteurSnapshot) {
-            if (acheteurSnapshot.docs.isNotEmpty) {
-              final acheteurData = acheteurSnapshot.docs.first.data();
-              final acheteurPhone = acheteurData['phone'] as String?;
+          .snapshots()
+          .listen((myLocationSnapshot) {
+            print('📍 [Navigation] Acheteur location docs: ${myLocationSnapshot.docs.length}');
+            
+            if (myLocationSnapshot.docs.isNotEmpty) {
+              final myData = myLocationSnapshot.docs.first.data();
+              final myOrderId = myData['orderId'] as String?;
               
-              _acheteurPhone = acheteurPhone;
+              print('📍 [Navigation] Acheteur orderId actuel: $myOrderId');
               
-              final acheteurPosition = LatLng(
-                acheteurData['latitude'] as double,
-                acheteurData['longitude'] as double,
-              );
-              
-              _acheteurPosition = acheteurPosition;
-              
-              markers.add(
-                Marker(
-                  markerId: const MarkerId('my_position'),
-                  position: acheteurPosition,
-                  icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
-                  infoWindow: const InfoWindow(
-                    title: 'Ma position (Acheteur)',
-                    snippet: 'Position actuelle',
-                  ),
-                ),
-              );
+              if (myOrderId != null && myOrderId.isNotEmpty) {
+                // Écouter les livreurs avec le même orderId
+                FirebaseFirestore.instance
+                    .collection('locations')
+                    .where('orderId', isEqualTo: myOrderId)
+                    .where('role', isEqualTo: 'livreur')
+                    .snapshots()
+                    .listen((livreurSnapshot) {
+                      print('📍 [Navigation] Received ${livreurSnapshot.docs.length} livreur locations for orderId: $myOrderId');
+                      
+                      setState(() {
+                        _hasActiveOrders = livreurSnapshot.docs.isNotEmpty;
+                        _isLoading = false;
+                      });
+                      
+                      if (livreurSnapshot.docs.isNotEmpty) {
+                        _updateMarkersFromLocations(livreurSnapshot.docs, userRole, userId);
+                      } else {
+                        _clearMapData();
+                      }
+                    });
+              } else {
+                setState(() {
+                  _hasActiveOrders = false;
+                  _isLoading = false;
+                });
+                _clearMapData();
+              }
+            } else {
+              print('📍 [Navigation] Aucune position trouvée pour acheteur $userId');
+              setState(() {
+                _isLoading = false;
+              });
             }
           });
     } else if (userRole == 'livreur') {
-      // Pour un livreur, afficher la position du client
-      for (var doc in latestPositions.values) {
-        final data = doc.data() as Map<String, dynamic>;
-        final locationUserId = data['userId'] as String;
-        final phone = data['phone'] as String?;
-        
-        _acheteurPhone = phone;
-        
-        final clientPosition = LatLng(
-          data['latitude'] as double,
-          data['longitude'] as double,
-        );
-
-        _acheteurPosition = clientPosition;
-
-        markers.add(
-          Marker(
-            markerId: MarkerId('client_$locationUserId'),
-            position: clientPosition,
-            icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
-            infoWindow: InfoWindow(
-              title: 'Position du client',
-              snippet: phone != null ? 'Tél: $phone' : 'En attente de livraison',
-            ),
-          ),
-        );
-      }
-
-      // Afficher la position du livreur connecté
+      // D'abord, écouter ma propre position pour obtenir l'orderId actuel
       FirebaseFirestore.instance
           .collection('locations')
           .where('userId', isEqualTo: userId)
           .where('role', isEqualTo: 'livreur')
-          .limit(1)
-          .get()
-          .then((livreurSnapshot) {
-            if (livreurSnapshot.docs.isNotEmpty) {
-              final livreurData = livreurSnapshot.docs.first.data();
-              final livreurPhone = livreurData['phone'] as String?;
+          .snapshots()
+          .listen((myLocationSnapshot) {
+            print('📍 [Navigation] Livreur location docs: ${myLocationSnapshot.docs.length}');
+            
+            if (myLocationSnapshot.docs.isNotEmpty) {
+              final myData = myLocationSnapshot.docs.first.data();
+              final myOrderId = myData['orderId'] as String?;
               
-              _livreurPhone = livreurPhone;
+              print('📍 [Navigation] Livreur orderId actuel: $myOrderId');
               
-              final livreurPosition = LatLng(
-                livreurData['latitude'] as double,
-                livreurData['longitude'] as double,
-              );
-              
-              _livreurPosition = livreurPosition;
-              
-              markers.add(
-                Marker(
-                  markerId: const MarkerId('my_position'),
-                  position: livreurPosition,
-                  icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
-                  infoWindow: const InfoWindow(
-                    title: 'Ma position (Livreur)',
-                    snippet: 'Position actuelle',
-                  ),
-                ),
-              );
+              if (myOrderId != null && myOrderId.isNotEmpty) {
+                // Écouter les acheteurs avec le même orderId
+                FirebaseFirestore.instance
+                    .collection('locations')
+                    .where('orderId', isEqualTo: myOrderId)
+                    .where('role', isEqualTo: 'acheteur')
+                    .snapshots()
+                    .listen((acheteurSnapshot) {
+                      print('📍 [Navigation] Received ${acheteurSnapshot.docs.length} acheteur locations for orderId: $myOrderId');
+                      
+                      setState(() {
+                        _hasActiveOrders = acheteurSnapshot.docs.isNotEmpty;
+                        _isLoading = false;
+                      });
+                      
+                      if (acheteurSnapshot.docs.isNotEmpty) {
+                        _updateMarkersFromLocations(acheteurSnapshot.docs, userRole, userId);
+                      } else {
+                        _clearMapData();
+                      }
+                    });
+              } else {
+                setState(() {
+                  _hasActiveOrders = false;
+                  _isLoading = false;
+                });
+                _clearMapData();
+              }
+            } else {
+              print('📍 [Navigation] Aucune position trouvée pour livreur $userId');
+              setState(() {
+                _isLoading = false;
+              });
             }
           });
     }
-
+  }
+  
+  void _clearMapData() {
     setState(() {
-      _markers = markers;
-      _isLoading = false;
+      _markers.clear();
+      _polylines.clear();
+      _livreurPosition = null;
+      _acheteurPosition = null;
+      _routeDistance = null;
+      _routeDuration = null;
     });
+    print('📍 [Navigation] No active orders, cleared map data');
+  }
 
-    // Calculer la route si on a les deux positions
-    if (_livreurPosition != null && _acheteurPosition != null) {
-      _calculateRouteInfo(_livreurPosition!, _acheteurPosition!);
+  void _updateMarkersFromLocations(List<QueryDocumentSnapshot> locations, String userRole, String myUserId) {
+    final markers = <Marker>{};
+    
+    print('📍 [Navigation] Updating markers for role: $userRole');
+    
+    for (var doc in locations) {
+      final data = doc.data() as Map<String, dynamic>;
+      final locationUserId = data['userId'] as String?;
+      final role = data['role'] as String?;
+      final phone = data['phone'] as String?;
+      final lat = data['latitude'] as double?;
+      final lng = data['longitude'] as double?;
+      
+      if (lat == null || lng == null) continue;
+      
+      final position = LatLng(lat, lng);
+      
+      if (userRole == 'acheteur' && role == 'livreur') {
+        // Afficher le livreur (icône bleue)
+        _livreurPosition = position;
+        _livreurPhone = phone;
+        
+        markers.add(
+          Marker(
+            markerId: MarkerId('livreur_$locationUserId'),
+            position: position,
+            icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
+            infoWindow: InfoWindow(
+              title: 'Livreur',
+              snippet: phone != null ? 'Tél: $phone' : 'En route vers vous',
+            ),
+          ),
+        );
+        print('📍 [Navigation] Added livreur marker at $position');
+      } else if (userRole == 'livreur' && role == 'acheteur') {
+        // Afficher l'acheteur (icône rouge)
+        _acheteurPosition = position;
+        _acheteurPhone = phone;
+        
+        markers.add(
+          Marker(
+            markerId: MarkerId('acheteur_$locationUserId'),
+            position: position,
+            icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+            infoWindow: InfoWindow(
+              title: 'Client',
+              snippet: phone != null ? 'Tél: $phone' : 'En attente de livraison',
+            ),
+          ),
+        );
+        print('📍 [Navigation] Added acheteur marker at $position');
+      }
     }
+    
+    // Ajouter ma propre position
+    _addMyPositionMarker(markers, userRole, myUserId);
+  }
+  
+  void _addMyPositionMarker(Set<Marker> markers, String userRole, String myUserId) {
+    // Récupérer ma propre position depuis la collection locations
+    FirebaseFirestore.instance
+        .collection('locations')
+        .where('userId', isEqualTo: myUserId)
+        .limit(1)
+        .get()
+        .then((snapshot) {
+          if (snapshot.docs.isNotEmpty) {
+            final myData = snapshot.docs.first.data();
+            final lat = myData['latitude'] as double?;
+            final lng = myData['longitude'] as double?;
+            final phone = myData['phone'] as String?;
+            
+            if (lat != null && lng != null) {
+              final myPosition = LatLng(lat, lng);
+              
+              if (userRole == 'livreur') {
+                _livreurPosition = myPosition;
+                _livreurPhone = phone;
+                
+                markers.add(
+                  Marker(
+                    markerId: const MarkerId('my_position'),
+                    position: myPosition,
+                    icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
+                    infoWindow: const InfoWindow(
+                      title: 'Ma position (Livreur)',
+                      snippet: 'Position actuelle',
+                    ),
+                  ),
+                );
+              } else if (userRole == 'acheteur') {
+                _acheteurPosition = myPosition;
+                _acheteurPhone = phone;
+                
+                markers.add(
+                  Marker(
+                    markerId: const MarkerId('my_position'),
+                    position: myPosition,
+                    icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+                    infoWindow: const InfoWindow(
+                      title: 'Ma position',
+                      snippet: 'Position actuelle',
+                    ),
+                  ),
+                );
+              }
+              
+              setState(() {
+                _markers = markers;
+                _isLoading = false;
+              });
+              
+              // Calculer la route si on a les deux positions
+              if (_livreurPosition != null && _acheteurPosition != null) {
+                _calculateRouteInfo(_livreurPosition!, _acheteurPosition!);
+              }
+            }
+          }
+        });
   }
 
   Future<void> _makePhoneCall(String phoneNumber) async {
