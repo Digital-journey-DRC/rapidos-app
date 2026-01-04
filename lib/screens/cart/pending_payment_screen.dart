@@ -1207,6 +1207,22 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> {
                                   final status = order['status']?.toString().toLowerCase() ?? '';
                                   return status == 'cancelled';
                                 });
+                                
+                                // Vérifier si toutes les commandes sont en pending_payment
+                                final allPendingPayment = vendeurOrders.every((order) {
+                                  final status = order['status']?.toString().toLowerCase() ?? '';
+                                  return status == 'pending_payment';
+                                });
+                                
+                                // Vérifier si un moyen de paiement a été sélectionné par l'utilisateur
+                                // (présent dans _selectedPaymentMethods signifie qu'il a été modifié)
+                                final hasSelectedPaymentMethod = _selectedPaymentMethods.containsKey(vendeurId);
+                                
+                                // Afficher le bouton annuler si :
+                                // - Pas toutes annulées ET
+                                // - (Pas toutes en pending_payment OU un moyen de paiement a été sélectionné par l'utilisateur)
+                                final showCancelButton = !allCancelled && 
+                                    (!allPendingPayment || hasSelectedPaymentMethod);
 
                                 return Container(
                                   margin: const EdgeInsets.only(bottom: 16),
@@ -1624,8 +1640,8 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> {
                                               ),
                                             ),
 
-                                            // Bouton Annuler Commande (caché si toutes les commandes sont déjà annulées)
-                                            if (!allCancelled) ...[
+                                            // Bouton Annuler Commande (caché si toutes les commandes sont déjà annulées ou si toutes sont en pending_payment sans moyen de paiement)
+                                            if (showCancelButton) ...[
                                               const SizedBox(height: 12),
                                               SizedBox(
                                                 width: double.infinity,
