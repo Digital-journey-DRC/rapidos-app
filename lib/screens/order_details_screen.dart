@@ -34,6 +34,8 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
   bool _isUploadingPhoto = false; // Pour le loader du bouton upload photo
   bool _isMarkingReady = false; // Pour le loader du bouton prêt à expédier
   bool _isAcceptingLivraison = false; // Pour le loader du bouton accepter livraison
+  bool _isMarkingEnRoute = false; // Pour le loader du bouton marquer en route
+  bool _isDelivering = false; // Pour le loader du bouton livrer
 
   @override
   void initState() {
@@ -67,6 +69,196 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     }
   }
 
+  /// Dialog pour saisir le code colis (étapes 3 et 4)
+  void _showCodeColisDialog(BuildContext context, String title, String description, String targetStatus) {
+    final TextEditingController codeController = TextEditingController();
+    bool isProcessing = false;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) => Dialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Container(
+              width: MediaQuery.of(context).size.width * 0.9,
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    description,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey.shade700,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  TextField(
+                    controller: codeController,
+                    keyboardType: TextInputType.number,
+                    maxLength: 10,
+                    enabled: !isProcessing,
+                    decoration: InputDecoration(
+                      hintText: 'Entrez le code colis',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      filled: true,
+                      fillColor: Colors.grey.shade50,
+                      prefixIcon: const Icon(Icons.qr_code, color: Colors.grey),
+                    ),
+                    onChanged: (value) {
+                      setDialogState(() {});
+                    },
+                  ),
+                  const SizedBox(height: 24),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        onPressed: isProcessing
+                            ? null
+                            : () => Navigator.pop(context),
+                        child: const Text(
+                          'ANNULER',
+                          style: TextStyle(color: Colors.grey),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      ElevatedButton(
+                        onPressed: isProcessing || codeController.text.isEmpty
+                            ? null
+                            : () async {
+                                setDialogState(() {
+                                  isProcessing = true;
+                                });
+
+                                try {
+                                  final currentOrderData = _currentOrderData ?? widget.orderData;
+                                  final orderId = currentOrderData['orderId']?.toString() ?? widget.orderId;
+                                  final codeColis = codeController.text.trim();
+
+                                  print('🚚 [OrderDetailsScreen] Mise à jour statut - orderId: $orderId, status: $targetStatus, codeColis: $codeColis');
+
+                                  // Définir le loader approprié
+                                  if (targetStatus == 'en_route') {
+                                    setState(() {
+                                      _isMarkingEnRoute = true;
+                                    });
+                                  } else if (targetStatus == 'delivered') {
+                                    setState(() {
+                                      _isDelivering = true;
+                                    });
+                                  }
+
+                                  final result = await context.read<OrderCubit>().updateOrderStatus(
+                                    orderId: orderId,
+                                    status: targetStatus,
+                                    codeColis: codeColis,
+                                  );
+
+                                  if (mounted) {
+                                    Navigator.pop(context); // Fermer le dialog
+
+                                    if (result['success'] == true) {
+                                      // Mettre à jour les données localement
+                                      if (result['order'] != null) {
+                                        setState(() {
+                                          _currentOrderData = Map<String, dynamic>.from(result['order']);
+                                        });
+                                      }
+
+                                      // Afficher le nouveau code si généré (étape 3)
+                                      String message = result['message'] ?? 'Statut mis à jour avec succès';
+                                      if (result['newCodeColis'] != null) {
+                                        message += '\nNouveau code de confirmation: ${result['newCodeColis']}';
+                                      }
+
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text(message),
+                                          backgroundColor: Colors.green,
+                                          behavior: SnackBarBehavior.floating,
+                                          duration: const Duration(seconds: 4),
+                                        ),
+                                      );
+                                    } else {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text(result['message'] ?? 'Erreur lors de la mise à jour'),
+                                          backgroundColor: Colors.red,
+                                          behavior: SnackBarBehavior.floating,
+                                        ),
+                                      );
+                                    }
+                                  }
+                                } catch (e) {
+                                  if (mounted) {
+                                    Navigator.pop(context);
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text('Erreur: $e'),
+                                        backgroundColor: Colors.red,
+                                        behavior: SnackBarBehavior.floating,
+                                      ),
+                                    );
+                                  }
+                                } finally {
+                                  if (mounted) {
+                                    setState(() {
+                                      _isMarkingEnRoute = false;
+                                      _isDelivering = false;
+                                    });
+                                  }
+                                }
+                              },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        child: isProcessing
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                ),
+                              )
+                            : const Text(
+                                'VALIDER',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
 
   void _showCodeConfirmationDialog(BuildContext context, String docId, String shortCode, String livreurId) {
     final TextEditingController codeController = TextEditingController();
@@ -957,8 +1149,8 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                                           const SizedBox(width: 5),
                                           Text(
                                             vendorPhone,
-                                            style: TextStyle(
-                                              fontSize: 12,
+                                    style: TextStyle(
+                                      fontSize: 12,
                                               color: Colors.grey.shade700,
                                             ),
                                           ),
@@ -1021,7 +1213,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                                                     },
                                                     style: ElevatedButton.styleFrom(
                                                       backgroundColor: AppColors.primary,
-                                                      shape: RoundedRectangleBorder(
+                                    shape: RoundedRectangleBorder(
                                                         borderRadius: BorderRadius.circular(8),
                                                       ),
                                                       padding: const EdgeInsets.symmetric(
@@ -1058,9 +1250,9 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                                                         SizedBox(width: 8),
                                                         Text('WhatsApp',
                                                             style: TextStyle(color: Colors.white)),
-                                                      ],
-                                                    ),
-                                                  ),
+                      ],
+                    ),
+                  ),
                                                 ],
                                               ),
                                               const SizedBox(height: 16),
@@ -1166,9 +1358,9 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                   if (paymentMethod.isNotEmpty) ...[
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                      decoration: BoxDecoration(
+                                    decoration: BoxDecoration(
                         color: Colors.white,
-                        borderRadius: BorderRadius.circular(10),
+                                      borderRadius: BorderRadius.circular(10),
                         border: Border.all(color: Colors.grey.shade200),
                       ),
                       child: Row(
@@ -1181,12 +1373,12 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                                 paymentMethod['imageUrl'],
                                 width: 35,
                                 height: 35,
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) {
-                                  return Container(
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (context, error, stackTrace) {
+                                              return Container(
                                     width: 35,
                                     height: 35,
-                                    color: Colors.grey.shade200,
+                                                color: Colors.grey.shade200,
                                     child: Icon(Icons.payment, color: Colors.grey.shade400, size: 18),
                                   );
                                 },
@@ -1194,22 +1386,22 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                             ),
                           if (paymentMethod['imageUrl'] != null) const SizedBox(width: 8),
                           // Informations en 2 lignes max
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
                               mainAxisSize: MainAxisSize.min,
-                              children: [
+                                    children: [
                                 // Ligne 1: Nom du moyen de paiement
-                                Text(
+                                      Text(
                                   paymentMethod['name']?.toString() ?? paymentMethod['type']?.toString() ?? 'N/A',
-                                  style: const TextStyle(
+                                        style: const TextStyle(
                                     fontSize: 11,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.black87,
-                                  ),
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.black87,
+                                        ),
                                   maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
                                 // Ligne 2: Nom titulaire et numéro de compte (ou numéro à débiter)
                                 if (paymentMethod['nomTitulaire'] != null || paymentMethod['numeroCompte'] != null || (numeroPayment != null && numeroPayment.isNotEmpty))
                                   const SizedBox(height: 3),
@@ -1236,7 +1428,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                                 else if (paymentMethod['numeroCompte'] != null)
                                   Text(
                                     paymentMethod['numeroCompte']?.toString() ?? '',
-                                    style: TextStyle(
+                                              style: TextStyle(
                                       fontSize: 9,
                                       color: Colors.grey.shade600,
                                     ),
@@ -1244,21 +1436,21 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                                     overflow: TextOverflow.ellipsis,
                                   )
                                 else if (numeroPayment != null && numeroPayment.isNotEmpty)
-                                  Text(
+                                          Text(
                                     numeroPayment,
-                                    style: TextStyle(
+                                            style: TextStyle(
                                       fontSize: 9,
                                       color: Colors.grey.shade600,
-                                    ),
+                                            ),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
-                                  ),
-                              ],
+                                          ),
+                                        ],
                             ),
-                          ),
-                        ],
-                      ),
-                    ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
                     const SizedBox(height: 12),
                   ],
 
@@ -1287,7 +1479,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                         ],
                       ),
                     ),
-                    const SizedBox(height: 12),
+                  const SizedBox(height: 12),
                   ],
 
                   // Photo du colis (si disponible)
@@ -1385,7 +1577,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 12),
+                  const SizedBox(height: 12),
                   ],
 
                   // Résumé de la commande - Compact
@@ -1398,7 +1590,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                         color: Colors.grey.shade200,
                         width: 1,
                       ),
-                    ),
+                        ),
                     child: Column(
                       children: [
                         // Total produit et Frais de livraison en spaceBetween
@@ -1466,11 +1658,11 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                             ),
                             Text(
                               '${totalAvecLivraison.toStringAsFixed(0)} FC',
-                              style: const TextStyle(
+                                  style: const TextStyle(
                                 fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.primary,
-                              ),
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.primary,
+                                  ),
                             ),
                           ],
                         ),
@@ -1534,7 +1726,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.transparent,
                             shadowColor: Colors.transparent,
-                            shape: RoundedRectangleBorder(
+                                      shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
                             padding: const EdgeInsets.symmetric(vertical: 16),
@@ -1546,7 +1738,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                           ),
                           label: const Text(
                             'Expédier la commande',
-                            style: TextStyle(
+                                          style: TextStyle(
                               color: Colors.white,
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
@@ -1557,7 +1749,8 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                       ),
                   ] else if (userRole == 'livreur') ...[
                     // Boutons d'action pour les livreurs
-                    if (status == 'prêt à expédier')
+                    // Accepter la livraison si le statut est pret_a_expedier
+                    if (status.toLowerCase() == 'pret_a_expedier' || status == 'prêt à expédier')
                       Container(
                         width: double.infinity,
                         decoration: BoxDecoration(
@@ -1575,29 +1768,26 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                               color: AppColors.primary.withOpacity(0.3),
                               blurRadius: 6,
                               offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
+                                                    ),
+                                                  ],
+                                                ),
                         padding: const EdgeInsets.all(10),
                         child: ElevatedButton(
                           onPressed: _isAcceptingLivraison
-                              ? null
+                                                        ? null
                               : () async {
                                   setState(() {
                                     _isAcceptingLivraison = true;
                                   });
                                   
                                   try {
-                                    // Utiliser l'ID de la commande comme livraisonId
-                                    // Le backend peut utiliser orderId ou id selon la structure
-                                    // Essayer d'abord 'id' si disponible, sinon utiliser orderId
-                                    final livraisonId = orderData['id']?.toString() ?? 
-                                                       orderData['orderId']?.toString() ?? 
-                                                       widget.orderId;
+                                    // Utiliser orderId pour l'endpoint /ecommerce/livraison/:orderId/take
+                                    final orderId = orderData['orderId']?.toString() ?? 
+                                                   widget.orderId;
                                     
-                                    print('🚚 [OrderDetailsScreen] Acceptation livraison - livraisonId: $livraisonId');
+                                    print('🚚 [OrderDetailsScreen] Acceptation livraison - orderId: $orderId');
                                     
-                                    final result = await context.read<OrderCubit>().acceptLivraison(livraisonId);
+                                    final result = await context.read<OrderCubit>().acceptLivraison(orderId);
                                     
                                     if (mounted) {
                                       if (result['success'] == true) {
@@ -1608,7 +1798,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                                           });
                                         }
                                         
-                                        ScaffoldMessenger.of(context).showSnackBar(
+                                            ScaffoldMessenger.of(context).showSnackBar(
                                           SnackBar(
                                             content: Text(result['message'] ?? 'Livraison acceptée avec succès'),
                                             backgroundColor: Colors.green,
@@ -1620,22 +1810,22 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                                         ScaffoldMessenger.of(context).showSnackBar(
                                           SnackBar(
                                             content: Text(result['message'] ?? 'Erreur lors de l\'acceptation'),
-                                            backgroundColor: Colors.red,
-                                            behavior: SnackBarBehavior.floating,
-                                          ),
-                                        );
+                                                backgroundColor: Colors.red,
+                                                behavior: SnackBarBehavior.floating,
+                                              ),
+                                            );
                                       }
-                                    }
-                                  } catch (e) {
+                                          }
+                                        } catch (e) {
                                     if (mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(
-                                          content: Text('Erreur: $e'),
-                                          backgroundColor: Colors.red,
-                                          behavior: SnackBarBehavior.floating,
-                                        ),
-                                      );
-                                    }
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              SnackBar(
+                                                content: Text('Erreur: $e'),
+                                                backgroundColor: Colors.red,
+                                                behavior: SnackBarBehavior.floating,
+                                              ),
+                                            );
+                                          }
                                   } finally {
                                     if (mounted) {
                                       setState(() {
@@ -1649,12 +1839,192 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                             shadowColor: Colors.transparent,
                             disabledBackgroundColor: Colors.grey.shade300,
                             disabledForegroundColor: Colors.grey.shade600,
+                                      shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                                      ),
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                                    ),
+                          child: _isAcceptingLivraison
+                              ? Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                    SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                        const Text(
+                                      'Traitement...',
+                                          style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 13,
+                                            fontWeight: FontWeight.w600,
+                                        letterSpacing: 0.3,
+                                          ),
+                                        ),
+                                      ],
+                                )
+                              : const Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.check_circle_outline,
+                                      color: Colors.white,
+                                      size: 16,
+                                    ),
+                                    SizedBox(width: 8),
+                                    Text(
+                                      'Accepter',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                        letterSpacing: 0.3,
+                                  ),
+                                ),
+                              ],
+                            ),
+                        ),
+                      ),
+                    // ÉTAPE 3 : Récupérer le colis (Marquer en route) - statut accepte_livreur
+                    if (status.toLowerCase() == 'accepte_livreur' || status == 'accepté livreur')
+                      Container(
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              Colors.orange.shade600,
+                              Colors.orange.shade700,
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(10),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.orange.withOpacity(0.3),
+                              blurRadius: 6,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        padding: const EdgeInsets.all(10),
+                        child: ElevatedButton(
+                          onPressed: _isMarkingEnRoute
+                              ? null
+                              : () {
+                                  _showCodeColisDialog(
+                                    context,
+                                    'Récupérer le colis',
+                                    'Veuillez entrer le code colis fourni par le vendeur',
+                                    'en_route',
+                                  );
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.transparent,
+                            shadowColor: Colors.transparent,
+                            disabledBackgroundColor: Colors.grey.shade300,
+                            disabledForegroundColor: Colors.grey.shade600,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(8),
                             ),
                             padding: const EdgeInsets.symmetric(vertical: 10),
                           ),
-                          child: _isAcceptingLivraison
+                          child: _isMarkingEnRoute
+                              ? Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    const Text(
+                                      'Traitement...',
+                                      style: TextStyle(
+                            color: Colors.white,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                        letterSpacing: 0.3,
+                                      ),
+                                    ),
+                                  ],
+                                )
+                              : const Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.inventory_2_outlined,
+                                      color: Colors.white,
+                                      size: 16,
+                                    ),
+                                    SizedBox(width: 8),
+                                    Text(
+                                      'Récupérer le colis',
+                            style: TextStyle(
+                              color: Colors.white,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                        letterSpacing: 0.3,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                        ),
+                      ),
+                    // ÉTAPE 4 : Livrer la commande - statut en_route
+                    if (status.toLowerCase() == 'en_route' || status == 'en route')
+                      Container(
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              Colors.green.shade600,
+                              Colors.green.shade700,
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(10),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.green.withOpacity(0.3),
+                              blurRadius: 6,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        padding: const EdgeInsets.all(10),
+                        child: ElevatedButton(
+                          onPressed: _isDelivering
+                              ? null
+                              : () {
+                                  _showCodeColisDialog(
+                                    context,
+                                    'Livrer la commande',
+                                    'Veuillez entrer le code colis fourni par le client',
+                                    'delivered',
+                                  );
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.transparent,
+                            shadowColor: Colors.transparent,
+                            disabledBackgroundColor: Colors.grey.shade300,
+                            disabledForegroundColor: Colors.grey.shade600,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                          ),
+                          child: _isDelivering
                               ? Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
@@ -1682,22 +2052,22 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
                                     Icon(
-                                      Icons.check_circle_outline,
-                                      color: Colors.white,
-                                      size: 16,
-                                    ),
+                                      Icons.local_shipping_outlined,
+                            color: Colors.white,
+                            size: 16,
+                          ),
                                     SizedBox(width: 8),
                                     Text(
-                                      'Recevoir colis',
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w600,
-                                        letterSpacing: 0.3,
-                                      ),
+                                      'Livrer la commande',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 0.3,
+                            ),
                                     ),
                                   ],
-                                ),
+                          ),
                         ),
                       ),
                     if (status == 'en route pour livraison')

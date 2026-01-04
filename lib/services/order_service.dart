@@ -527,11 +527,13 @@ class OrderService {
     required String orderId,
     required String status,
     String? reason,
+    String? codeColis,
   }) async {
     print('🔄 [OrderService] updateOrderStatus - Début');
     print('   📦 OrderId: $orderId');
     print('   📊 Status: $status');
     print('   📝 Reason: ${reason ?? 'Non fourni'}');
+    print('   🔐 CodeColis: ${codeColis ?? 'Non fourni'}');
     
     try {
       final token = await StorageService().getToken();
@@ -550,6 +552,10 @@ class OrderService {
       
       if (reason != null && reason.isNotEmpty) {
         body['reason'] = reason;
+      }
+      
+      if (codeColis != null && codeColis.isNotEmpty) {
+        body['codeColis'] = codeColis;
       }
 
       print('📤 [OrderService] Requête PATCH: $baseUrl/ecommerce/commandes/$orderId/status');
@@ -579,6 +585,7 @@ class OrderService {
           'success': true,
           'order': responseData['order'] ?? {},
           'message': responseData['message'] ?? 'Statut mis à jour avec succès',
+          'newCodeColis': responseData['newCodeColis'], // Nouveau code généré (étape 3)
         };
       } else {
         final errorData = jsonDecode(response.body);
@@ -955,11 +962,13 @@ class OrderService {
   }
 
   /// Accepte une livraison
-  /// Endpoint: POST /livraison/accept/{livraisonId}
+  /// Endpoint: POST /ecommerce/livraison/:orderId/take
+  /// Description: Le livreur accepte une livraison. Change automatiquement le statut de pret_a_expedier à accepte_livreur et assigne le livreur.
   /// Authentification: REQUISE
-  Future<Map<String, dynamic>> acceptLivraison(String livraisonId) async {
+  /// Conditions: Utilisateur doit être un livreur, commande doit être en statut pret_a_expedier, commande ne doit pas être déjà assignée
+  Future<Map<String, dynamic>> acceptLivraison(String orderId) async {
     print('🔄 [OrderService] acceptLivraison - Début');
-    print('   📦 LivraisonId: $livraisonId');
+    print('   📦 OrderId: $orderId');
     
     try {
       final token = await StorageService().getToken();
@@ -973,7 +982,7 @@ class OrderService {
       }
 
       final response = await http.post(
-        Uri.parse('$baseUrl/livraison/accept/$livraisonId'),
+        Uri.parse('$baseUrl/ecommerce/livraison/$orderId/take'),
         headers: {
           'Content-Type': 'application/json',
           'accept': 'application/json',
@@ -994,7 +1003,7 @@ class OrderService {
         print('✅ [OrderService] Livraison acceptée avec succès');
         return {
           'success': true,
-          'message': responseData['message'] ?? 'Livraison acceptée avec succès',
+          'message': responseData['message'] ?? 'Livraison prise en charge avec succès',
           'order': responseData['order'] ?? responseData['livraison'],
         };
       } else {

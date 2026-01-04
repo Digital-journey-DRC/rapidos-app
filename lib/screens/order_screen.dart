@@ -194,8 +194,12 @@ class _OrderScreenState extends State<OrderScreen> {
       case 'prêt à expédier':
       case 'pret a expedier':
         return Colors.blue;
+      case 'accepte_livreur':
+      case 'accepté livreur':
+        return Colors.purple;
       case 'in_delivery':
       case 'en_route':
+      case 'en route':
         return Colors.green;
       case 'delivered':
         return Colors.green;
@@ -394,8 +398,12 @@ class _OrderScreenState extends State<OrderScreen> {
       case 'prêt à expédier':
       case 'pret a expedier':
         return 'PRÊT À EXPÉDIER';
+      case 'accepte_livreur':
+      case 'accepté livreur':
+        return 'ACCEPTÉ LIVREUR';
       case 'in_delivery':
       case 'en_route':
+      case 'en route':
         return 'EN ROUTE';
       case 'delivered':
         return 'LIVRÉ';
@@ -414,7 +422,7 @@ class _OrderScreenState extends State<OrderScreen> {
       label: Text(
         label,
         style: TextStyle(
-          fontSize: 12,
+          fontSize: 11,
           fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
           color: isSelected ? Colors.white : Colors.grey.shade700,
         ),
@@ -428,7 +436,7 @@ class _OrderScreenState extends State<OrderScreen> {
       selectedColor: AppColors.primary,
       backgroundColor: Colors.grey.shade200,
       checkmarkColor: Colors.white,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(20),
         side: BorderSide(
@@ -856,7 +864,9 @@ class _OrderScreenState extends State<OrderScreen> {
                               const SizedBox(width: 8),
                               _buildStatusFilterChip('PRÊT À EXPÉDIER', 'pret_a_expedier'),
                               const SizedBox(width: 8),
-                              _buildStatusFilterChip('EN ROUTE', 'in_delivery'),
+                              _buildStatusFilterChip('ACCEPTÉ LIVREUR', 'accepte_livreur'),
+                              const SizedBox(width: 8),
+                              _buildStatusFilterChip('EN ROUTE', 'en_route'),
                               const SizedBox(width: 8),
                               _buildStatusFilterChip('LIVRÉ', 'delivered'),
                             ],
@@ -928,7 +938,9 @@ class _OrderScreenState extends State<OrderScreen> {
                               const SizedBox(width: 8),
                               _buildStatusFilterChip('PRÊT À EXPÉDIER', 'pret_a_expedier'),
                               const SizedBox(width: 8),
-                              _buildStatusFilterChip('EN ROUTE', 'in_delivery'),
+                              _buildStatusFilterChip('ACCEPTÉ LIVREUR', 'accepte_livreur'),
+                              const SizedBox(width: 8),
+                              _buildStatusFilterChip('EN ROUTE', 'en_route'),
                               const SizedBox(width: 8),
                               _buildStatusFilterChip('LIVRÉ', 'delivered'),
                               const SizedBox(width: 8),
@@ -1011,7 +1023,9 @@ class _OrderScreenState extends State<OrderScreen> {
                                 const SizedBox(width: 8),
                                 _buildStatusFilterChip('PRÊT À EXPÉDIER', 'pret_a_expedier'),
                                 const SizedBox(width: 8),
-                                _buildStatusFilterChip('EN ROUTE', 'in_delivery'),
+                                _buildStatusFilterChip('ACCEPTÉ LIVREUR', 'accepte_livreur'),
+                                const SizedBox(width: 8),
+                                _buildStatusFilterChip('EN ROUTE', 'en_route'),
                                 const SizedBox(width: 8),
                                 _buildStatusFilterChip('LIVRÉ', 'delivered'),
                                 const SizedBox(width: 8),
@@ -1221,9 +1235,11 @@ class _OrderScreenState extends State<OrderScreen> {
                 } else if (filterStatus == 'pret_a_expedier') {
                   // Accepter toutes les variantes
                   return status == 'pret_a_expedier' || status == 'ready_to_ship' || status == 'prêt à expédier' || status == 'pret a expedier';
-                } else if (filterStatus == 'in_delivery' || filterStatus == 'en_route') {
-                  // Accepter les deux variantes
-                  return status == 'in_delivery' || status == 'en_route';
+                } else if (filterStatus == 'accepte_livreur') {
+                  return status == 'accepte_livreur' || status == 'accepté livreur';
+                } else if (filterStatus == 'en_route' || filterStatus == 'in_delivery') {
+                  // Accepter les variantes
+                  return status == 'en_route' || status == 'en route' || status == 'in_delivery';
                 } else if (filterStatus == 'delivered') {
                   return status == 'delivered';
                 } else if (filterStatus == 'cancelled') {
@@ -1906,8 +1922,6 @@ class _OrderScreenState extends State<OrderScreen> {
               final phone = order['phone']?.toString() ?? '';
               final clientName = order['clientName']?.toString() ?? order['client']?.toString() ?? 'Client';
               final codeColis = order['codeColis']?.toString() ?? '';
-              final vendorName = order['vendorName']?.toString() ?? '';
-              final vendorPhone = order['vendorPhone']?.toString() ?? '';
               
               // Construire l'adresse à partir de l'objet address
               final addressData = order['address'] as Map<String, dynamic>? ?? {};
@@ -2038,43 +2052,6 @@ class _OrderScreenState extends State<OrderScreen> {
                                               ),
                                             ],
                                           ),
-                                          if (vendorName.isNotEmpty) ...[
-                                            const SizedBox(height: 4),
-                                            GestureDetector(
-                                              onTap: vendorPhone.isNotEmpty ? () {
-                                                launchUrl(Uri.parse('tel:$vendorPhone'));
-                                              } : null,
-                                              child: Row(
-                                                children: [
-                                                  Icon(
-                                                    vendorPhone.isNotEmpty ? Icons.phone : Icons.store_outlined,
-                                                    size: 12,
-                                                    color: AppColors.primary,
-                                                  ),
-                                                  const SizedBox(width: 4),
-                                                  Expanded(
-                                                    child: Text(
-                                                      'Vendeur: $vendorName',
-                                                      style: TextStyle(
-                                                        fontSize: 11,
-                                                        color: AppColors.primary,
-                                                        fontWeight: FontWeight.w500,
-                                                        decoration: vendorPhone.isNotEmpty ? TextDecoration.underline : null,
-                                                      ),
-                                                      maxLines: 1,
-                                                      overflow: TextOverflow.ellipsis,
-                                                    ),
-                                                  ),
-                                                  if (vendorPhone.isNotEmpty)
-                                                    Icon(
-                                                      Icons.call,
-                                                      size: 14,
-                                                      color: Colors.green,
-                                                    ),
-                                                ],
-                                              ),
-                                            ),
-                                          ],
                                         ],
                                       ),
                                     ),

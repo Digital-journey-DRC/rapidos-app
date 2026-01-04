@@ -442,6 +442,7 @@ class OrderCubit extends Cubit<OrderState> {
     required String orderId,
     required String status,
     String? reason,
+    String? codeColis,
   }) async {
     emit(state.copyWith(isLoading: true, error: null, success: false));
 
@@ -450,6 +451,7 @@ class OrderCubit extends Cubit<OrderState> {
         orderId: orderId,
         status: status,
         reason: reason,
+        codeColis: codeColis,
       );
 
       if (result['success'] == true) {
