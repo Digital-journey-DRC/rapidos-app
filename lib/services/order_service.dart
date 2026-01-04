@@ -758,25 +758,47 @@ class OrderService {
     }
   }
 
-  /// @deprecated Utilisez [getBuyerOrders] à la place
-  /// Récupère la liste des commandes de l'acheteur connecté (ancienne méthode)
+  /// Helper pour parser les montants (String, int, double)
+  double _parseAmount(dynamic value) {
+    if (value is double) return value;
+    if (value is int) return value.toDouble();
+    if (value is String) return double.tryParse(value) ?? 0.0;
+    return 0.0;
+  }
+
+  /// Récupère l'historique des commandes de l'acheteur connecté
   /// Endpoint: GET /ecommerce/commandes/acheteur
   /// Authentification: REQUISE
-  @Deprecated('Utilisez getBuyerOrders à la place')
-  Future<Map<String, dynamic>> getAcheteurOrders() async {
+  /// 
+  /// [status] (optionnel): Filtrer par statut (pending_payment, pending, en_preparation, etc.)
+  Future<Map<String, dynamic>> getAcheteurOrders({String? status}) async {
+    print('📥 [OrderService] getAcheteurOrders - Début');
+    print('   Status filter: ${status ?? 'Aucun'}');
+    
     try {
       final token = await StorageService().getToken();
+      print('🔑 Token récupéré: ${token != null ? 'Oui (${token.substring(0, 20)}...)' : 'Non'}');
 
       if (token == null) {
+        print('❌ [OrderService] Token manquant');
         return {
           'success': false,
           'message': 'Token d\'authentification manquant',
-          'commandes': [],
+          'orders': [],
+          'stats': {},
         };
       }
 
+      // Construire l'URL avec le paramètre de statut si fourni
+      final uri = status != null
+          ? Uri.parse('$baseUrl/ecommerce/commandes/acheteur?status=$status')
+          : Uri.parse('$baseUrl/ecommerce/commandes/acheteur');
+
+      print('🌐 [OrderService] Envoi de la requête GET...');
+      print('   URL: $uri');
+
       final response = await http.get(
-        Uri.parse('$baseUrl/ecommerce/commandes/acheteur'),
+        uri,
         headers: {
           'Content-Type': 'application/json',
           'accept': 'application/json',
@@ -785,30 +807,99 @@ class OrderService {
       ).timeout(
         const Duration(seconds: 15),
         onTimeout: () {
+          print('⏱️ [OrderService] Timeout après 15 secondes');
           throw Exception('Timeout: La connexion au serveur a pris trop de temps');
         },
       );
 
+      print('📡 [OrderService] Réponse reçue');
+      print('   Status Code: ${response.statusCode}');
+      print('   Body length: ${response.body.length} caractères');
+
       if (response.statusCode == 200) {
         final responseData = jsonDecode(response.body);
+        print('✅ [OrderService] Succès (200)');
+        print('   Commandes count: ${(responseData['commandes'] ?? []).length}');
+        
+        // Récupérer les commandes (nouvelle structure avec 'commandes')
+        final commandes = responseData['commandes'] ?? [];
+        
+        // Transformer les commandes pour correspondre à la structure attendue par l'UI
+        final orders = commandes.map<Map<String, dynamic>>((commande) {
+          // Convertir items en products pour compatibilité
+          final items = commande['items'] as List? ?? [];
+          final products = items.map((item) => {
+            'name': item['name'] ?? '',
+            'price': item['price'] ?? 0,
+            'quantity': item['quantity'] ?? 1,
+            'productId': item['productId'] ?? 0,
+            'idVendeur': item['idVendeur'] ?? commande['vendorId'],
+          }).toList();
+          
+          // Calculer totalAvecLivraison
+          final total = _parseAmount(commande['total'] ?? 0);
+          final deliveryFee = _parseAmount(commande['deliveryFee'] ?? 0);
+          final totalAvecLivraison = total + deliveryFee;
+          
+          // Créer l'objet vendeur à partir de vendorId (on n'a pas les détails du vendeur)
+          final vendorId = commande['vendorId'];
+          
+          return {
+            'id': commande['id'],
+            'orderId': commande['orderId'],
+            'status': commande['status'],
+            'vendeurId': vendorId,
+            'vendeur': vendorId != null ? {'id': vendorId} : {},
+            'products': products,
+            'items': products, // Pour compatibilité avec OrderDetailsScreen
+            'total': commande['total'],
+            'deliveryFee': commande['deliveryFee'],
+            'totalAvecLivraison': totalAvecLivraison,
+            'distanceKm': commande['distanceKm']?.toString() ?? '',
+            'address': commande['address'] ?? {},
+            'latitude': commande['latitude']?.toString() ?? '',
+            'longitude': commande['longitude']?.toString() ?? '',
+            'paymentMethod': commande['paymentMethod'] ?? {},
+            'createdAt': commande['createdAt'],
+            'updatedAt': commande['updatedAt'],
+            'codeColis': commande['codeColis'],
+            'packagePhoto': commande['packagePhoto'],
+          };
+        }).toList();
+        
+        // Print des commandes
+        for (var order in orders) {
+          final orderId = order['id']?.toString() ?? '';
+          final total = _parseAmount(order['total']);
+          final deliveryFee = _parseAmount(order['deliveryFee']);
+          final paymentMethod = order['paymentMethod'] ?? {};
+          print('📦 Commande #$orderId: ${total.toStringAsFixed(0)} FC + ${deliveryFee.toStringAsFixed(0)} FC livraison');
+          print('   Moyen de paiement: ${paymentMethod['name'] ?? ''} (${paymentMethod['numeroCompte'] ?? ''})');
+        }
+        
         return {
           'success': true,
-          'commandes': responseData['commandes'] ?? [],
+          'orders': orders,
           'message': responseData['message'] ?? 'Commandes récupérées avec succès',
         };
       } else {
         final errorData = jsonDecode(response.body);
+        print('❌ [OrderService] Erreur (${response.statusCode})');
+        print('   Error data: $errorData');
+        
         return {
           'success': false,
           'message': errorData['message'] ?? 'Erreur lors de la récupération des commandes',
-          'commandes': [],
+          'orders': [],
+          'stats': {},
         };
       }
     } catch (e) {
+      print('❌ [OrderService] Exception: $e');
       return {
         'success': false,
         'message': 'Erreur de connexion: $e',
-        'commandes': [],
+        'orders': [],
       };
     }
   }

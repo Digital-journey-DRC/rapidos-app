@@ -5,6 +5,7 @@ import 'package:immo/constants.dart';
 import 'package:immo/cubit/order_cubit.dart';
 import 'package:immo/widgets/ecommerce_loading.dart';
 import 'package:immo/services/payment_method_service.dart';
+import 'package:immo/services/order_service.dart';
 import 'payment_method_selection_screen.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -22,8 +23,10 @@ class PendingPaymentScreen extends StatefulWidget {
 
 class _PendingPaymentScreenState extends State<PendingPaymentScreen> {
   final PaymentMethodService _paymentMethodService = PaymentMethodService();
+  final OrderService _orderService = OrderService();
   Map<int, List<Map<String, dynamic>>>? _vendeurPaymentMethods;
   Map<int, Map<String, dynamic>> _selectedPaymentMethods = {};
+  Map<int, bool> _isCancelling = {}; // Pour suivre l'état d'annulation par vendeur
 
   Future<void> _loadPaymentMethods(BuildContext context) async {
     final orderListState = context.read<OrderCubit>().orderListState;
@@ -788,6 +791,175 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> {
     }
   }
 
+  // Affiche le popup pour annuler les commandes d'un vendeur
+  Future<void> _showCancelOrderDialog(int vendeurId, List<Map<String, dynamic>> vendeurOrders) async {
+    final TextEditingController reasonController = TextEditingController();
+    
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: Row(
+            children: [
+              Icon(Icons.cancel_outlined, color: Colors.red, size: 18),
+              const SizedBox(width: 6),
+              const Text(
+                'Annuler',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Voulez-vous vraiment annuler toutes les commandes de ce vendeur ?',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: reasonController,
+                  decoration: const InputDecoration(
+                    labelText: 'Raison *',
+                    hintText: 'Ex: Changement d\'avis...',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.edit, size: 18),
+                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  ),
+                  style: const TextStyle(fontSize: 13),
+                  maxLines: 3,
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Non', style: TextStyle(fontSize: 13)),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                if (reasonController.text.trim().isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Veuillez renseigner la raison'),
+                      backgroundColor: Colors.orange,
+                    ),
+                  );
+                  return;
+                }
+                Navigator.pop(context, true);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              ),
+              child: const Text('Valider', style: TextStyle(fontSize: 13)),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (result == true && reasonController.text.trim().isNotEmpty) {
+      await _cancelVendeurOrders(vendeurId, vendeurOrders, reasonController.text.trim());
+    }
+  }
+
+  // Annule toutes les commandes d'un vendeur
+  Future<void> _cancelVendeurOrders(
+    int vendeurId,
+    List<Map<String, dynamic>> vendeurOrders,
+    String reason,
+  ) async {
+    setState(() {
+      _isCancelling[vendeurId] = true;
+    });
+
+    try {
+      // Annuler toutes les commandes du vendeur
+      int successCount = 0;
+      int failCount = 0;
+
+      for (var order in vendeurOrders) {
+        final orderId = order['id']?.toString() ?? '';
+        if (orderId.isEmpty) {
+          failCount++;
+          continue;
+        }
+
+        try {
+          final result = await _orderService.updateOrderStatus(
+            orderId: orderId,
+            status: 'cancelled',
+            reason: reason,
+          );
+
+          if (result['success'] == true) {
+            successCount++;
+          } else {
+            failCount++;
+            print('❌ Erreur lors de l\'annulation de la commande $orderId: ${result['message']}');
+          }
+        } catch (e) {
+          failCount++;
+          print('❌ Exception lors de l\'annulation de la commande $orderId: $e');
+        }
+      }
+
+      setState(() {
+        _isCancelling[vendeurId] = false;
+      });
+
+      // Afficher le résultat et rafraîchir
+      if (mounted) {
+        if (successCount > 0) {
+          // Rafraîchir les commandes avant d'afficher le message
+          await context.read<OrderCubit>().fetchOrders();
+          // Recharger les moyens de paiement
+          _loadPaymentMethods(context);
+          
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                failCount > 0
+                    ? '$successCount commande(s) annulée(s), $failCount erreur(s)'
+                    : '${successCount} commande(s) annulée(s) avec succès',
+              ),
+              backgroundColor: failCount > 0 ? Colors.orange : Colors.green,
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Erreur lors de l\'annulation des commandes'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      setState(() {
+        _isCancelling[vendeurId] = false;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   void _showPaymentMethodSelection(int vendeurId, Map<String, dynamic> currentPaymentMethod, List<Map<String, dynamic>> vendeurOrders) {
     final paymentMethods = _vendeurPaymentMethods?[vendeurId];
     if (paymentMethods == null || paymentMethods.isEmpty) {
@@ -1029,6 +1201,12 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> {
                                 final vendeurName = '${vendeur['firstName'] ?? ''} ${vendeur['lastName'] ?? ''}'.trim();
                                 final vendeurTotals = _calculateVendeurTotals(vendeurOrders);
                                 final selectedPaymentMethod = _selectedPaymentMethods[vendeurId] ?? firstOrder['paymentMethod'] as Map<String, dynamic>?;
+                                
+                                // Vérifier si toutes les commandes sont déjà annulées
+                                final allCancelled = vendeurOrders.every((order) {
+                                  final status = order['status']?.toString().toLowerCase() ?? '';
+                                  return status == 'cancelled';
+                                });
 
                                 return Container(
                                   margin: const EdgeInsets.only(bottom: 16),
@@ -1445,6 +1623,43 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> {
                                                 ],
                                               ),
                                             ),
+
+                                            // Bouton Annuler Commande (caché si toutes les commandes sont déjà annulées)
+                                            if (!allCancelled) ...[
+                                              const SizedBox(height: 12),
+                                              SizedBox(
+                                                width: double.infinity,
+                                                child: ElevatedButton.icon(
+                                                  onPressed: (_isCancelling[vendeurId] == true)
+                                                      ? null
+                                                      : () => _showCancelOrderDialog(vendeurId, vendeurOrders),
+                                                  icon: _isCancelling[vendeurId] == true
+                                                      ? const SizedBox(
+                                                          width: 14,
+                                                          height: 14,
+                                                          child: CircularProgressIndicator(
+                                                            strokeWidth: 2,
+                                                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                                          ),
+                                                        )
+                                                      : const Icon(Icons.cancel_outlined, size: 16),
+                                                  label: Text(
+                                                    _isCancelling[vendeurId] == true
+                                                        ? 'Annulation...'
+                                                        : 'Annuler',
+                                                    ),
+                                                  style: ElevatedButton.styleFrom(
+                                                    backgroundColor: Colors.red,
+                                                    foregroundColor: Colors.white,
+                                                    padding: const EdgeInsets.symmetric(vertical: 10),
+                                                    shape: RoundedRectangleBorder(
+                                                      borderRadius: BorderRadius.circular(8),
+                                                    ),
+                                                    textStyle: const TextStyle(fontSize: 13),
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
                                           ],
                                         ),
                                       ),

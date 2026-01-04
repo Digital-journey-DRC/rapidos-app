@@ -11,6 +11,7 @@ import 'package:immo/screens/home/new_home.dart';
 import 'package:immo/screens/home/voir_plus_produits.dart';
 import 'package:immo/screens/navigation_example.dart';
 import 'package:immo/screens/order_screen.dart';
+import 'package:immo/screens/order/commande_client_screen.dart';
 
 import '../constants.dart';
 import '../cubit/auth_cubit.dart';
@@ -247,8 +248,8 @@ class _MainScreenState extends State<MainScreen> {
         _screens[0], // NewHomeScreen
         _screens[1], // CartScreen
         _screens[2], // FavorisScreen
-        _screens[4],
-        _screens[6]
+        const CommandeClientScreen(backNavigation: false), // Historique des commandes client
+        _screens[6] // NavigationExample (Maps)
         // _screens[10]
         // HomeMarchantScreen
       ];
