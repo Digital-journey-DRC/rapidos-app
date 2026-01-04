@@ -12,6 +12,10 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'dart:io';
 import 'package:camera/camera.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'package:immo/services/storage_service.dart';
 import 'order_screen.dart'; // Pour accéder à CameraColisScreen
 
 class OrderDetailsScreen extends StatefulWidget {
@@ -195,6 +199,14 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                                           duration: const Duration(seconds: 4),
                                         ),
                                       );
+
+                                      // Envoyer la localisation en background après succès de "Récupérer le colis"
+                                      if (targetStatus == 'en_route') {
+                                        final currentOrderData = _currentOrderData ?? widget.orderData;
+                                        final orderId = currentOrderData['orderId']?.toString() ?? widget.orderId;
+                                        // Exécuter en background sans attendre
+                                        _sendLivreurLocationInBackground(orderId);
+                                      }
                                     } else {
                                       ScaffoldMessenger.of(context).showSnackBar(
                                         SnackBar(
@@ -227,7 +239,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                               },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.primary,
-                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(8),
                           ),
@@ -258,6 +270,55 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
         );
       },
     );
+  }
+
+  /// Envoie la localisation du livreur en background après récupération du colis
+  Future<void> _sendLivreurLocationInBackground(String orderId) async {
+    try {
+      // Récupérer la position GPS actuelle
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+
+      // Récupérer le token
+      final token = await StorageService().getToken();
+      if (token == null) {
+        print('⚠️ [OrderDetailsScreen] Token manquant pour envoyer la localisation');
+        return;
+      }
+
+      // Préparer le body de la requête
+      final body = {
+        'orderId': orderId,
+        'latitude': position.latitude,
+        'longitude': position.longitude,
+      };
+
+      // Envoyer la requête POST en background
+      final response = await http.post(
+        Uri.parse('http://24.144.87.127:3333/ecommerce/location/livreur'),
+        headers: {
+          'Content-Type': 'application/json',
+          'accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode(body),
+      ).timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          throw Exception('Timeout lors de l\'envoi de la localisation');
+        },
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        print('✅ [OrderDetailsScreen] Localisation du livreur envoyée avec succès');
+      } else {
+        print('⚠️ [OrderDetailsScreen] Erreur lors de l\'envoi de la localisation: ${response.statusCode}');
+      }
+    } catch (e) {
+      // Ne pas afficher d'erreur à l'utilisateur car c'est en background
+      print('⚠️ [OrderDetailsScreen] Erreur lors de l\'envoi de la localisation en background: $e');
+    }
   }
 
   void _showCodeConfirmationDialog(BuildContext context, String docId, String shortCode, String livreurId) {
@@ -368,12 +429,15 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.primary,
                           foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(8),
                           ),
                         ),
-                        child: const Text('CONFIRMER'),
+                        child: const Text(
+                          'CONFIRMER',
+                          style: TextStyle(fontSize: 13),
+                        ),
                       ),
                     ],
                   ),
@@ -648,12 +712,15 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                           backgroundColor: AppColors.primary,
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 24, vertical: 12),
+                              horizontal: 16, vertical: 8),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(8),
                           ),
                         ),
-                        child: const Text('CONFIRMER'),
+                        child: const Text(
+                          'CONFIRMER',
+                          style: TextStyle(fontSize: 13),
+                        ),
                       ),
                     ],
                   ),
@@ -1023,15 +1090,15 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                                                           borderRadius: BorderRadius.circular(8),
                                                         ),
                                                         padding: const EdgeInsets.symmetric(
-                                                            horizontal: 20, vertical: 12),
+                                                            horizontal: 16, vertical: 8),
                                                       ),
                                                       child: const Row(
                                                         mainAxisSize: MainAxisSize.min,
                                                         children: [
-                                                          Icon(Icons.phone, color: Colors.white),
-                                                          SizedBox(width: 8),
+                                                          Icon(Icons.phone, color: Colors.white, size: 16),
+                                                          SizedBox(width: 6),
                                                           Text('Appeler',
-                                                              style: TextStyle(color: Colors.white)),
+                                                              style: TextStyle(color: Colors.white, fontSize: 13)),
                                                         ],
                                                       ),
                                                     ),
@@ -1057,15 +1124,15 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                                                           borderRadius: BorderRadius.circular(8),
                                                         ),
                                                         padding: const EdgeInsets.symmetric(
-                                                            horizontal: 20, vertical: 12),
+                                                            horizontal: 16, vertical: 8),
                                                       ),
                                                       child: const Row(
                                                         mainAxisSize: MainAxisSize.min,
                                                         children: [
-                                                          Icon(Icons.message, color: Colors.white),
-                                                          SizedBox(width: 8),
+                                                          Icon(Icons.message, color: Colors.white, size: 16),
+                                                          SizedBox(width: 6),
                                                           Text('WhatsApp',
-                                                              style: TextStyle(color: Colors.white)),
+                                                              style: TextStyle(color: Colors.white, fontSize: 13)),
                                                         ],
                                                       ),
                                                     ),
@@ -1718,7 +1785,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                             ),
                           ],
                         ),
-                        padding: const EdgeInsets.all(16),
+                        padding: const EdgeInsets.all(10),
                         child: ElevatedButton.icon(
                           onPressed: () {
                             _showExpeditionDialog(context, widget.orderId);
@@ -1729,20 +1796,20 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                                       shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
-                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            padding: const EdgeInsets.symmetric(vertical: 8),
                           ),
                           icon: const Icon(
                             Icons.local_shipping_outlined,
                             color: Colors.white,
-                            size: 20,
+                            size: 16,
                           ),
                           label: const Text(
                             'Expédier la commande',
                                           style: TextStyle(
                               color: Colors.white,
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 0.5,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 0.3,
                             ),
                           ),
                         ),
@@ -1842,7 +1909,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                                       shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(8),
                                       ),
-                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            padding: const EdgeInsets.symmetric(vertical: 8),
                                     ),
                           child: _isAcceptingLivraison
                               ? Row(
@@ -1932,7 +1999,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(8),
                             ),
-                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            padding: const EdgeInsets.symmetric(vertical: 8),
                           ),
                           child: _isMarkingEnRoute
                               ? Row(
@@ -2022,7 +2089,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(8),
                             ),
-                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            padding: const EdgeInsets.symmetric(vertical: 8),
                           ),
                           child: _isDelivering
                               ? Row(
@@ -2111,18 +2178,18 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(8),
                             ),
-                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            padding: const EdgeInsets.symmetric(vertical: 8),
                           ),
                           icon: const Icon(
                             Icons.local_shipping_outlined,
                             color: Colors.white,
-                            size: 16,
+                            size: 14,
                           ),
                           label: const Text(
                             'Confirmer la livraison',
                             style: TextStyle(
                               color: Colors.white,
-                              fontSize: 13,
+                              fontSize: 12,
                               fontWeight: FontWeight.w600,
                               letterSpacing: 0.3,
                             ),
@@ -2311,7 +2378,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                   foregroundColor: Colors.white,
                   disabledBackgroundColor: Colors.grey.shade300,
                   disabledForegroundColor: Colors.grey.shade600,
-                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  padding: const EdgeInsets.symmetric(vertical: 8),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),
                   ),
@@ -2403,7 +2470,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                 foregroundColor: Colors.white,
                 disabledBackgroundColor: Colors.grey.shade300,
                 disabledForegroundColor: Colors.grey.shade600,
-                padding: const EdgeInsets.symmetric(vertical: 10),
+                padding: const EdgeInsets.symmetric(vertical: 8),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
                 ),
@@ -2649,8 +2716,12 @@ class _VendeurOrderActionsWidgetState extends State<_VendeurOrderActionsWidget> 
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.red,
                 foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               ),
-              child: const Text('Annuler la commande'),
+              child: const Text(
+                'Annuler la commande',
+                style: TextStyle(fontSize: 13),
+              ),
             ),
           ],
         );
@@ -2829,7 +2900,7 @@ class _VendeurOrderActionsWidgetState extends State<_VendeurOrderActionsWidget> 
                 foregroundColor: Colors.white,
                 disabledBackgroundColor: Colors.grey.shade300,
                 disabledForegroundColor: Colors.grey.shade600,
-                padding: const EdgeInsets.symmetric(vertical: 12),
+                padding: const EdgeInsets.symmetric(vertical: 8),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
                 ),
@@ -2888,7 +2959,7 @@ class _VendeurOrderActionsWidgetState extends State<_VendeurOrderActionsWidget> 
                 ),
                 foregroundColor: Colors.red.shade600,
                 disabledForegroundColor: Colors.grey.shade600,
-                padding: const EdgeInsets.symmetric(vertical: 12),
+                padding: const EdgeInsets.symmetric(vertical: 8),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
                 ),
