@@ -31,6 +31,7 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
   Timer? _searchDebounceTimer;
   bool _isSearching = false;
   bool _isGettingCurrentLocation = false;
+  String _previousSearchText = '';
 
   // Variable pour suivre l'adresse sélectionnée depuis Google
   Map<String, dynamic>? _selectedGoogleAddress;
@@ -68,21 +69,48 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
   }
 
   void _onSearchChanged() {
-    _searchDebounceTimer?.cancel();
-    _searchDebounceTimer = Timer(const Duration(milliseconds: 500), () {
-      final query = _searchAddressController.text;
-      if (query.length > 1) {
-        setState(() {
-          _isSearching = true;
-        });
-        _searchAddress(query);
-      } else {
-        setState(() {
-          _searchResults.clear();
-          _isSearching = false;
-        });
-      }
-    });
+    final query = _searchAddressController.text;
+    
+    // Détecter si un espace a été ajouté
+    final hasSpace = query.contains(' ');
+    final previousHadSpace = _previousSearchText.contains(' ');
+    final spaceJustAdded = hasSpace && !previousHadSpace;
+    
+    // Si un espace vient d'être ajouté et que le texte a plus d'un caractère, rechercher
+    if (spaceJustAdded && query.trim().length > 1) {
+      _searchDebounceTimer?.cancel();
+      setState(() {
+        _isSearching = true;
+      });
+      _searchAddress(query.trim());
+      _previousSearchText = query;
+      return;
+    }
+    
+    // Si le texte contient déjà un espace et qu'il y a eu une modification, rechercher
+    if (hasSpace && query.trim().length > 1 && query != _previousSearchText) {
+      _searchDebounceTimer?.cancel();
+      _searchDebounceTimer = Timer(const Duration(milliseconds: 300), () {
+        if (_searchAddressController.text.contains(' ') && 
+            _searchAddressController.text.trim().length > 1) {
+          setState(() {
+            _isSearching = true;
+          });
+          _searchAddress(_searchAddressController.text.trim());
+        }
+      });
+    }
+    
+    // Si le texte est vide, effacer les résultats
+    if (query.isEmpty) {
+      _searchDebounceTimer?.cancel();
+      setState(() {
+        _searchResults.clear();
+        _isSearching = false;
+      });
+    }
+    
+    _previousSearchText = query;
   }
 
   Future<void> _searchAddress(String query) async {
@@ -175,6 +203,7 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
             location['lat'].toDouble(),
             location['lng'].toDouble(),
             result['description'],
+            isFromCurrentLocation: false,
           );
         }
       }
@@ -251,6 +280,7 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
           position.latitude,
           position.longitude,
           '',
+          isFromCurrentLocation: true,
         );
       } else {
         if (mounted) {
@@ -338,8 +368,9 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
     String avenue,
     double latitude,
     double longitude,
-    String fullAddress,
-  ) async {
+    String fullAddress, {
+    bool isFromCurrentLocation = false,
+  }) async {
     final authState = context.read<AuthCubit>().state;
     if (authState is! AuthSuccess || authState.user == null) {
       return;
@@ -379,16 +410,6 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
                 ),
                 const SizedBox(height: 20),
                 TextField(
-                  controller: numeroController,
-                  decoration: const InputDecoration(
-                    labelText: 'Numéro',
-                    hintText: 'Ex: 12, 45B...',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.numbers),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
                   controller: refAdresseController,
                   decoration: const InputDecoration(
                     labelText: 'Référence de l\'adresse',
@@ -426,14 +447,22 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
     final userName =
         '${authState.user!['firstName'] ?? ''} ${authState.user!['lastName'] ?? ''}'.trim();
 
+    // Variable pour stocker le dialog du loader
+    BuildContext? loaderContext;
+
     try {
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => const Center(
-          child: CircularProgressIndicator(),
-        ),
-      );
+      if (context.mounted) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (dialogContext) {
+            loaderContext = dialogContext;
+            return const Center(
+              child: CircularProgressIndicator(),
+            );
+          },
+        );
+      }
 
       final docRef = await FirebaseFirestore.instance
           .collection('delivery_addresses')
@@ -455,17 +484,22 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
         'source': 'google',
       });
 
-      if (mounted) {
-        Navigator.pop(context); // Fermer le loader
-      }
-
       // Récupérer l'adresse créée
       final addressDoc = await docRef.get();
       final addressData = addressDoc.data() as Map<String, dynamic>;
       final addressId = addressDoc.id;
 
+      // Fermer le loader AVANT d'afficher le dialogue de confirmation
+      if (context.mounted && loaderContext != null) {
+        Navigator.of(loaderContext!).pop();
+        loaderContext = null;
+      }
+
+      // Attendre un peu pour s'assurer que le loader est bien fermé
+      await Future.delayed(const Duration(milliseconds: 100));
+
       // Demander confirmation
-      if (mounted) {
+      if (context.mounted) {
         _showAddressConfirmationDialog(
           context,
           addressId,
@@ -473,8 +507,12 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
         );
       }
     } catch (e) {
-      if (mounted) {
-        Navigator.pop(context); // Fermer le loader en cas d'erreur
+      // Fermer le loader en cas d'erreur
+      if (context.mounted && loaderContext != null) {
+        Navigator.of(loaderContext!).pop();
+        loaderContext = null;
+      }
+      if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Erreur lors de la sauvegarde: $e'),
@@ -564,11 +602,11 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
-          padding: const EdgeInsets.all(24),
-          margin: const EdgeInsets.only(bottom: 16),
+          padding: const EdgeInsets.all(16),
+          margin: const EdgeInsets.only(bottom: 12),
           decoration: BoxDecoration(
             color: Colors.orange.shade50,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(12),
             border: Border.all(
               color: Colors.orange.shade200,
               width: 1.5,
@@ -578,24 +616,24 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
             children: [
               Icon(
                 Icons.location_off_outlined,
-                size: 48,
+                size: 36,
                 color: Colors.orange.shade700,
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
               const Text(
                 'Aucune adresse de livraison trouvée',
                 style: TextStyle(
-                  fontSize: 18,
+                  fontSize: 16,
                   fontWeight: FontWeight.bold,
                   color: Colors.black87,
                 ),
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               Text(
                 'Créez une adresse de livraison pour continuer votre commande.',
                 style: TextStyle(
-                  fontSize: 14,
+                  fontSize: 12,
                   color: Colors.grey.shade700,
                 ),
                 textAlign: TextAlign.center,
@@ -605,10 +643,10 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
         ),
         // Recherche d'adresse Google
         Container(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(10),
             border: Border.all(color: Colors.grey.shade200),
           ),
           child: Column(
@@ -631,6 +669,15 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
               TextField(
                 controller: _searchAddressController,
                 focusNode: _searchFocusNode,
+                onSubmitted: (value) {
+                  // Si l'utilisateur appuie sur Entrée et qu'il y a du texte, rechercher
+                  if (value.trim().isNotEmpty) {
+                    setState(() {
+                      _isSearching = true;
+                    });
+                    _searchAddress(value.trim());
+                  }
+                },
                 decoration: InputDecoration(
                   hintText: 'Tapez une adresse...',
                   prefixIcon: const Icon(Icons.location_on),
@@ -648,6 +695,7 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
                               icon: const Icon(Icons.clear),
                               onPressed: () {
                                 _searchAddressController.clear();
+                                _previousSearchText = '';
                                 setState(() {
                                   _searchResults.clear();
                                 });
@@ -756,10 +804,10 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
       children: [
         // Recherche d'adresse Google
         Container(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(10),
             border: Border.all(color: Colors.grey.shade200),
           ),
           child: Column(
@@ -767,21 +815,30 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
             children: [
               Row(
                 children: [
-                  Icon(Icons.search, color: AppColors.primary),
-                  const SizedBox(width: 8),
+                  Icon(Icons.search, color: AppColors.primary, size: 18),
+                  const SizedBox(width: 6),
                   const Text(
                     'Rechercher une adresse',
                     style: TextStyle(
-                      fontSize: 16,
+                      fontSize: 14,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
               TextField(
                 controller: _searchAddressController,
                 focusNode: _searchFocusNode,
+                onSubmitted: (value) {
+                  // Si l'utilisateur appuie sur Entrée et qu'il y a du texte, rechercher
+                  if (value.trim().isNotEmpty) {
+                    setState(() {
+                      _isSearching = true;
+                    });
+                    _searchAddress(value.trim());
+                  }
+                },
                 decoration: InputDecoration(
                   hintText: 'Tapez une adresse...',
                   prefixIcon: const Icon(Icons.location_on),
@@ -799,6 +856,7 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
                               icon: const Icon(Icons.clear),
                               onPressed: () {
                                 _searchAddressController.clear();
+                                _previousSearchText = '';
                                 setState(() {
                                   _searchResults.clear();
                                 });
@@ -1063,15 +1121,23 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
     final userName =
         '${authState.user!['firstName'] ?? ''} ${authState.user!['lastName'] ?? ''}'.trim();
 
+    // Variable pour stocker le dialog du loader
+    BuildContext? loaderContext;
+    
     try {
       // Afficher un loader
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => const Center(
-          child: CircularProgressIndicator(),
-        ),
-      );
+      if (context.mounted) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (dialogContext) {
+            loaderContext = dialogContext;
+            return const Center(
+              child: CircularProgressIndicator(),
+            );
+          },
+        );
+      }
 
       final docRef = await FirebaseFirestore.instance
           .collection('delivery_addresses')
@@ -1091,17 +1157,21 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
         'longitude': 0.0,
       });
 
-      // Fermer le loader
-      if (context.mounted) {
-        Navigator.pop(context);
-      }
-
       // Récupérer l'adresse créée
       final addressDoc = await docRef.get();
       final addressData = addressDoc.data() as Map<String, dynamic>;
       final addressId = addressDoc.id;
 
-      // Fermer le loader et demander confirmation
+      // Fermer le loader AVANT d'afficher le dialogue de confirmation
+      if (context.mounted && loaderContext != null) {
+        Navigator.of(loaderContext!).pop();
+        loaderContext = null;
+      }
+
+      // Attendre un peu pour s'assurer que le loader est bien fermé
+      await Future.delayed(const Duration(milliseconds: 100));
+
+      // Afficher le dialogue de confirmation
       if (context.mounted) {
         _showAddressConfirmationDialog(
           context,
@@ -1110,8 +1180,12 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
         );
       }
     } catch (e) {
+      // Fermer le loader en cas d'erreur
+      if (context.mounted && loaderContext != null) {
+        Navigator.of(loaderContext!).pop();
+        loaderContext = null;
+      }
       if (context.mounted) {
-        Navigator.pop(context); // Fermer le loader en cas d'erreur
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Erreur lors de la création: $e'),
@@ -1199,6 +1273,9 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
           'id': addressId,
         };
         selectedAddressId = addressId;
+        // Réinitialiser le flag pour permettre une nouvelle initialisation
+        _isProcessingRedirect = false;
+        _isInitializing = false;
       });
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -1244,11 +1321,19 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
         try {
           String fullAddress =
               '${address['quartier']}, ${address['commune']}, ${address['ville']}, ${address['numero']}, RDC';
+          print('🌐 [AddressSelectionScreen] Récupération des coordonnées pour: $fullAddress');
           final coordinates = await getCoordinatesFromGoogle(fullAddress);
           latitude = coordinates['latitude'] ?? 0.0;
           longitude = coordinates['longitude'] ?? 0.0;
+          print('📍 [AddressSelectionScreen] Coordonnées obtenues: lat=$latitude, lng=$longitude');
+          
+          if (latitude == 0.0 || longitude == 0.0) {
+            print('⚠️ [AddressSelectionScreen] Les coordonnées sont toujours à 0.0 après récupération');
+          }
         } catch (e) {
-          print('Erreur lors de la récupération des coordonnées: $e');
+          print('❌ [AddressSelectionScreen] Erreur lors de la récupération des coordonnées: $e');
+          // Ne pas bloquer, continuer avec les coordonnées à 0.0
+          // Le code suivant vérifiera et affichera un message d'erreur approprié
         }
       }
 
@@ -1416,8 +1501,10 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
         }
         
         // Gérer les erreurs
-        if (state.error != null && !_isProcessingRedirect) {
+        if (state.error != null) {
           print('❌ [AddressSelectionScreen] Erreur détectée: ${state.error}');
+          // Réinitialiser le flag pour permettre une nouvelle tentative
+          _isProcessingRedirect = false;
           if (mounted) {
             setState(() {
               _isInitializing = false;
@@ -1484,62 +1571,62 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
                         Row(
                           children: [
                             Container(
-                              padding: const EdgeInsets.all(8),
+                              padding: const EdgeInsets.all(6),
                               decoration: BoxDecoration(
                                 color: AppColors.primary.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: BorderRadius.circular(6),
                               ),
                               child: Icon(
                                 Icons.bookmark,
                                 color: AppColors.primary,
-                                size: 20,
+                                size: 16,
                               ),
                             ),
-                            const SizedBox(width: 12),
+                            const SizedBox(width: 8),
                             const Text(
                               'Vos adresses enregistrées',
                               style: TextStyle(
-                                fontSize: 20,
+                                fontSize: 16,
                                 fontWeight: FontWeight.bold,
                                 color: Colors.black87,
                               ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 12),
                         // Liste des adresses
                         ...snapshot.data!.docs.map((doc) {
                           final address =
                               doc.data() as Map<String, dynamic>;
                           final isSelected = selectedAddressId == doc.id;
                           return Container(
-                            margin: const EdgeInsets.only(bottom: 12),
+                            margin: const EdgeInsets.only(bottom: 6),
                             decoration: BoxDecoration(
                               color: isSelected
                                   ? AppColors.primary.withOpacity(0.08)
                                   : Colors.white,
-                              borderRadius: BorderRadius.circular(16),
+                              borderRadius: BorderRadius.circular(10),
                               border: Border.all(
                                 color: isSelected
                                     ? AppColors.primary
                                     : Colors.grey.shade200,
-                                width: isSelected ? 2.5 : 1,
+                                width: isSelected ? 1.5 : 1,
                               ),
                               boxShadow: [
                                 BoxShadow(
                                   color: isSelected
-                                      ? AppColors.primary.withOpacity(0.15)
-                                      : Colors.black.withOpacity(0.05),
-                                  blurRadius: isSelected ? 8 : 4,
-                                  offset: const Offset(0, 2),
-                                  spreadRadius: isSelected ? 1 : 0,
+                                      ? AppColors.primary.withOpacity(0.1)
+                                      : Colors.black.withOpacity(0.03),
+                                  blurRadius: isSelected ? 4 : 2,
+                                  offset: const Offset(0, 1),
+                                  spreadRadius: 0,
                                 ),
                               ],
                             ),
                             child: Material(
                               color: Colors.transparent,
                               child: InkWell(
-                                borderRadius: BorderRadius.circular(16),
+                                borderRadius: BorderRadius.circular(10),
                                 onTap: () {
                                   print('📍 [AddressSelectionScreen] Adresse sélectionnée: ${doc.id}');
                                   setState(() {
@@ -1548,6 +1635,9 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
                                       'id': doc.id,
                                     };
                                     selectedAddressId = doc.id;
+                                    // Réinitialiser le flag pour permettre une nouvelle initialisation
+                                    _isProcessingRedirect = false;
+                                    _isInitializing = false;
                                     print('📍 [AddressSelectionScreen] selectedAddress mis à jour: ${selectedAddress != null ? 'Oui' : 'Non'}');
                                     print('📍 [AddressSelectionScreen] selectedAddressId: $selectedAddressId');
                                   });
@@ -1555,17 +1645,17 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
                                   setStateButton(() {});
                                 },
                                 child: Padding(
-                                  padding: const EdgeInsets.all(16),
+                                  padding: const EdgeInsets.all(8),
                                   child: Row(
                                     children: [
                                       Container(
-                                        width: 48,
-                                        height: 48,
+                                        width: 32,
+                                        height: 32,
                                         decoration: BoxDecoration(
                                           color: isSelected
                                               ? AppColors.primary
                                               : Colors.grey.shade100,
-                                          borderRadius: BorderRadius.circular(12),
+                                          borderRadius: BorderRadius.circular(8),
                                         ),
                                         child: Icon(
                                           isSelected
@@ -1574,10 +1664,10 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
                                           color: isSelected
                                               ? Colors.white
                                               : Colors.grey.shade600,
-                                          size: 24,
+                                          size: 18,
                                         ),
                                       ),
-                                      const SizedBox(width: 16),
+                                      const SizedBox(width: 8),
                                       Expanded(
                                         child: Column(
                                           crossAxisAlignment:
@@ -1586,46 +1676,46 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
                                             Text(
                                               '${address['avenue'] ?? ''}, ${address['numero'] ?? ''}',
                                               style: TextStyle(
-                                                fontSize: 16,
+                                                fontSize: 13,
                                                 fontWeight: FontWeight.w600,
                                                 color: isSelected
                                                     ? AppColors.primary
                                                     : Colors.black87,
                                               ),
                                             ),
-                                            const SizedBox(height: 6),
+                                            const SizedBox(height: 3),
                                             Row(
                                               children: [
                                                 Icon(
                                                   Icons.location_city,
-                                                  size: 14,
+                                                  size: 10,
                                                   color: Colors.grey.shade500,
                                                 ),
-                                                const SizedBox(width: 4),
+                                                const SizedBox(width: 3),
                                                 Expanded(
                                                   child: Text(
                                                     '${address['quartier'] ?? ''}, ${address['commune'] ?? ''}',
                                                     style: TextStyle(
-                                                      fontSize: 13,
+                                                      fontSize: 11,
                                                       color: Colors.grey.shade600,
                                                     ),
                                                   ),
                                                 ),
                                               ],
                                             ),
-                                            const SizedBox(height: 2),
+                                            const SizedBox(height: 1),
                                             Row(
                                               children: [
                                                 Icon(
                                                   Icons.public,
-                                                  size: 14,
+                                                  size: 10,
                                                   color: Colors.grey.shade500,
                                                 ),
-                                                const SizedBox(width: 4),
+                                                const SizedBox(width: 3),
                                                 Text(
                                                   '${address['ville'] ?? ''}, ${address['pays'] ?? 'RDC'}',
                                                   style: TextStyle(
-                                                    fontSize: 13,
+                                                    fontSize: 11,
                                                     color: Colors.grey.shade600,
                                                   ),
                                                 ),
@@ -1636,7 +1726,7 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
                                       ),
                                       if (isSelected)
                                         Container(
-                                          padding: const EdgeInsets.all(4),
+                                          padding: const EdgeInsets.all(2),
                                           decoration: BoxDecoration(
                                             color: AppColors.primary,
                                             shape: BoxShape.circle,
@@ -1644,7 +1734,7 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
                                           child: const Icon(
                                             Icons.check,
                                             color: Colors.white,
-                                            size: 16,
+                                            size: 12,
                                           ),
                                         ),
                                     ],

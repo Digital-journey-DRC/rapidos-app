@@ -1127,8 +1127,8 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> {
                                               final distanceKm = order['distanceKm']?.toString() ?? '';
 
                                               return Container(
-                                                margin: const EdgeInsets.only(bottom: 10),
-                                                padding: const EdgeInsets.all(10),
+                                                margin: const EdgeInsets.only(bottom: 8),
+                                                padding: const EdgeInsets.all(8),
                                                 decoration: BoxDecoration(
                                                   color: Colors.grey.shade50,
                                                   borderRadius: BorderRadius.circular(8),
@@ -1141,30 +1141,30 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> {
                                                     Row(
                                                       children: [
                                                         Container(
-                                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                                                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                                                           decoration: BoxDecoration(
                                                             color: AppColors.primary.withOpacity(0.1),
-                                                            borderRadius: BorderRadius.circular(6),
+                                                            borderRadius: BorderRadius.circular(5),
                                                           ),
                                                           child: Text(
                                                             '#${orderId.length > 8 ? orderId.substring(0, 8) : orderId}',
                                                             style: const TextStyle(
-                                                              fontSize: 10,
+                                                              fontSize: 9,
                                                               fontWeight: FontWeight.bold,
                                                               color: AppColors.primary,
                                                             ),
                                                           ),
                                                         ),
-                                                        const SizedBox(width: 8),
+                                                        const SizedBox(width: 6),
                                                         if (order['status'] != null)
                                                           Container(
                                                             padding: const EdgeInsets.symmetric(
-                                                              horizontal: 6,
-                                                              vertical: 3,
+                                                              horizontal: 5,
+                                                              vertical: 2,
                                                             ),
                                                             decoration: BoxDecoration(
                                                               color: _statusColor(order['status'].toString()).withOpacity(0.15),
-                                                              borderRadius: BorderRadius.circular(6),
+                                                              borderRadius: BorderRadius.circular(5),
                                                               border: Border.all(
                                                                 color: _statusColor(order['status'].toString()).withOpacity(0.3),
                                                                 width: 0.5,
@@ -1174,24 +1174,24 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> {
                                                               _translateStatus(order['status'].toString()),
                                                               style: TextStyle(
                                                                 color: _statusColor(order['status'].toString()),
-                                                                fontSize: 9,
+                                                                fontSize: 8,
                                                                 fontWeight: FontWeight.bold,
                                                               ),
                                                             ),
                                                           ),
                                                       ],
                                                     ),
-                                                    const SizedBox(height: 8),
+                                                    const SizedBox(height: 6),
                                                     // Adresse
                                                     Row(
                                                       children: [
-                                                        Icon(Icons.location_on, size: 14, color: AppColors.primary),
-                                                        const SizedBox(width: 6),
+                                                        Icon(Icons.location_on, size: 12, color: AppColors.primary),
+                                                        const SizedBox(width: 5),
                                                         Expanded(
                                                           child: Text(
                                                             '${address['avenue'] ?? ''}, ${address['numero'] ?? ''}',
                                                             style: TextStyle(
-                                                              fontSize: 11,
+                                                              fontSize: 10,
                                                               color: Colors.grey.shade700,
                                                               fontWeight: FontWeight.w500,
                                                             ),
@@ -1201,14 +1201,14 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> {
                                                           Text(
                                                             '$distanceKm km',
                                                             style: TextStyle(
-                                                              fontSize: 10,
+                                                              fontSize: 9,
                                                               fontWeight: FontWeight.w600,
                                                               color: AppColors.primary,
                                                             ),
                                                           ),
                                                       ],
                                                     ),
-                                                    const SizedBox(height: 8),
+                                                    const SizedBox(height: 6),
                                                     // Produits
                                                     ...products.map((product) {
                                                       final productName = product['name']?.toString() ?? 'Produit';
@@ -1216,11 +1216,11 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> {
                                                       final price = _parseAmount(product['price']);
                                                       final productTotal = price * quantity;
                                                       return Container(
-                                                        margin: const EdgeInsets.only(bottom: 6),
-                                                        padding: const EdgeInsets.all(8),
+                                                        margin: const EdgeInsets.only(bottom: 4),
+                                                        padding: const EdgeInsets.all(6),
                                                         decoration: BoxDecoration(
                                                           color: Colors.white,
-                                                          borderRadius: BorderRadius.circular(6),
+                                                          borderRadius: BorderRadius.circular(5),
                                                           border: Border.all(color: Colors.grey.shade200),
                                                         ),
                                                         child: Row(
@@ -1232,7 +1232,7 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> {
                                                                   Text(
                                                                     productName,
                                                                     style: const TextStyle(
-                                                                      fontSize: 12,
+                                                                      fontSize: 11,
                                                                       fontWeight: FontWeight.w600,
                                                                     ),
                                                                   ),
@@ -1240,7 +1240,7 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> {
                                                                   Text(
                                                                     '$quantity × ${price.toStringAsFixed(0)} FC',
                                                                     style: TextStyle(
-                                                                      fontSize: 10,
+                                                                      fontSize: 9,
                                                                       color: Colors.grey.shade600,
                                                                     ),
                                                                   ),
@@ -1250,7 +1250,7 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> {
                                                             Text(
                                                               '${productTotal.toStringAsFixed(0)} FC',
                                                               style: const TextStyle(
-                                                                fontSize: 13,
+                                                                fontSize: 12,
                                                                 fontWeight: FontWeight.bold,
                                                                 color: AppColors.primary,
                                                               ),
