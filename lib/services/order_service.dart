@@ -846,26 +846,58 @@ class OrderService {
       );
 
       print('📥 [OrderService] Réponse reçue - Status: ${response.statusCode}');
-      print('📥 [OrderService] Réponse body: ${response.body}');
+      print('📥 [OrderService] Réponse body complète:');
+      print('═══════════════════════════════════════════════════════════');
+      print(response.body);
+      print('═══════════════════════════════════════════════════════════');
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(response.body);
+        print('📊 [OrderService] Structure de la réponse JSON:');
+        print('   - Clés disponibles: ${responseData.keys.toList()}');
+        print('   - Type de responseData: ${responseData.runtimeType}');
+        
         // Le backend peut retourner 'livraison' ou 'orders' ou directement un tableau
         final rawOrders = responseData['livraison'] ?? 
                        responseData['orders'] ?? 
                        (responseData is List ? responseData : []);
         
         print('✅ [OrderService] ${rawOrders.length} commandes récupérées pour le livreur');
+        print('📦 [OrderService] Type de rawOrders: ${rawOrders.runtimeType}');
         
-        // Log des données brutes pour debug
+        // Log des données brutes pour debug - AFFICHAGE COMPLET
         for (var i = 0; i < rawOrders.length; i++) {
           final order = rawOrders[i];
-          print('📦 [OrderService] Commande $i:');
+          print('═══════════════════════════════════════════════════════════');
+          print('📦 [OrderService] Commande $i - DONNÉES COMPLÈTES:');
+          print('═══════════════════════════════════════════════════════════');
           print('   - id: ${order['id']}');
-          print('   - status: "${order['status']}"');
           print('   - orderId: ${order['orderId']}');
+          print('   - status: "${order['status']}"');
           print('   - client: ${order['client']}');
-          print('   - total: ${order['total']}');
+          print('   - clientName: ${order['clientName']}');
+          print('   - phone: ${order['phone']}');
+          print('   - vendorId: ${order['vendorId']}');
+          print('   - vendorName: ${order['vendorName']}');
+          print('   - vendorPhone: ${order['vendorPhone']}');
+          print('   - total: ${order['total']} (type: ${order['total'].runtimeType})');
+          print('   - deliveryFee: ${order['deliveryFee']} (type: ${order['deliveryFee'].runtimeType})');
+          print('   - codeColis: ${order['codeColis']}');
+          print('   - distanceKm: ${order['distanceKm']}');
+          print('   - address: ${order['address']}');
+          print('   - latitude: ${order['latitude']}');
+          print('   - longitude: ${order['longitude']}');
+          print('   - paymentMethod: ${order['paymentMethod']}');
+          print('   - items: ${order['items']}');
+          print('   - products: ${order['products']}');
+          print('   - createdAt: ${order['createdAt']}');
+          print('   - updatedAt: ${order['updatedAt']}');
+          print('   - buyer: ${order['buyer']}');
+          print('   - vendor: ${order['vendor']}');
+          print('   - clientUser: ${order['clientUser']}');
+          print('   - vendeur: ${order['vendeur']}');
+          print('   - livreur: ${order['livreur']}');
+          print('═══════════════════════════════════════════════════════════');
         }
         
         // Transformer les commandes pour correspondre à la structure attendue (comme vendeur)
@@ -936,6 +968,12 @@ class OrderService {
         }).toList();
         
         print('✅ [OrderService] Commandes livreur transformées avec succès');
+        print('📊 [OrderService] Nombre de commandes transformées: ${orders.length}');
+        print('📊 [OrderService] Structure finale retournée:');
+        if (orders.isNotEmpty) {
+          print('   - Exemple de commande transformée (première):');
+          print('     ${orders.first}');
+        }
         
         return {
           'success': true,

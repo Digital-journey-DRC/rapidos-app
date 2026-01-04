@@ -2528,22 +2528,14 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
         if (result['success'] == true) {
           print('✅ [OrderDetailsScreen] Photo uploadée avec succès');
           
-          // Mettre à jour les données localement avec les nouvelles données de la commande
-          if (result['order'] != null) {
-            setState(() {
-              _currentOrderData = Map<String, dynamic>.from(result['order']);
-            });
-            print('🔄 [OrderDetailsScreen] Données de la commande mises à jour localement');
-          }
-          
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Photo uploadée avec succès. Vous pouvez maintenant marquer la commande comme prête à expédier.'),
+              content: Text('Photo uploadée avec succès'),
               backgroundColor: Colors.green,
-              duration: Duration(seconds: 3),
             ),
           );
-          // Rester sur la même page - les données sont déjà mises à jour via setState
+          // Retourner à la liste des commandes
+          Navigator.pop(context);
         } else {
           print('❌ [OrderDetailsScreen] Erreur: ${result['message']}');
           if (mounted) {
@@ -2592,21 +2584,14 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
         if (result['success'] == true) {
           print('✅ [OrderDetailsScreen] Commande marquée comme prête à expédier');
           
-          // Mettre à jour les données localement avec les nouvelles données de la commande
-          if (result['order'] != null) {
-            setState(() {
-              _currentOrderData = Map<String, dynamic>.from(result['order']);
-            });
-            print('🔄 [OrderDetailsScreen] Données de la commande mises à jour localement');
-          }
-          
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Commande marquée comme prête à expédier'),
               backgroundColor: Colors.green,
             ),
           );
-          // Rester sur la même page - les données sont déjà mises à jour via setState
+          // Retourner à la liste des commandes
+          Navigator.pop(context);
         } else {
           print('❌ [OrderDetailsScreen] Erreur: ${result['message']}');
           if (mounted) {
@@ -2732,7 +2717,8 @@ class _VendeurOrderActionsWidgetState extends State<_VendeurOrderActionsWidget> 
               backgroundColor: Colors.orange,
             ),
           );
-          widget.onStatusChanged();
+          // Retourner à la liste des commandes
+          Navigator.pop(context);
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -2786,13 +2772,13 @@ class _VendeurOrderActionsWidgetState extends State<_VendeurOrderActionsWidget> 
           print('✅ [OrderDetailsScreen] Préparation commencée avec succès');
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Préparation de la commande commencée. Vous pouvez maintenant uploader la photo du colis.'),
+              content: Text('Préparation de la commande commencée'),
               backgroundColor: Colors.green,
-              duration: Duration(seconds: 3),
+              duration: Duration(seconds: 2),
             ),
           );
-          // Rafraîchir les données pour afficher l'étape suivante
-          widget.onStatusChanged();
+          // Retourner à la liste des commandes
+          Navigator.pop(context);
         } else {
           print('❌ [OrderDetailsScreen] Erreur: ${result['message']}');
           ScaffoldMessenger.of(context).showSnackBar(

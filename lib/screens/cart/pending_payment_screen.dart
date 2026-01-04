@@ -1266,6 +1266,30 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> {
 
                                             const SizedBox(height: 12),
 
+                                            // Message incitatif simple (uniquement si moyen de paiement non sélectionné)
+                                            if (selectedPaymentMethod == null || selectedPaymentMethod.isEmpty) ...[
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.orange.shade50,
+                                                  borderRadius: BorderRadius.circular(8),
+                                                  border: Border.all(
+                                                    color: Colors.orange.shade300,
+                                                    width: 1,
+                                                  ),
+                                                ),
+                                                child: Text(
+                                                  'Cliquez sur l\'icône de  votre moyen de paiement et finaliser votre commande',
+                                                  style: TextStyle(
+                                                    fontSize: 12,
+                                                    fontWeight: FontWeight.w600,
+                                                    color: Colors.orange.shade900,
+                                                  ),
+                                                ),
+                                              ),
+                                              const SizedBox(height: 12),
+                                            ],
+
                                             // Moyen de paiement pour ce vendeur
                                             Container(
                                               padding: const EdgeInsets.all(10),

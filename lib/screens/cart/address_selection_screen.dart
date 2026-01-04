@@ -345,6 +345,83 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
       return;
     }
 
+    // Afficher un dialog pour demander le numéro et la référence
+    final TextEditingController numeroController = TextEditingController();
+    final TextEditingController refAdresseController = TextEditingController();
+
+    final shouldSave = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: const Row(
+            children: [
+              Icon(Icons.location_on, color: AppColors.primary),
+              SizedBox(width: 8),
+              Text('Compléter l\'adresse'),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '$avenue, $quartier, $commune, $ville',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.black87,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 20),
+                TextField(
+                  controller: numeroController,
+                  decoration: const InputDecoration(
+                    labelText: 'Numéro',
+                    hintText: 'Ex: 12, 45B...',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.numbers),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: refAdresseController,
+                  decoration: const InputDecoration(
+                    labelText: 'Référence de l\'adresse',
+                    hintText: 'Ex: Près du marché, en face de...',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.info_outline),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Annuler'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Enregistrer'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (shouldSave != true || !mounted) {
+      return;
+    }
+
     final userId = authState.user!['id']?.toString() ?? '';
     final userName =
         '${authState.user!['firstName'] ?? ''} ${authState.user!['lastName'] ?? ''}'.trim();
@@ -368,8 +445,8 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
         'commune': commune,
         'quartier': quartier,
         'avenue': avenue,
-        'numero': _numeroController.text.trim(),
-        'refAdresse': _refAdresseController.text.trim(),
+        'numero': numeroController.text.trim(),
+        'refAdresse': refAdresseController.text.trim(),
         'pays': 'RDC',
         'phone': authState.user!['phone'] ?? '',
         'latitude': latitude,
@@ -1305,80 +1382,55 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
         print('   error: ${state.error}');
         print('   _isProcessingRedirect: $_isProcessingRedirect');
         
-        if (state.success && !_isProcessingRedirect) {
-          print('✅ [AddressSelectionScreen] État success détecté - Début de la redirection');
+        // Gérer le succès - navigation directe sans fetchOrders supplémentaire
+        if (state.success && !_isProcessingRedirect && !state.isLoading) {
+          print('✅ [AddressSelectionScreen] État success détecté - Navigation directe');
           
           // Marquer comme en cours de traitement pour éviter les appels multiples
           _isProcessingRedirect = true;
           
           // Réinitialiser le flag local
-          _isInitializing = false;
+          if (mounted) {
+            setState(() {
+              _isInitializing = false;
+            });
+          }
           
           // Vider le panier
           print('🛒 [AddressSelectionScreen] Vidage du panier...');
           context.read<CartCubit>().clearCart();
           
-          // Rafraîchir les commandes et naviguer directement
-          print('📥 [AddressSelectionScreen] Récupération des commandes...');
-          context.read<OrderCubit>().fetchOrders(status: 'pending_payment').then((_) {
-            print('✅ [AddressSelectionScreen] Commandes récupérées avec succès');
-            
-            // Naviguer directement vers l'écran de paiement en attente
-            if (context.mounted) {
-              print('🧭 [AddressSelectionScreen] Navigation vers PendingPaymentScreen...');
-              Navigator.pushAndRemoveUntil(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const PendingPaymentScreen(),
-                ),
-                (route) => false,
-              );
-              print('✅ [AddressSelectionScreen] Navigation effectuée');
-              
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Commande(s) initialisée(s) avec succès!'),
-                  backgroundColor: AppColors.success,
-                ),
-              );
-            }
-          }).catchError((error) {
-            print('❌ [AddressSelectionScreen] Erreur lors de la récupération des commandes: $error');
-            // Naviguer quand même vers l'écran de paiement en attente
-            if (context.mounted) {
-              Navigator.pushAndRemoveUntil(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const PendingPaymentScreen(),
-                ),
-                (route) => false,
-              );
-            }
-          });
+          // Naviguer directement vers l'écran de paiement en attente
+          // L'écran suivant chargera les commandes lui-même
+          if (context.mounted) {
+            print('🧭 [AddressSelectionScreen] Navigation vers PendingPaymentScreen...');
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const PendingPaymentScreen(),
+              ),
+              (route) => false,
+            );
+            print('✅ [AddressSelectionScreen] Navigation effectuée');
+          }
         }
         
         // Gérer les erreurs
-        if (state.error != null) {
+        if (state.error != null && !_isProcessingRedirect) {
           print('❌ [AddressSelectionScreen] Erreur détectée: ${state.error}');
-          if (_isInitializing) {
+          if (mounted) {
             setState(() {
               _isInitializing = false;
             });
           }
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(state.error!),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-        
-        // Si l'état n'est plus en chargement et qu'on était en train d'initialiser, réinitialiser le flag
-        if (!state.isLoading && _isInitializing && !state.success && state.error == null) {
-          // L'état a changé mais sans succès ni erreur explicite, réinitialiser quand même
-          setState(() {
-            _isInitializing = false;
-          });
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(state.error!),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
         }
       },
       builder: (context, orderState) {
