@@ -703,7 +703,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
               color: Colors.white,
               padding: const EdgeInsets.symmetric(vertical: 16),
               child: SizedBox(
-                height: 120,
+                height: 110,
                 child: BlocBuilder<CategoryCubit, CategoryState>(
                 builder: (context, state) {
                   if (state is CategoryLoading) {
@@ -717,12 +717,12 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                         width: 90,
                         decoration: BoxDecoration(
                           color: Colors.grey.shade100,
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(14),
                         ),
                         child: ShimmerLoading(
                           width: 90,
                           height: 120,
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(14),
                         ),
                       ),
                     );
@@ -753,49 +753,58 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                           },
                           child: Container(
                             width: 90,
+                            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
                             decoration: BoxDecoration(
                               color: Colors.white,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: Colors.grey.shade200),
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: Colors.grey.shade200,
+                                width: 1,
+                              ),
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withOpacity(0.03),
-                                  blurRadius: 4,
+                                  color: Colors.black.withOpacity(0.04),
+                                  blurRadius: 6,
                                   offset: const Offset(0, 2),
+                                  spreadRadius: 0,
                                 ),
                               ],
                             ),
                             child: Column(
+                              mainAxisSize: MainAxisSize.min,
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 Container(
                                   width: 50,
                                   height: 50,
                                   decoration: BoxDecoration(
-                                    color: AppColors.primary.withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(25),
+                                    color: AppColors.primary.withOpacity(0.12),
+                                    borderRadius: BorderRadius.circular(14),
                                   ),
                                   child: Center(
                                     child: _getCategoryIconWidget(
                                       cat.name,
                                       AppColors.primary,
-                                      28,
+                                      26,
                                     ),
                                   ),
                                 ),
                                 const SizedBox(height: 8),
-                                Padding(
-                                  padding:
-                                      const EdgeInsets.symmetric(horizontal: 4),
-                                  child: Text(
-                                    cat.name,
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
+                                Flexible(
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 2),
+                                    child: Text(
+                                      cat.name,
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.grey.shade800,
+                                        height: 1.2,
+                                      ),
+                                      textAlign: TextAlign.center,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
                                     ),
-                                    textAlign: TextAlign.center,
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
                               ],
