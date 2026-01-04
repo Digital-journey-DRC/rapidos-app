@@ -508,16 +508,16 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     final updatedAt = orderData['updatedAt']?.toString() ?? '';
     final address = orderData['address'] as Map<String, dynamic>? ?? {};
     final phone = orderData['phone']?.toString() ?? '';
-    // Extraire le nom du client depuis l'email ou utiliser une valeur par défaut
+    // Utiliser clientName de l'API ou extraire depuis l'email
     final clientEmail = orderData['client']?.toString() ?? '';
-    String clientName = 'Client';
-    if (clientEmail.isNotEmpty) {
-      // Extraire le nom depuis l'email (partie avant @)
-      final nameFromEmail = clientEmail.split('@').first;
-      if (nameFromEmail.isNotEmpty) {
-        clientName = nameFromEmail[0].toUpperCase() + nameFromEmail.substring(1);
-      }
-    }
+    final clientName = orderData['clientName']?.toString().isNotEmpty == true 
+        ? orderData['clientName'].toString()
+        : (clientEmail.isNotEmpty ? clientEmail : 'Client');
+    
+    // Informations du vendeur
+    final vendorName = orderData['vendorName']?.toString() ?? '';
+    final vendorPhone = orderData['vendorPhone']?.toString() ?? '';
+    
     final packagePhoto = orderData['packagePhoto']?.toString();
     final paymentMethod = orderData['paymentMethod'] as Map<String, dynamic>? ?? {};
     final numeroPayment = orderData['numeroPayment']?.toString();
@@ -922,6 +922,174 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                       ],
                     ),
                   ),
+
+                  // Section Vendeur (visible uniquement pour le livreur)
+                  if (userRole == 'livreur' && vendorName.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    _buildSectionCard(
+                      title: 'Informations vendeur',
+                      icon: Icons.store_outlined,
+                      child: Column(
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      vendorName,
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.black87,
+                                      ),
+                                    ),
+                                    if (vendorPhone.isNotEmpty) ...[
+                                      const SizedBox(height: 4),
+                                      Row(
+                                        children: [
+                                          Icon(
+                                            Icons.phone,
+                                            size: 14,
+                                            color: Colors.grey.shade600,
+                                          ),
+                                          const SizedBox(width: 5),
+                                          Text(
+                                            vendorPhone,
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: Colors.grey.shade700,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                              if (vendorPhone.isNotEmpty)
+                                Container(
+                                  decoration: BoxDecoration(
+                                    color: Colors.green.shade50,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: IconButton(
+                                    onPressed: () {
+                                      showModalBottomSheet(
+                                        context: context,
+                                        shape: const RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                                        ),
+                                        builder: (context) => Container(
+                                          padding: const EdgeInsets.all(20),
+                                          child: Column(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Container(
+                                                width: 40,
+                                                height: 4,
+                                                decoration: BoxDecoration(
+                                                  color: Colors.grey.shade300,
+                                                  borderRadius: BorderRadius.circular(2),
+                                                ),
+                                              ),
+                                              const SizedBox(height: 20),
+                                              const Text(
+                                                'Contacter le vendeur',
+                                                style: TextStyle(
+                                                  fontSize: 18,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 8),
+                                              Text(
+                                                vendorName,
+                                                style: const TextStyle(
+                                                  fontSize: 16,
+                                                  color: AppColors.primary,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 20),
+                                              Row(
+                                                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                                children: [
+                                                  ElevatedButton(
+                                                    onPressed: () {
+                                                      launchUrl(Uri.parse('tel:$vendorPhone'));
+                                                      Navigator.pop(context);
+                                                    },
+                                                    style: ElevatedButton.styleFrom(
+                                                      backgroundColor: AppColors.primary,
+                                                      shape: RoundedRectangleBorder(
+                                                        borderRadius: BorderRadius.circular(8),
+                                                      ),
+                                                      padding: const EdgeInsets.symmetric(
+                                                          horizontal: 20, vertical: 12),
+                                                    ),
+                                                    child: const Row(
+                                                      mainAxisSize: MainAxisSize.min,
+                                                      children: [
+                                                        Icon(Icons.phone, color: Colors.white),
+                                                        SizedBox(width: 8),
+                                                        Text('Appeler',
+                                                            style: TextStyle(color: Colors.white)),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                  ElevatedButton(
+                                                    onPressed: () {
+                                                      final whatsappUrl = 'https://wa.me/${vendorPhone.replaceAll('+', '')}';
+                                                      launchUrl(Uri.parse(whatsappUrl));
+                                                      Navigator.pop(context);
+                                                    },
+                                                    style: ElevatedButton.styleFrom(
+                                                      backgroundColor: Colors.green,
+                                                      shape: RoundedRectangleBorder(
+                                                        borderRadius: BorderRadius.circular(8),
+                                                      ),
+                                                      padding: const EdgeInsets.symmetric(
+                                                          horizontal: 20, vertical: 12),
+                                                    ),
+                                                    child: const Row(
+                                                      mainAxisSize: MainAxisSize.min,
+                                                      children: [
+                                                        Icon(Icons.message, color: Colors.white),
+                                                        SizedBox(width: 8),
+                                                        Text('WhatsApp',
+                                                            style: TextStyle(color: Colors.white)),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                              const SizedBox(height: 16),
+                                              TextButton(
+                                                onPressed: () => Navigator.pop(context),
+                                                child: const Text(
+                                                  'ANNULER',
+                                                  style: TextStyle(color: Colors.grey),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                    icon: Icon(
+                                      Icons.phone_in_talk,
+                                      color: Colors.green.shade700,
+                                      size: 20,
+                                    ),
+                                    tooltip: 'Contacter le vendeur',
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
 
                   const SizedBox(height: 12),
 

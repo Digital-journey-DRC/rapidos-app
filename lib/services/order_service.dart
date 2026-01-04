@@ -476,6 +476,8 @@ class OrderService {
             'items': products, // Pour compatibilité avec OrderDetailsScreen
             'client': commande['client'] ?? '', // Ajout direct pour OrderDetailsScreen
             'phone': commande['phone'] ?? '', // Ajout direct pour OrderDetailsScreen
+            'clientName': commande['clientName'] ?? '', // Nom du client
+            'clientPhone': commande['clientPhone'] ?? commande['phone'] ?? '', // Téléphone du client
             'total': total.toStringAsFixed(2),
             'deliveryFee': deliveryFee,
             'totalAvecLivraison': totalAvecLivraison,
@@ -805,7 +807,7 @@ class OrderService {
   }
 
   /// Récupère toutes les commandes du livreur
-  /// Endpoint: GET /livraison/ma-liste
+  /// Endpoint: GET /ecommerce/livraison/ma-liste
   /// Authentification: REQUISE
   Future<Map<String, dynamic>> getLivreurOrders() async {
     print('🔄 [OrderService] getLivreurOrders - Début');
@@ -823,7 +825,7 @@ class OrderService {
       }
 
       final response = await http.get(
-        Uri.parse('$baseUrl/livraison/ma-liste'),
+        Uri.parse('$baseUrl/ecommerce/livraison/ma-liste'),
         headers: {
           'Content-Type': 'application/json',
           'accept': 'application/json',
@@ -842,15 +844,95 @@ class OrderService {
       if (response.statusCode == 200) {
         final responseData = jsonDecode(response.body);
         // Le backend peut retourner 'livraison' ou 'orders' ou directement un tableau
-        final orders = responseData['livraison'] ?? 
+        final rawOrders = responseData['livraison'] ?? 
                        responseData['orders'] ?? 
                        (responseData is List ? responseData : []);
         
-        print('✅ [OrderService] ${orders.length} commandes récupérées pour le livreur');
+        print('✅ [OrderService] ${rawOrders.length} commandes récupérées pour le livreur');
+        
+        // Log des données brutes pour debug
+        for (var i = 0; i < rawOrders.length; i++) {
+          final order = rawOrders[i];
+          print('📦 [OrderService] Commande $i:');
+          print('   - id: ${order['id']}');
+          print('   - status: "${order['status']}"');
+          print('   - orderId: ${order['orderId']}');
+          print('   - client: ${order['client']}');
+          print('   - total: ${order['total']}');
+        }
+        
+        // Transformer les commandes pour correspondre à la structure attendue (comme vendeur)
+        final orders = (rawOrders as List).map<Map<String, dynamic>>((commande) {
+          // Helper pour parser les montants
+          double parseAmount(dynamic value) {
+            if (value is double) return value;
+            if (value is int) return value.toDouble();
+            if (value is String) return double.tryParse(value) ?? 0.0;
+            return 0.0;
+          }
+          
+          // Calculer totalAvecLivraison
+          final total = parseAmount(commande['total'] ?? 0);
+          final deliveryFee = parseAmount(commande['deliveryFee'] ?? 0);
+          final totalAvecLivraison = total + deliveryFee;
+          
+          // Construire l'objet buyer à partir de client (string) et phone
+          final buyer = commande['buyer'] ?? {
+            'email': commande['client'] ?? '',
+            'phone': commande['phone'] ?? '',
+          };
+          
+          // Transformer items en products pour la compatibilité
+          final products = (commande['items'] as List? ?? commande['products'] as List? ?? []).map((item) {
+            return {
+              'name': item['name'] ?? '',
+              'price': item['price'] ?? 0,
+              'quantity': item['quantity'] ?? 1,
+              'idVendeur': item['idVendeur'] ?? commande['vendorId'] ?? commande['vendeurId'],
+              'productId': item['productId'] ?? 0,
+            };
+          }).toList();
+          
+          return {
+            'id': commande['id'],
+            'orderId': commande['orderId'],
+            'status': commande['status'],
+            'vendeurId': commande['vendorId'] ?? commande['vendeurId'],
+            'buyer': buyer,
+            'products': products,
+            'items': products,
+            'client': commande['client'] ?? '',
+            'phone': commande['phone'] ?? '',
+            'clientName': commande['clientName'] ?? '',
+            'vendorName': commande['vendorName'] ?? '',
+            'vendorPhone': commande['vendorPhone'] ?? '',
+            'total': total.toStringAsFixed(2),
+            'deliveryFee': deliveryFee,
+            'totalAvecLivraison': totalAvecLivraison,
+            'address': commande['address'] ?? {},
+            'latitude': commande['latitude']?.toString() ?? '',
+            'longitude': commande['longitude']?.toString() ?? '',
+            'paymentMethod': commande['paymentMethod'] ?? {},
+            'packagePhoto': commande['packagePhoto'],
+            'packagePhotoPublicId': commande['packagePhotoPublicId'],
+            'paymentMethodId': commande['paymentMethodId'],
+            'numeroPayment': commande['numeroPayment'],
+            'codeColis': commande['codeColis'],
+            'distanceKm': commande['distanceKm']?.toString() ?? '',
+            'createdAt': commande['createdAt'],
+            'updatedAt': commande['updatedAt'],
+            'vendor': commande['vendor'],
+            'clientUser': commande['clientUser'],
+            'vendeur': commande['vendeur'],
+            'livreur': commande['livreur'],
+          };
+        }).toList();
+        
+        print('✅ [OrderService] Commandes livreur transformées avec succès');
         
         return {
           'success': true,
-          'orders': orders is List ? orders : [],
+          'orders': orders,
           'message': responseData['message'] ?? 'Commandes récupérées avec succès',
         };
       } else {

@@ -191,6 +191,8 @@ class _OrderScreenState extends State<OrderScreen> {
         return Colors.orange;
       case 'pret_a_expedier':
       case 'ready_to_ship':
+      case 'prêt à expédier':
+      case 'pret a expedier':
         return Colors.blue;
       case 'in_delivery':
       case 'en_route':
@@ -240,8 +242,8 @@ class _OrderScreenState extends State<OrderScreen> {
     final pending = stats['pending'] ?? 0;
     // Les stats peuvent utiliser 'in_preparation' mais les commandes utilisent 'en_preparation'
     final inPreparation = (stats['in_preparation'] ?? 0) + (stats['en_preparation'] ?? 0);
-    // Les stats peuvent utiliser 'ready_to_ship' mais les commandes utilisent 'pret_a_expedier'
-    final readyToShip = (stats['ready_to_ship'] ?? 0) + (stats['pret_a_expedier'] ?? 0);
+    // Les stats peuvent utiliser 'ready_to_ship' mais les commandes utilisent 'pret_a_expedier' ou 'prêt à expédier' ou 'pret a expedier'
+    final readyToShip = (stats['ready_to_ship'] ?? 0) + (stats['pret_a_expedier'] ?? 0) + (stats['prêt à expédier'] ?? 0) + (stats['pret a expedier'] ?? 0);
     final inDelivery = stats['in_delivery'] ?? 0;
     final delivered = stats['delivered'] ?? 0;
     final cancelled = stats['cancelled'] ?? 0;
@@ -389,6 +391,8 @@ class _OrderScreenState extends State<OrderScreen> {
         return 'EN PRÉPARATION';
       case 'pret_a_expedier':
       case 'ready_to_ship':
+      case 'prêt à expédier':
+      case 'pret a expedier':
         return 'PRÊT À EXPÉDIER';
       case 'in_delivery':
       case 'en_route':
@@ -1215,8 +1219,8 @@ class _OrderScreenState extends State<OrderScreen> {
                   // Accepter les deux variantes
                   return status == 'en_preparation' || status == 'in_preparation';
                 } else if (filterStatus == 'pret_a_expedier') {
-                  // Accepter les deux variantes
-                  return status == 'pret_a_expedier' || status == 'ready_to_ship';
+                  // Accepter toutes les variantes
+                  return status == 'pret_a_expedier' || status == 'ready_to_ship' || status == 'prêt à expédier' || status == 'pret a expedier';
                 } else if (filterStatus == 'in_delivery' || filterStatus == 'en_route') {
                   // Accepter les deux variantes
                   return status == 'in_delivery' || status == 'en_route';
@@ -1742,34 +1746,63 @@ class _OrderScreenState extends State<OrderScreen> {
       );
     }
 
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance.collection('carts').where('status',
-          whereIn: ['prêt à expédier', 'en route pour livraison', 'delivered']).snapshots(),
-      builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return Padding(
-            padding: const EdgeInsets.all(32.0),
-            child: Center(
-              child: Text(
-                'Erreur: ${snapshot.error}',
-                textAlign: TextAlign.center,
-              ),
+    // Charger les commandes au premier build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final orderListState = context.read<OrderCubit>().orderListState;
+      if (!orderListState.isLoading && orderListState.orders.isEmpty && orderListState.error == null) {
+        context.read<OrderCubit>().fetchLivreurOrders();
+      }
+    });
+
+    return BlocConsumer<OrderCubit, OrderState>(
+      listener: (context, state) {
+        if (state.error != null && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(state.error!),
+              backgroundColor: Colors.red,
             ),
           );
         }
-
-        if (snapshot.connectionState == ConnectionState.waiting) {
+      },
+      builder: (context, state) {
+        final orderListState = context.read<OrderCubit>().orderListState;
+        
+        if (orderListState.isLoading && orderListState.orders.isEmpty) {
           return const Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const OrderCardShimmer(),
-              const SizedBox(height: 10),
-              const OrderCardShimmer(),
+              OrderCardShimmer(),
+              SizedBox(height: 10),
+              OrderCardShimmer(),
             ],
           );
         }
 
-        final orders = snapshot.data!.docs;
+        if (orderListState.error != null && orderListState.orders.isEmpty) {
+          return Padding(
+            padding: const EdgeInsets.all(32.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.error_outline, size: 50, color: Colors.red),
+                const SizedBox(height: 16),
+                Text(
+                  'Erreur: ${orderListState.error}',
+                  style: const TextStyle(color: Colors.red),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: () => context.read<OrderCubit>().fetchLivreurOrders(),
+                  child: const Text('Réessayer'),
+                ),
+              ],
+            ),
+          );
+        }
+
+        final orders = orderListState.orders;
 
         if (orders.isEmpty) {
           return Padding(
@@ -1788,17 +1821,21 @@ class _OrderScreenState extends State<OrderScreen> {
                       color: AppColors.primary),
                   textAlign: TextAlign.center,
                 ),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: () => context.read<OrderCubit>().fetchLivreurOrders(),
+                  child: const Text('Actualiser'),
+                ),
               ],
             ),
           );
         }
 
         // Filtrer par statut
-        var filteredOrders = orders;
+        var filteredOrders = List<dynamic>.from(orders);
         if (_selectedStatusFilter != 'Tous') {
-          filteredOrders = orders.where((doc) {
-            final data = doc.data() as Map<String, dynamic>;
-            final status = data['status']?.toString().toLowerCase() ?? '';
+          filteredOrders = filteredOrders.where((order) {
+            final status = order['status']?.toString().toLowerCase() ?? '';
             return status == _selectedStatusFilter.toLowerCase();
           }).toList();
         }
@@ -1806,25 +1843,24 @@ class _OrderScreenState extends State<OrderScreen> {
         // Filtrer par recherche
         final searchQuery = _searchController.text.toLowerCase().trim();
         if (searchQuery.isNotEmpty) {
-          filteredOrders = filteredOrders.where((doc) {
-            final data = doc.data() as Map<String, dynamic>;
-            final clientName = (data['client']?.toString() ?? '').toLowerCase();
-            final shortCode = (data['shortCode']?.toString() ?? '').toLowerCase();
-            final orderId = doc.id.toLowerCase();
-            final items = data['items'] as List? ?? [];
+          filteredOrders = filteredOrders.where((order) {
+            final clientName = (order['client']?.toString() ?? '').toLowerCase();
+            final phone = (order['phone']?.toString() ?? '').toLowerCase();
+            final orderId = (order['orderId']?.toString() ?? '').toLowerCase();
+            final codeColis = (order['codeColis']?.toString() ?? '').toLowerCase();
+            final items = order['items'] as List? ?? [];
             final productNames = items.map((item) {
               if (item is Map) {
                 return (item['name']?.toString() ?? '').toLowerCase();
               }
               return '';
             }).join(' ');
-            final address = (data['adresse']?.toString() ?? '').toLowerCase();
 
             return clientName.contains(searchQuery) ||
-                shortCode.contains(searchQuery) ||
+                phone.contains(searchQuery) ||
                 orderId.contains(searchQuery) ||
-                productNames.contains(searchQuery) ||
-                address.contains(searchQuery);
+                codeColis.contains(searchQuery) ||
+                productNames.contains(searchQuery);
           }).toList();
         }
 
@@ -1852,237 +1888,302 @@ class _OrderScreenState extends State<OrderScreen> {
           );
         }
 
-        return ListView.builder(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: EdgeInsets.only(
-            left: 12,
-            right: 12,
-            top: 8,
-            bottom: MediaQuery.of(context).padding.bottom + 20,
-          ),
-          itemCount: filteredOrders.length,
-          itemBuilder: (context, index) {
-            final doc = filteredOrders[index];
-            final data = doc.data() as Map<String, dynamic>;
-            final items = data['items'] as List? ?? [];
-            final status = data['status']?.toString() ?? 'pending';
-            final timestamp = data['timestamp'] as Timestamp?;
-            final clientName = data['client']?.toString() ?? 'Client';
-            
-            // Calculer le total
-            double total = 0.0;
-            for (var item in items) {
-              if (item is Map) {
-                final price = (item['price'] ?? 0.0) is double 
-                    ? item['price'] as double 
-                    : (item['price'] ?? 0).toDouble();
-                final quantity = (item['quantity'] ?? 1) is int 
-                    ? item['quantity'] as int 
-                    : int.tryParse(item['quantity']?.toString() ?? '1') ?? 1;
-                total += price * quantity;
+        return RefreshIndicator(
+          onRefresh: () => context.read<OrderCubit>().fetchLivreurOrders(),
+          child: ListView.builder(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: EdgeInsets.only(
+              left: 12,
+              right: 12,
+              top: 8,
+              bottom: MediaQuery.of(context).padding.bottom + 20,
+            ),
+            itemCount: filteredOrders.length,
+            itemBuilder: (context, index) {
+              final order = filteredOrders[index] as Map<String, dynamic>;
+              final items = order['items'] as List? ?? [];
+              final status = order['status']?.toString() ?? 'pending';
+              final phone = order['phone']?.toString() ?? '';
+              final clientName = order['clientName']?.toString() ?? order['client']?.toString() ?? 'Client';
+              final codeColis = order['codeColis']?.toString() ?? '';
+              final vendorName = order['vendorName']?.toString() ?? '';
+              final vendorPhone = order['vendorPhone']?.toString() ?? '';
+              
+              // Construire l'adresse à partir de l'objet address
+              final addressData = order['address'] as Map<String, dynamic>? ?? {};
+              final address = [
+                addressData['avenue'],
+                addressData['numero'],
+                addressData['quartier'],
+                addressData['commune'],
+              ].where((e) => e != null && e.toString().isNotEmpty).join(', ');
+              
+              // Parser le total
+              double total = 0.0;
+              final totalValue = order['total'];
+              if (totalValue is double) {
+                total = totalValue;
+              } else if (totalValue is int) {
+                total = totalValue.toDouble();
+              } else if (totalValue is String) {
+                total = double.tryParse(totalValue) ?? 0.0;
               }
-            }
 
-            return Container(
-              margin: const EdgeInsets.only(bottom: 8),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                  color: Colors.grey.shade200,
-                  width: 0.5,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.03),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
-                    spreadRadius: 0,
-                  ),
-                ],
-              ),
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
+              return Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                decoration: BoxDecoration(
+                  color: Colors.white,
                   borderRadius: BorderRadius.circular(10),
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => OrderDetailsScreen(
-                          orderData: data,
-                          orderId: doc.id,
-                        ),
-                      ),
-                    );
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.all(10),
-                    child: Row(
-                      children: [
-                        // Icône de livraison
-                        Container(
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            color: AppColors.primary.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Icon(
-                            Icons.local_shipping_outlined,
-                            color: AppColors.primary,
-                            size: 20,
+                  border: Border.all(
+                    color: Colors.grey.shade200,
+                    width: 0.5,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.03),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                      spreadRadius: 0,
+                    ),
+                  ],
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(10),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => OrderDetailsScreen(
+                            orderData: order,
+                            orderId: order['orderId']?.toString() ?? order['id']?.toString() ?? '',
                           ),
                         ),
-                        const SizedBox(width: 12),
-                        // Informations principales
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Expanded(
-                                    child: Column(
+                      );
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.all(10),
+                      child: Row(
+                        children: [
+                          // Icône de livraison
+                          Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: AppColors.primary.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Icon(
+                              Icons.local_shipping_outlined,
+                              color: AppColors.primary,
+                              size: 20,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          // Informations principales
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            clientName,
+                                            style: const TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w600,
+                                              color: Colors.black87,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          if (phone.isNotEmpty) ...[
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              phone,
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                color: Colors.grey.shade600,
+                                              ),
+                                            ),
+                                          ],
+                                          const SizedBox(height: 4),
+                                          Row(
+                                            children: [
+                                              Icon(
+                                                Icons.location_on_outlined,
+                                                size: 12,
+                                                color: Colors.grey.shade600,
+                                              ),
+                                              const SizedBox(width: 4),
+                                              Expanded(
+                                                child: Text(
+                                                  address.isNotEmpty ? address : 'Adresse non spécifiée',
+                                                  style: TextStyle(
+                                                    fontSize: 11,
+                                                    color: Colors.grey.shade600,
+                                                  ),
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          if (vendorName.isNotEmpty) ...[
+                                            const SizedBox(height: 4),
+                                            GestureDetector(
+                                              onTap: vendorPhone.isNotEmpty ? () {
+                                                launchUrl(Uri.parse('tel:$vendorPhone'));
+                                              } : null,
+                                              child: Row(
+                                                children: [
+                                                  Icon(
+                                                    vendorPhone.isNotEmpty ? Icons.phone : Icons.store_outlined,
+                                                    size: 12,
+                                                    color: AppColors.primary,
+                                                  ),
+                                                  const SizedBox(width: 4),
+                                                  Expanded(
+                                                    child: Text(
+                                                      'Vendeur: $vendorName',
+                                                      style: TextStyle(
+                                                        fontSize: 11,
+                                                        color: AppColors.primary,
+                                                        fontWeight: FontWeight.w500,
+                                                        decoration: vendorPhone.isNotEmpty ? TextDecoration.underline : null,
+                                                      ),
+                                                      maxLines: 1,
+                                                      overflow: TextOverflow.ellipsis,
+                                                    ),
+                                                  ),
+                                                  if (vendorPhone.isNotEmpty)
+                                                    Icon(
+                                                      Icons.call,
+                                                      size: 14,
+                                                      color: Colors.green,
+                                                    ),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
+                                        ],
+                                      ),
+                                    ),
+                                    Column(
+                                      crossAxisAlignment: CrossAxisAlignment.end,
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 6,
+                                            vertical: 3,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: _statusColor(status).withOpacity(0.15),
+                                            borderRadius: BorderRadius.circular(6),
+                                            border: Border.all(
+                                              color: _statusColor(status).withOpacity(0.3),
+                                              width: 0.5,
+                                            ),
+                                          ),
+                                          child: Text(
+                                            _translateStatus(status),
+                                            style: TextStyle(
+                                              color: _statusColor(status),
+                                              fontSize: 9,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ),
+                                        if (codeColis.isNotEmpty) ...[
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            'Code: $codeColis',
+                                            style: TextStyle(
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.w600,
+                                              color: AppColors.primary,
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 6),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
-                                        Text(
-                                          clientName,
-                                          style: const TextStyle(
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.w600,
-                                            color: Colors.black87,
-                                          ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                        const SizedBox(height: 4),
                                         Row(
                                           children: [
                                             Icon(
-                                              Icons.location_on_outlined,
+                                              Icons.inventory_2_outlined,
                                               size: 12,
                                               color: Colors.grey.shade600,
                                             ),
                                             const SizedBox(width: 4),
-                                            Expanded(
-                                              child: Text(
-                                                data['adresse'] ?? 'Adresse non spécifiée',
-                                                style: TextStyle(
-                                                  fontSize: 11,
-                                                  color: Colors.grey.shade600,
-                                                ),
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
+                                            Text(
+                                              '${items.length} ${items.length > 1 ? 'articles' : 'article'}',
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                color: Colors.grey.shade600,
                                               ),
                                             ),
                                           ],
                                         ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          '${total.toStringAsFixed(0)} FC',
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.bold,
+                                            color: AppColors.primary,
+                                          ),
+                                        ),
                                       ],
                                     ),
-                                  ),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 6,
-                                      vertical: 3,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: _statusColor(status).withOpacity(0.15),
-                                      borderRadius: BorderRadius.circular(6),
-                                      border: Border.all(
-                                        color: _statusColor(status).withOpacity(0.3),
-                                        width: 0.5,
+                                    Container(
+                                      padding: const EdgeInsets.all(6),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.primary.withOpacity(0.1),
+                                        borderRadius: BorderRadius.circular(6),
+                                        border: Border.all(
+                                          color: AppColors.primary.withOpacity(0.2),
+                                          width: 0.5,
+                                        ),
+                                      ),
+                                      child: Icon(
+                                        Icons.arrow_forward_ios,
+                                        size: 12,
+                                        color: AppColors.primary,
                                       ),
                                     ),
-                                    child: Text(
-                                      _translateStatus(status),
-                                      style: TextStyle(
-                                        color: _statusColor(status),
-                                        fontSize: 9,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 6),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: [
-                                  Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Row(
-                                        children: [
-                                          Icon(
-                                            Icons.inventory_2_outlined,
-                                            size: 12,
-                                            color: Colors.grey.shade600,
-                                          ),
-                                          const SizedBox(width: 4),
-                                          Text(
-                                            '${items.length} ${items.length > 1 ? 'articles' : 'article'}',
-                                            style: TextStyle(
-                                              fontSize: 11,
-                                              color: Colors.grey.shade600,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 2),
-                                      Row(
-                                        children: [
-                                          Icon(
-                                            Icons.calendar_today,
-                                            size: 10,
-                                            color: Colors.grey.shade500,
-                                          ),
-                                          const SizedBox(width: 3),
-                                          Text(
-                                            _formatDate(timestamp),
-                                            style: TextStyle(
-                                              fontSize: 10,
-                                              color: Colors.grey.shade600,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                  Container(
-                                    padding: const EdgeInsets.all(6),
-                                    decoration: BoxDecoration(
-                                      color: AppColors.primary.withOpacity(0.1),
-                                      borderRadius: BorderRadius.circular(6),
-                                      border: Border.all(
-                                        color: AppColors.primary.withOpacity(0.2),
-                                        width: 0.5,
-                                      ),
-                                    ),
-                                    child: Icon(
-                                      Icons.arrow_forward_ios,
-                                      size: 12,
-                                      color: AppColors.primary,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
+                                  ],
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
-              ),
-            );
-          },
+              );
+            },
+          ),
         );
       },
     );
@@ -2243,22 +2344,13 @@ class _OrderScreenState extends State<OrderScreen> {
                 final status = order['status']?.toString() ?? 'pending';
                 final createdAt = order['createdAt']?.toString() ?? '';
                 final buyer = order['buyer'] as Map<String, dynamic>? ?? {};
-                // Adapter pour la nouvelle structure : buyer peut avoir email/phone ou firstName/lastName
-                // Prioriser firstName/lastName, sinon extraire le nom de l'email
-                String buyerName = '${buyer['firstName'] ?? ''} ${buyer['lastName'] ?? ''}'.trim();
+                // Utiliser clientName de l'API en priorité, sinon fallback sur l'ancien système
+                String buyerName = order['clientName']?.toString() ?? '';
                 if (buyerName.isEmpty) {
-                  final email = buyer['email']?.toString().trim() ?? '';
-                  if (email.isNotEmpty) {
-                    // Extraire le nom depuis l'email (partie avant @)
-                    buyerName = email.split('@').first;
-                    // Capitaliser la première lettre
-                    if (buyerName.isNotEmpty) {
-                      buyerName = buyerName[0].toUpperCase() + buyerName.substring(1);
-                    }
-                  }
+                  buyerName = '${buyer['firstName'] ?? ''} ${buyer['lastName'] ?? ''}'.trim();
                 }
                 if (buyerName.isEmpty) {
-                  buyerName = 'Client';
+                  buyerName = order['client']?.toString() ?? 'Client';
                 }
                 final products = order['products'] as List? ?? [];
                 final totalProduit = _parseAmount(order['total'] ?? 0);

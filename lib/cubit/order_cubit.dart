@@ -373,6 +373,38 @@ class OrderCubit extends Cubit<OrderState> {
     }
   }
 
+  /// Récupère les commandes du livreur
+  Future<void> fetchLivreurOrders() async {
+    emit(state.copyWith(isLoading: true, error: null));
+    _orderListState = _orderListState.copyWith(isLoading: true, error: null);
+    emit(state.copyWith());
+
+    try {
+      final result = await _orderService.getLivreurOrders();
+
+      if (result['success'] == true) {
+        _orderListState = _orderListState.copyWith(
+          isLoading: false,
+          orders: result['orders'] ?? [],
+          error: null,
+        );
+        emit(state.copyWith());
+      } else {
+        _orderListState = _orderListState.copyWith(
+          isLoading: false,
+          error: result['message'] ?? 'Erreur lors de la récupération des commandes',
+        );
+        emit(state.copyWith());
+      }
+    } catch (e) {
+      _orderListState = _orderListState.copyWith(
+        isLoading: false,
+        error: 'Erreur de connexion: $e',
+      );
+      emit(state.copyWith());
+    }
+  }
+
   /// Récupère les commandes du vendeur
   Future<void> fetchVendeurOrders() async {
     emit(state.copyWith(isLoading: true, error: null));
