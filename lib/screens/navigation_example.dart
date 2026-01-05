@@ -282,7 +282,6 @@ class _NavigationExampleState extends State<NavigationExample> {
           .snapshots()
           .listen((myLocationSnapshot) {
             print('📍 [Navigation] Acheteur location docs: ${myLocationSnapshot.docs.length}');
-            
             if (myLocationSnapshot.docs.isNotEmpty) {
               final myData = myLocationSnapshot.docs.first.data();
               final myOrderId = myData['orderId'] as String?;
