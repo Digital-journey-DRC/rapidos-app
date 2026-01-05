@@ -1290,28 +1290,6 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> {
                                 final vendeurName = '${vendeur['firstName'] ?? ''} ${vendeur['lastName'] ?? ''}'.trim();
                                 final vendeurTotals = _calculateVendeurTotals(vendeurOrders);
                                 final selectedPaymentMethod = _selectedPaymentMethods[vendeurId] ?? firstOrder['paymentMethod'] as Map<String, dynamic>?;
-                                
-                                // Vérifier si toutes les commandes sont déjà annulées
-                                final allCancelled = vendeurOrders.every((order) {
-                                  final status = order['status']?.toString().toLowerCase() ?? '';
-                                  return status == 'cancelled';
-                                });
-                                
-                                // Vérifier si toutes les commandes sont en pending_payment
-                                final allPendingPayment = vendeurOrders.every((order) {
-                                  final status = order['status']?.toString().toLowerCase() ?? '';
-                                  return status == 'pending_payment';
-                                });
-                                
-                                // Vérifier si un moyen de paiement a été sélectionné par l'utilisateur
-                                // (présent dans _selectedPaymentMethods signifie qu'il a été modifié)
-                                final hasSelectedPaymentMethod = _selectedPaymentMethods.containsKey(vendeurId);
-                                
-                                // Afficher le bouton annuler si :
-                                // - Pas toutes annulées ET
-                                // - (Pas toutes en pending_payment OU un moyen de paiement a été sélectionné par l'utilisateur)
-                                final showCancelButton = !allCancelled && 
-                                    (!allPendingPayment || hasSelectedPaymentMethod);
 
                                 return Container(
                                   margin: const EdgeInsets.only(bottom: 16),
@@ -1820,41 +1798,39 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> {
                                                 ),
                                               ),
                                               // Bouton Annuler Commande
-                                              if (showCancelButton) ...[
-                                                const SizedBox(height: 12),
-                                                SizedBox(
-                                                  width: double.infinity,
-                                                  child: ElevatedButton.icon(
-                                                    onPressed: (_isCancelling[vendeurId] == true)
-                                                        ? null
-                                                        : () => _showCancelOrderDialog(vendeurId, vendeurOrders),
-                                                    icon: _isCancelling[vendeurId] == true
-                                                        ? const SizedBox(
-                                                            width: 14,
-                                                            height: 14,
-                                                            child: CircularProgressIndicator(
-                                                              strokeWidth: 2,
-                                                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                                            ),
-                                                          )
-                                                        : const Icon(Icons.cancel_outlined, size: 16),
-                                                    label: Text(
-                                                      _isCancelling[vendeurId] == true
-                                                          ? 'Annulation...'
-                                                          : 'Annuler',
+                                              const SizedBox(height: 12),
+                                              SizedBox(
+                                                width: double.infinity,
+                                                child: ElevatedButton.icon(
+                                                  onPressed: (_isCancelling[vendeurId] == true)
+                                                      ? null
+                                                      : () => _showCancelOrderDialog(vendeurId, vendeurOrders),
+                                                  icon: _isCancelling[vendeurId] == true
+                                                      ? const SizedBox(
+                                                          width: 14,
+                                                          height: 14,
+                                                          child: CircularProgressIndicator(
+                                                            strokeWidth: 2,
+                                                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                                          ),
+                                                        )
+                                                      : const Icon(Icons.cancel_outlined, size: 16),
+                                                  label: Text(
+                                                    _isCancelling[vendeurId] == true
+                                                        ? 'Annulation...'
+                                                        : 'Annuler',
+                                                  ),
+                                                  style: ElevatedButton.styleFrom(
+                                                    backgroundColor: Colors.red,
+                                                    foregroundColor: Colors.white,
+                                                    padding: const EdgeInsets.symmetric(vertical: 10),
+                                                    shape: RoundedRectangleBorder(
+                                                      borderRadius: BorderRadius.circular(8),
                                                     ),
-                                                    style: ElevatedButton.styleFrom(
-                                                      backgroundColor: Colors.red,
-                                                      foregroundColor: Colors.white,
-                                                      padding: const EdgeInsets.symmetric(vertical: 10),
-                                                      shape: RoundedRectangleBorder(
-                                                        borderRadius: BorderRadius.circular(8),
-                                                      ),
-                                                      textStyle: const TextStyle(fontSize: 13),
-                                                    ),
+                                                    textStyle: const TextStyle(fontSize: 13),
                                                   ),
                                                 ),
-                                              ],
+                                              ),
                                             ],
                                           ],
                                         ),
