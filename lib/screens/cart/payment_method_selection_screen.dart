@@ -224,44 +224,24 @@ class _PaymentMethodSelectionScreenState extends State<PaymentMethodSelectionScr
     print('═══════════════════════════════════════════════════════════');
     print('');
 
-    // Mettre à jour toutes les commandes
-    final orderCubit = context.read<OrderCubit>();
-    
-    print('🔄 [PaymentMethodSelection] Début de la mise à jour du moyen de paiement');
-    print('📋 [PaymentMethodSelection] Nombre de commandes à mettre à jour: ${widget.orderIds.length}');
-    print('📋 [PaymentMethodSelection] IDs des commandes: ${widget.orderIds}');
+    // Retourner les données sans exécuter l'endpoint
+    // Les données seront stockées dans le state et validées plus tard
+    print('🔄 [PaymentMethodSelection] Retour des données (sans exécution de l\'endpoint)');
+    print('📋 [PaymentMethodSelection] Nombre de commandes: ${widget.orderIds.length}');
     print('💳 [PaymentMethodSelection] Moyen de paiement sélectionné: ID=$paymentMethodId, Nom=${_selectedPaymentMethod!['name']}');
     print('📱 [PaymentMethodSelection] Numéro de paiement: ${requiresNumero && numero.isNotEmpty ? numero : 'Non requis'}');
     
-    // Utiliser BlocListener pour écouter les résultats
-    for (var orderId in widget.orderIds) {
-      print('🔄 [PaymentMethodSelection] Mise à jour de la commande ID: $orderId');
-      print('   - PaymentMethodId: $paymentMethodId');
-      print('   - NumeroPayment: ${requiresNumero && numero.isNotEmpty ? numero : null}');
-      print('   - Body: ${jsonEncode(body)}');
-      
-      await orderCubit.updatePaymentMethod(
-        orderId: orderId,
-        paymentMethodId: paymentMethodId,
-        numeroPayment: requiresNumero ? numero : null,
-      );
-      
-      print('✅ [PaymentMethodSelection] Commande $orderId mise à jour avec succès');
-      
-      // Attendre un peu entre chaque mise à jour
-      await Future.delayed(const Duration(milliseconds: 200));
-    }
+    // Préparer les données à retourner
+    final result = <String, dynamic>{
+      'paymentMethod': _selectedPaymentMethod!,
+    };
     
-    print('✅ [PaymentMethodSelection] Toutes les commandes ont été mises à jour');
+    if (requiresNumero && numero.isNotEmpty) {
+      result['numeroPayment'] = numero;
+    }
 
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Moyen de paiement mis à jour avec succès'),
-          backgroundColor: AppColors.success,
-        ),
-      );
-      Navigator.pop(context, _selectedPaymentMethod);
+      Navigator.pop(context, result);
     }
   }
 
@@ -494,7 +474,7 @@ class _PaymentMethodSelectionScreenState extends State<PaymentMethodSelectionScr
                             ),
                           )
                         : const Text(
-                            'Confirmer commande',
+                            'Valider',
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 14,

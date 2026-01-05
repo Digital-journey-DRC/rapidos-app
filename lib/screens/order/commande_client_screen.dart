@@ -562,6 +562,7 @@ class _CommandeClientScreenState extends State<CommandeClientScreen> {
       
       final paymentMethod = order['paymentMethod'] as Map<String, dynamic>?;
       final paymentMethodName = paymentMethod?['name']?.toString() ?? '';
+      final codeColis = order['codeColis']?.toString();
       final createdAt = order['createdAt']?.toString() ?? '';
       
       String formattedDate = '';
@@ -717,6 +718,31 @@ class _CommandeClientScreenState extends State<CommandeClientScreen> {
                                   ),
                                 ],
                               ),
+                            if (codeColis != null && codeColis.isNotEmpty) ...[
+                              const SizedBox(height: 4),
+                              Row(
+                                children: [
+                                  Icon(
+                                    Icons.qr_code,
+                                    size: 11,
+                                    color: Colors.grey.shade600,
+                                  ),
+                                  const SizedBox(width: 3),
+                                  Expanded(
+                                    child: Text(
+                                      'Code: $codeColis',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        color: Colors.grey.shade700,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
                           ],
                         ),
                       ),

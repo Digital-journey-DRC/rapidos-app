@@ -27,6 +27,10 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> {
   Map<int, List<Map<String, dynamic>>>? _vendeurPaymentMethods;
   Map<int, Map<String, dynamic>> _selectedPaymentMethods = {};
   Map<int, bool> _isCancelling = {}; // Pour suivre l'état d'annulation par vendeur
+  // State temporaire pour stocker les moyens de paiement non validés
+  Map<int, Map<String, dynamic>> _pendingPaymentMethods = {}; // {vendeurId: {paymentMethod: {...}, numeroPayment: '...'}}
+  Map<int, String?> _numeroPayments = {}; // {vendeurId: numeroPayment} pour stocker le numéro après validation
+  Map<int, bool> _isConfirming = {}; // Pour suivre l'état de confirmation par vendeur
 
   Future<void> _loadPaymentMethods(BuildContext context) async {
     final orderListState = context.read<OrderCubit>().orderListState;
@@ -873,6 +877,91 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> {
     }
   }
 
+
+  // Confirme la commande (exécute l'endpoint)
+  Future<void> _confirmOrder(int vendeurId, List<Map<String, dynamic>> vendeurOrders) async {
+    // Utiliser les données pending si disponibles, sinon selected
+    Map<String, dynamic>? paymentMethod;
+    String? numeroPayment;
+    
+    if (_pendingPaymentMethods[vendeurId] != null) {
+      paymentMethod = _pendingPaymentMethods[vendeurId]!['paymentMethod'] as Map<String, dynamic>?;
+      numeroPayment = _pendingPaymentMethods[vendeurId]!['numeroPayment']?.toString();
+    } else if (_selectedPaymentMethods[vendeurId] != null) {
+      paymentMethod = _selectedPaymentMethods[vendeurId];
+      numeroPayment = _numeroPayments[vendeurId];
+    }
+    
+    if (paymentMethod == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Veuillez sélectionner un moyen de paiement'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _isConfirming[vendeurId] = true;
+    });
+
+    try {
+      final paymentMethodId = paymentMethod['id'] as int;
+
+      // Extraire les IDs des commandes
+      final orderIds = vendeurOrders.map((order) => order['id'] as int).toList();
+
+      // Mettre à jour toutes les commandes
+      final orderCubit = context.read<OrderCubit>();
+      for (var orderId in orderIds) {
+        await orderCubit.updatePaymentMethod(
+          orderId: orderId,
+          paymentMethodId: paymentMethodId,
+          numeroPayment: numeroPayment,
+        );
+        await Future.delayed(const Duration(milliseconds: 200));
+      }
+
+      // Rafraîchir les commandes
+      await context.read<OrderCubit>().fetchOrders();
+      _loadPaymentMethods(context);
+
+      setState(() {
+        _isConfirming[vendeurId] = false;
+        // Nettoyer les données temporaires et déplacer vers selected si c'était pending
+        if (_pendingPaymentMethods[vendeurId] != null) {
+          _selectedPaymentMethods[vendeurId] = paymentMethod!;
+          if (numeroPayment != null) {
+            _numeroPayments[vendeurId] = numeroPayment;
+          }
+          _pendingPaymentMethods.remove(vendeurId);
+        }
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Commande confirmée avec succès'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() {
+        _isConfirming[vendeurId] = false;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   // Annule toutes les commandes d'un vendeur
   Future<void> _cancelVendeurOrders(
     int vendeurId,
@@ -993,13 +1082,13 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> {
           orderIds: orderIds,
         ),
       ),
-    ).then((selectedMethod) {
-      if (selectedMethod != null) {
+    ).then((result) {
+      // result contient {paymentMethod: {...}, numeroPayment: '...'} ou null
+      if (result != null && result is Map<String, dynamic>) {
         setState(() {
-          _selectedPaymentMethods[vendeurId] = selectedMethod as Map<String, dynamic>;
+          // Stocker dans le state temporaire (non validé)
+          _pendingPaymentMethods[vendeurId] = result;
         });
-        // Rafraîchir les commandes (tous les statuts)
-        context.read<OrderCubit>().fetchOrders();
       }
     });
   }
@@ -1460,29 +1549,6 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> {
 
                                             const SizedBox(height: 12),
 
-                                            // Message incitatif simple (uniquement si moyen de paiement non sélectionné)
-                                            if (selectedPaymentMethod == null || selectedPaymentMethod.isEmpty) ...[
-                                              Container(
-                                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                                                decoration: BoxDecoration(
-                                                  color: Colors.orange.shade50,
-                                                  borderRadius: BorderRadius.circular(8),
-                                                  border: Border.all(
-                                                    color: Colors.orange.shade300,
-                                                    width: 1,
-                                                  ),
-                                                ),
-                                                child: Text(
-                                                  'Cliquez sur l\'icône de  votre moyen de paiement et finaliser votre commande',
-                                                  style: TextStyle(
-                                                    fontSize: 12,
-                                                    fontWeight: FontWeight.w600,
-                                                    color: Colors.orange.shade900,
-                                                  ),
-                                                ),
-                                              ),
-                                              const SizedBox(height: 12),
-                                            ],
 
                                             // Moyen de paiement pour ce vendeur
                                             Container(
@@ -1507,24 +1573,43 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> {
                                                         ),
                                                       ),
                                                       const Spacer(),
-                                                      IconButton(
-                                                        icon: const Icon(Icons.edit, size: 16),
-                                                        onPressed: () => _showPaymentMethodSelection(vendeurId, selectedPaymentMethod ?? {}, vendeurOrders),
-                                                        color: AppColors.primary,
-                                                        padding: EdgeInsets.zero,
-                                                        constraints: const BoxConstraints(),
-                                                      ),
+                                                      // Afficher le bouton "ajouter moyen de paiement" si pas de moyen de paiement validé
+                                                      if (_selectedPaymentMethods[vendeurId] == null)
+                                                        ElevatedButton.icon(
+                                                          onPressed: () => _showPaymentMethodSelection(vendeurId, selectedPaymentMethod ?? {}, vendeurOrders),
+                                                          icon: const Icon(Icons.add, size: 14),
+                                                          label: const Text(
+                                                            'Ajouter moyen de paiement',
+                                                            style: TextStyle(fontSize: 11),
+                                                          ),
+                                                          style: ElevatedButton.styleFrom(
+                                                            backgroundColor: AppColors.primary,
+                                                            foregroundColor: Colors.white,
+                                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                                                            minimumSize: Size.zero,
+                                                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                                          ),
+                                                        )
+                                                      else
+                                                        IconButton(
+                                                          icon: const Icon(Icons.edit, size: 16),
+                                                          onPressed: () => _showPaymentMethodSelection(vendeurId, selectedPaymentMethod ?? {}, vendeurOrders),
+                                                          color: AppColors.primary,
+                                                          padding: EdgeInsets.zero,
+                                                          constraints: const BoxConstraints(),
+                                                        ),
                                                     ],
                                                   ),
-                                                  if (selectedPaymentMethod != null) ...[
+                                                  // Afficher le moyen de paiement validé ou en attente
+                                                  if (_selectedPaymentMethods[vendeurId] != null) ...[
                                                     const SizedBox(height: 8),
                                                     Row(
                                                       children: [
-                                                        if (selectedPaymentMethod['imageUrl'] != null)
+                                                        if (_selectedPaymentMethods[vendeurId]!['imageUrl'] != null)
                                                           ClipRRect(
                                                             borderRadius: BorderRadius.circular(6),
                                                             child: CachedNetworkImage(
-                                                              imageUrl: selectedPaymentMethod['imageUrl'],
+                                                              imageUrl: _selectedPaymentMethods[vendeurId]!['imageUrl'],
                                                               width: 32,
                                                               height: 32,
                                                               fit: BoxFit.cover,
@@ -1546,15 +1631,73 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> {
                                                             crossAxisAlignment: CrossAxisAlignment.start,
                                                             children: [
                                                               Text(
-                                                                selectedPaymentMethod['name'] ?? 'Cash',
+                                                                _selectedPaymentMethods[vendeurId]!['name'] ?? 'Cash',
                                                                 style: const TextStyle(
                                                                   fontSize: 12,
                                                                   fontWeight: FontWeight.w600,
                                                                 ),
                                                               ),
-                                                              if (selectedPaymentMethod['numeroCompte'] != null)
+                                                              if (_selectedPaymentMethods[vendeurId]!['numeroCompte'] != null)
                                                                 Text(
-                                                                  selectedPaymentMethod['numeroCompte'],
+                                                                  _selectedPaymentMethods[vendeurId]!['numeroCompte'],
+                                                                  style: TextStyle(
+                                                                    fontSize: 10,
+                                                                    color: Colors.grey.shade600,
+                                                                  ),
+                                                                ),
+                                                              if (_numeroPayments[vendeurId] != null)
+                                                                Text(
+                                                                  'Numéro: ${_numeroPayments[vendeurId]}',
+                                                                  style: TextStyle(
+                                                                    fontSize: 10,
+                                                                    color: Colors.grey.shade600,
+                                                                  ),
+                                                                ),
+                                                            ],
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ] else if (_pendingPaymentMethods[vendeurId] != null) ...[
+                                                    // Afficher le moyen de paiement en attente
+                                                    const SizedBox(height: 8),
+                                                    Row(
+                                                      children: [
+                                                        if (_pendingPaymentMethods[vendeurId]!['paymentMethod']?['imageUrl'] != null)
+                                                          ClipRRect(
+                                                            borderRadius: BorderRadius.circular(6),
+                                                            child: CachedNetworkImage(
+                                                              imageUrl: _pendingPaymentMethods[vendeurId]!['paymentMethod']!['imageUrl'],
+                                                              width: 32,
+                                                              height: 32,
+                                                              fit: BoxFit.cover,
+                                                            ),
+                                                          )
+                                                        else
+                                                          Container(
+                                                            width: 32,
+                                                            height: 32,
+                                                            decoration: BoxDecoration(
+                                                              color: Colors.grey.shade200,
+                                                              borderRadius: BorderRadius.circular(6),
+                                                            ),
+                                                            child: const Icon(Icons.payment, size: 16),
+                                                          ),
+                                                        const SizedBox(width: 8),
+                                                        Expanded(
+                                                          child: Column(
+                                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                                            children: [
+                                                              Text(
+                                                                _pendingPaymentMethods[vendeurId]!['paymentMethod']?['name'] ?? 'Cash',
+                                                                style: const TextStyle(
+                                                                  fontSize: 12,
+                                                                  fontWeight: FontWeight.w600,
+                                                                ),
+                                                              ),
+                                                              if (_pendingPaymentMethods[vendeurId]!['numeroPayment'] != null)
+                                                                Text(
+                                                                  'Numéro: ${_pendingPaymentMethods[vendeurId]!['numeroPayment']}',
                                                                   style: TextStyle(
                                                                     fontSize: 10,
                                                                     color: Colors.grey.shade600,
@@ -1640,16 +1783,17 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> {
                                               ),
                                             ),
 
-                                            // Bouton Annuler Commande (caché si toutes les commandes sont déjà annulées ou si toutes sont en pending_payment sans moyen de paiement)
-                                            if (showCancelButton) ...[
+                                            // Boutons Confirmer et Annuler (affichés si moyen de paiement sélectionné - pending ou validé)
+                                            if (_selectedPaymentMethods[vendeurId] != null || _pendingPaymentMethods[vendeurId] != null) ...[
                                               const SizedBox(height: 12),
+                                              // Bouton Confirmer Commande
                                               SizedBox(
                                                 width: double.infinity,
                                                 child: ElevatedButton.icon(
-                                                  onPressed: (_isCancelling[vendeurId] == true)
+                                                  onPressed: (_isConfirming[vendeurId] == true)
                                                       ? null
-                                                      : () => _showCancelOrderDialog(vendeurId, vendeurOrders),
-                                                  icon: _isCancelling[vendeurId] == true
+                                                      : () => _confirmOrder(vendeurId, vendeurOrders),
+                                                  icon: _isConfirming[vendeurId] == true
                                                       ? const SizedBox(
                                                           width: 14,
                                                           height: 14,
@@ -1658,14 +1802,14 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> {
                                                             valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                                                           ),
                                                         )
-                                                      : const Icon(Icons.cancel_outlined, size: 16),
+                                                      : const Icon(Icons.check_circle, size: 16),
                                                   label: Text(
-                                                    _isCancelling[vendeurId] == true
-                                                        ? 'Annulation...'
-                                                        : 'Annuler',
-                                                    ),
+                                                    _isConfirming[vendeurId] == true
+                                                        ? 'Confirmation...'
+                                                        : 'Confirmer commande',
+                                                  ),
                                                   style: ElevatedButton.styleFrom(
-                                                    backgroundColor: Colors.red,
+                                                    backgroundColor: AppColors.primary,
                                                     foregroundColor: Colors.white,
                                                     padding: const EdgeInsets.symmetric(vertical: 10),
                                                     shape: RoundedRectangleBorder(
@@ -1675,6 +1819,42 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> {
                                                   ),
                                                 ),
                                               ),
+                                              // Bouton Annuler Commande
+                                              if (showCancelButton) ...[
+                                                const SizedBox(height: 12),
+                                                SizedBox(
+                                                  width: double.infinity,
+                                                  child: ElevatedButton.icon(
+                                                    onPressed: (_isCancelling[vendeurId] == true)
+                                                        ? null
+                                                        : () => _showCancelOrderDialog(vendeurId, vendeurOrders),
+                                                    icon: _isCancelling[vendeurId] == true
+                                                        ? const SizedBox(
+                                                            width: 14,
+                                                            height: 14,
+                                                            child: CircularProgressIndicator(
+                                                              strokeWidth: 2,
+                                                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                                            ),
+                                                          )
+                                                        : const Icon(Icons.cancel_outlined, size: 16),
+                                                    label: Text(
+                                                      _isCancelling[vendeurId] == true
+                                                          ? 'Annulation...'
+                                                          : 'Annuler',
+                                                    ),
+                                                    style: ElevatedButton.styleFrom(
+                                                      backgroundColor: Colors.red,
+                                                      foregroundColor: Colors.white,
+                                                      padding: const EdgeInsets.symmetric(vertical: 10),
+                                                      shape: RoundedRectangleBorder(
+                                                        borderRadius: BorderRadius.circular(8),
+                                                      ),
+                                                      textStyle: const TextStyle(fontSize: 13),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
                                             ],
                                           ],
                                         ),
