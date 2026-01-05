@@ -13,6 +13,7 @@ import 'package:printing/printing.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter/services.dart';
 import 'dart:typed_data';
+import 'dart:async';
 
 class PendingPaymentScreen extends StatefulWidget {
   const PendingPaymentScreen({Key? key}) : super(key: key);
@@ -21,7 +22,7 @@ class PendingPaymentScreen extends StatefulWidget {
   State<PendingPaymentScreen> createState() => _PendingPaymentScreenState();
 }
 
-class _PendingPaymentScreenState extends State<PendingPaymentScreen> {
+class _PendingPaymentScreenState extends State<PendingPaymentScreen> with WidgetsBindingObserver {
   final PaymentMethodService _paymentMethodService = PaymentMethodService();
   final OrderService _orderService = OrderService();
   Map<int, List<Map<String, dynamic>>>? _vendeurPaymentMethods;
@@ -31,6 +32,39 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> {
   Map<int, Map<String, dynamic>> _pendingPaymentMethods = {}; // {vendeurId: {paymentMethod: {...}, numeroPayment: '...'}}
   Map<int, String?> _numeroPayments = {}; // {vendeurId: numeroPayment} pour stocker le numéro après validation
   Map<int, bool> _isConfirming = {}; // Pour suivre l'état de confirmation par vendeur
+  Timer? _refreshTimer; // Timer pour rafraîchir périodiquement
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _loadPaymentMethods(context);
+    // Rafraîchir les commandes toutes les 10 secondes pour détecter les changements de statut
+    _refreshTimer = Timer.periodic(const Duration(seconds: 10), (timer) {
+      if (mounted) {
+        context.read<OrderCubit>().fetchOrders().then((_) {
+          _loadPaymentMethods(context);
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // Rafraîchir les commandes quand l'app revient au premier plan
+      context.read<OrderCubit>().fetchOrders().then((_) {
+        _loadPaymentMethods(context);
+      });
+    }
+  }
 
   Future<void> _loadPaymentMethods(BuildContext context) async {
     final orderListState = context.read<OrderCubit>().orderListState;
@@ -1103,6 +1137,8 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> {
         if (state.success) {
           // Recharger les moyens de paiement après mise à jour
           _loadPaymentMethods(context);
+          // Rafraîchir les commandes pour avoir les dernières données
+          context.read<OrderCubit>().fetchOrders();
         } else if (state.error != null) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -1240,29 +1276,38 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> {
                 child: RefreshIndicator(
                   onRefresh: () async {
                     await context.read<OrderCubit>().fetchOrders();
+                    _loadPaymentMethods(context);
                   },
                   child: groupedOrders.isEmpty
-                      ? Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.payment_outlined,
-                                size: 48,
-                                color: Colors.grey.shade400,
-                              ),
-                              const SizedBox(height: 12),
-                              Text(
-                                'Aucune commande',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.grey.shade600,
+                      ? ListView(
+                          children: [
+                            SizedBox(
+                              height: MediaQuery.of(context).size.height * 0.5,
+                              child: Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.payment_outlined,
+                                      size: 48,
+                                      color: Colors.grey.shade400,
+                                    ),
+                                    const SizedBox(height: 12),
+                                    Text(
+                                      'Aucune commande',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.grey.shade600,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
-                            ],
-                          ),
+                            ),
+                          ],
                         )
                       : SingleChildScrollView(
+                          physics: const AlwaysScrollableScrollPhysics(),
                           padding: const EdgeInsets.all(12),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,

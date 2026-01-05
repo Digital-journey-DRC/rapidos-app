@@ -69,37 +69,7 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
   }
 
   void _onSearchChanged() {
-    final query = _searchAddressController.text;
-    
-    // Détecter si un espace a été ajouté
-    final hasSpace = query.contains(' ');
-    final previousHadSpace = _previousSearchText.contains(' ');
-    final spaceJustAdded = hasSpace && !previousHadSpace;
-    
-    // Si un espace vient d'être ajouté et que le texte a plus d'un caractère, rechercher
-    if (spaceJustAdded && query.trim().length > 1) {
-      _searchDebounceTimer?.cancel();
-      setState(() {
-        _isSearching = true;
-      });
-      _searchAddress(query.trim());
-      _previousSearchText = query;
-      return;
-    }
-    
-    // Si le texte contient déjà un espace et qu'il y a eu une modification, rechercher
-    if (hasSpace && query.trim().length > 1 && query != _previousSearchText) {
-      _searchDebounceTimer?.cancel();
-      _searchDebounceTimer = Timer(const Duration(milliseconds: 300), () {
-        if (_searchAddressController.text.contains(' ') && 
-            _searchAddressController.text.trim().length > 1) {
-          setState(() {
-            _isSearching = true;
-          });
-          _searchAddress(_searchAddressController.text.trim());
-        }
-      });
-    }
+    final query = _searchAddressController.text.trim();
     
     // Si le texte est vide, effacer les résultats
     if (query.isEmpty) {
@@ -107,6 +77,28 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
       setState(() {
         _searchResults.clear();
         _isSearching = false;
+      });
+      _previousSearchText = '';
+      return;
+    }
+    
+    // Recherche en temps réel dès qu'une lettre est tapée (style Yango)
+    // Debounce intelligent : plus court pour les requêtes courtes, plus long pour les longues
+    _searchDebounceTimer?.cancel();
+    
+    // Si la requête a changé, lancer la recherche
+    if (query != _previousSearchText && query.length >= 1) {
+      setState(() {
+        _isSearching = true;
+      });
+      
+      // Debounce adaptatif : 200ms pour les requêtes courtes, 400ms pour les longues
+      final debounceTime = query.length < 3 ? 200 : 400;
+      
+      _searchDebounceTimer = Timer(Duration(milliseconds: debounceTime), () {
+        if (_searchAddressController.text.trim() == query && query.length >= 1) {
+          _searchAddress(query);
+        }
       });
     }
     
@@ -710,21 +702,99 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
               if (_searchResults.isNotEmpty) ...[
                 const SizedBox(height: 12),
                 Container(
-                  constraints: const BoxConstraints(maxHeight: 200),
+                  constraints: const BoxConstraints(maxHeight: 300),
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade50,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.grey.shade200),
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.grey.shade200, width: 1),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                        spreadRadius: 0,
+                      ),
+                    ],
                   ),
-                  child: ListView.builder(
+                  child: ListView.separated(
                     shrinkWrap: true,
+                    padding: const EdgeInsets.symmetric(vertical: 4),
                     itemCount: _searchResults.length,
+                    separatorBuilder: (context, index) => Divider(
+                      height: 1,
+                      thickness: 1,
+                      color: Colors.grey.shade100,
+                      indent: 48,
+                    ),
                     itemBuilder: (context, index) {
                       final result = _searchResults[index];
-                      return ListTile(
-                        leading: const Icon(Icons.place, color: AppColors.primary),
-                        title: Text(result['description']),
-                        onTap: () => _selectAddress(result),
+                      final description = result['description']?.toString() ?? '';
+                      // Séparer l'adresse principale et les détails
+                      final parts = description.split(', ');
+                      final mainAddress = parts.isNotEmpty ? parts[0] : description;
+                      final details = parts.length > 1 ? parts.sublist(1).join(', ') : '';
+                      
+                      return Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: () => _selectAddress(result),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Container(
+                                  width: 36,
+                                  height: 36,
+                                  decoration: BoxDecoration(
+                                    color: AppColors.primary.withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Icon(
+                                    Icons.place,
+                                    color: AppColors.primary,
+                                    size: 18,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        mainAddress,
+                                        style: const TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.black87,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      if (details.isNotEmpty) ...[
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          details,
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: Colors.grey.shade600,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                ),
+                                Icon(
+                                  Icons.arrow_forward_ios,
+                                  size: 14,
+                                  color: Colors.grey.shade400,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
                       );
                     },
                   ),
@@ -830,62 +900,161 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
               TextField(
                 controller: _searchAddressController,
                 focusNode: _searchFocusNode,
-                onSubmitted: (value) {
-                  // Si l'utilisateur appuie sur Entrée et qu'il y a du texte, rechercher
-                  if (value.trim().isNotEmpty) {
-                    setState(() {
-                      _isSearching = true;
-                    });
-                    _searchAddress(value.trim());
-                  }
-                },
+                autofocus: false,
                 decoration: InputDecoration(
-                  hintText: 'Tapez une adresse...',
-                  prefixIcon: const Icon(Icons.location_on),
+                  hintText: 'Rechercher une adresse...',
+                  hintStyle: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey.shade500,
+                  ),
+                  prefixIcon: Icon(
+                    Icons.search,
+                    color: AppColors.primary,
+                    size: 20,
+                  ),
                   suffixIcon: _isSearching
-                      ? const Padding(
-                          padding: EdgeInsets.all(12.0),
+                      ? Padding(
+                          padding: const EdgeInsets.all(12.0),
                           child: SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                            ),
                           ),
                         )
                       : _searchAddressController.text.isNotEmpty
                           ? IconButton(
-                              icon: const Icon(Icons.clear),
+                              icon: Icon(
+                                Icons.clear,
+                                size: 18,
+                                color: Colors.grey.shade600,
+                              ),
                               onPressed: () {
                                 _searchAddressController.clear();
                                 _previousSearchText = '';
                                 setState(() {
                                   _searchResults.clear();
+                                  _isSearching = false;
                                 });
                               },
                             )
                           : null,
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: Colors.grey.shade300),
                   ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: Colors.grey.shade300),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: AppColors.primary, width: 1.5),
+                  ),
+                  filled: true,
+                  fillColor: Colors.grey.shade50,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                 ),
+                style: const TextStyle(fontSize: 14),
               ),
               if (_searchResults.isNotEmpty) ...[
                 const SizedBox(height: 12),
                 Container(
-                  constraints: const BoxConstraints(maxHeight: 200),
+                  constraints: const BoxConstraints(maxHeight: 300),
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade50,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.grey.shade200),
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.grey.shade200, width: 1),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                        spreadRadius: 0,
+                      ),
+                    ],
                   ),
-                  child: ListView.builder(
+                  child: ListView.separated(
                     shrinkWrap: true,
+                    padding: const EdgeInsets.symmetric(vertical: 4),
                     itemCount: _searchResults.length,
+                    separatorBuilder: (context, index) => Divider(
+                      height: 1,
+                      thickness: 1,
+                      color: Colors.grey.shade100,
+                      indent: 48,
+                    ),
                     itemBuilder: (context, index) {
                       final result = _searchResults[index];
-                      return ListTile(
-                        leading: const Icon(Icons.place, color: AppColors.primary),
-                        title: Text(result['description']),
-                        onTap: () => _selectAddress(result),
+                      final description = result['description']?.toString() ?? '';
+                      // Séparer l'adresse principale et les détails
+                      final parts = description.split(', ');
+                      final mainAddress = parts.isNotEmpty ? parts[0] : description;
+                      final details = parts.length > 1 ? parts.sublist(1).join(', ') : '';
+                      
+                      return Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: () => _selectAddress(result),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Container(
+                                  width: 36,
+                                  height: 36,
+                                  decoration: BoxDecoration(
+                                    color: AppColors.primary.withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Icon(
+                                    Icons.place,
+                                    color: AppColors.primary,
+                                    size: 18,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        mainAddress,
+                                        style: const TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.black87,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      if (details.isNotEmpty) ...[
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          details,
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: Colors.grey.shade600,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                ),
+                                Icon(
+                                  Icons.arrow_forward_ios,
+                                  size: 14,
+                                  color: Colors.grey.shade400,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
                       );
                     },
                   ),
