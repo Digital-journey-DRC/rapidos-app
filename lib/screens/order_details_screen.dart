@@ -1790,7 +1790,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                     if (status == 'en_preparation') ...[
                       _buildEnPreparationActions(
                         context, 
-                        widget.orderId, 
+                        orderData['id'].toString(), 
                         packagePhoto,
                         onStatusChanged: () {
                           // Ne pas naviguer, juste rafraîchir les données
@@ -2774,7 +2774,7 @@ class _VendeurOrderActionsWidgetState extends State<_VendeurOrderActionsWidget> 
 
     try {
       final result = await context.read<OrderCubit>().updateOrderStatus(
-        orderId: widget.orderId,
+        orderId: widget.orderData['id'].toString(),
         status: 'cancelled',
         reason: reasonController.text.trim(),
       );
@@ -2832,7 +2832,7 @@ class _VendeurOrderActionsWidgetState extends State<_VendeurOrderActionsWidget> 
       print('   📝 Reason: Commande prise en charge');
       
       final result = await context.read<OrderCubit>().updateOrderStatus(
-        orderId: widget.orderId,
+        orderId: widget.orderData['id'].toString(),
         status: 'en_preparation',
         reason: 'Commande prise en charge',
       );
