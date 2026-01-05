@@ -38,13 +38,24 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> with Widget
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _loadPaymentMethods(context);
+    // Attendre que le widget soit monté avant d'utiliser le context
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _loadPaymentMethods(context);
+      }
+    });
     // Rafraîchir les commandes toutes les 10 secondes pour détecter les changements de statut
     _refreshTimer = Timer.periodic(const Duration(seconds: 10), (timer) {
       if (mounted) {
-        context.read<OrderCubit>().fetchOrders().then((_) {
-          _loadPaymentMethods(context);
-        });
+        try {
+          context.read<OrderCubit>().fetchOrders().then((_) {
+            if (mounted) {
+              _loadPaymentMethods(context);
+            }
+          });
+        } catch (e) {
+          print('Erreur lors du rafraîchissement: $e');
+        }
       }
     });
   }
@@ -58,41 +69,66 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> with Widget
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
+    if (state == AppLifecycleState.resumed && mounted) {
       // Rafraîchir les commandes quand l'app revient au premier plan
-      context.read<OrderCubit>().fetchOrders().then((_) {
-        _loadPaymentMethods(context);
-      });
+      try {
+        context.read<OrderCubit>().fetchOrders().then((_) {
+          if (mounted) {
+            _loadPaymentMethods(context);
+          }
+        });
+      } catch (e) {
+        print('Erreur lors du rafraîchissement au retour: $e');
+      }
     }
   }
 
   Future<void> _loadPaymentMethods(BuildContext context) async {
-    final orderListState = context.read<OrderCubit>().orderListState;
-    final orders = orderListState.orders;
+    if (!mounted) return;
     
-    // Extraire les IDs des vendeurs uniques
-    final vendeurIds = orders
-        .map((order) => order['vendeurId'] as int? ?? 0)
-        .where((id) => id > 0)
-        .toSet()
-        .toList();
+    try {
+      final orderListState = context.read<OrderCubit>().orderListState;
+      final orders = orderListState.orders;
+      
+      // Extraire les IDs des vendeurs uniques
+      final vendeurIds = orders
+          .map((order) {
+            final vendeurId = order['vendeurId'];
+            if (vendeurId is int) return vendeurId;
+            if (vendeurId is String) return int.tryParse(vendeurId);
+            return 0;
+          })
+          .where((id) => id != null && id > 0)
+          .cast<int>()
+          .toSet()
+          .toList();
 
-    // Charger les moyens de paiement pour chaque vendeur
-    final paymentMethodsMap = <int, List<Map<String, dynamic>>>{};
-    for (final vendeurId in vendeurIds) {
-      try {
-        final result = await _paymentMethodService.getVendeurPaymentMethodsForClient(vendeurId);
-        if (result['success'] == true) {
-          paymentMethodsMap[vendeurId] = List<Map<String, dynamic>>.from(result['paymentMethods'] ?? []);
+      // Charger les moyens de paiement pour chaque vendeur
+      final paymentMethodsMap = <int, List<Map<String, dynamic>>>{};
+      for (final vendeurId in vendeurIds) {
+        try {
+          final result = await _paymentMethodService.getVendeurPaymentMethodsForClient(vendeurId);
+          if (result['success'] == true) {
+            paymentMethodsMap[vendeurId] = List<Map<String, dynamic>>.from(result['paymentMethods'] ?? []);
+          }
+        } catch (e) {
+          print('Erreur lors du chargement des moyens de paiement pour vendeur $vendeurId: $e');
         }
-      } catch (e) {
-        print('Erreur lors du chargement des moyens de paiement pour vendeur $vendeurId: $e');
+      }
+      
+      if (mounted) {
+        setState(() {
+          _vendeurPaymentMethods = paymentMethodsMap;
+        });
+      }
+    } catch (e) {
+      print('Erreur lors du chargement des moyens de paiement: $e');
+      if (mounted) {
+        setState(() {
+          _vendeurPaymentMethods = {};
+        });
       }
     }
-    
-    setState(() {
-      _vendeurPaymentMethods = paymentMethodsMap;
-    });
   }
 
   // Convertir total et deliveryFee qui peuvent être String ou double
@@ -949,21 +985,21 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> with Widget
 
       // Rafraîchir les commandes
       await context.read<OrderCubit>().fetchOrders();
-      _loadPaymentMethods(context);
-
-      setState(() {
-        _isConfirming[vendeurId] = false;
-        // Nettoyer les données temporaires et déplacer vers selected si c'était pending
-        if (_pendingPaymentMethods[vendeurId] != null) {
-          _selectedPaymentMethods[vendeurId] = paymentMethod!;
-          if (numeroPayment != null) {
-            _numeroPayments[vendeurId] = numeroPayment;
-          }
-          _pendingPaymentMethods.remove(vendeurId);
-        }
-      });
-
       if (mounted) {
+        _loadPaymentMethods(context);
+        
+        setState(() {
+          _isConfirming[vendeurId] = false;
+          // Nettoyer les données temporaires et déplacer vers selected si c'était pending
+          if (_pendingPaymentMethods[vendeurId] != null) {
+            _selectedPaymentMethods[vendeurId] = paymentMethod!;
+            if (numeroPayment != null) {
+              _numeroPayments[vendeurId] = numeroPayment;
+            }
+            _pendingPaymentMethods.remove(vendeurId);
+          }
+        });
+
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Commande confirmée avec succès'),
@@ -1085,8 +1121,22 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> with Widget
       return;
     }
 
-    // Extraire les IDs des commandes de ce vendeur
-    final orderIds = vendeurOrders.map((order) => order['id'] as int).toList();
+    // Extraire les IDs des commandes de ce vendeur avec vérification de sécurité
+    final orderIds = vendeurOrders
+        .map((order) {
+          final id = order['id'];
+          if (id == null) return null;
+          // Convertir en int si c'est un String ou un int
+          if (id is int) return id;
+          if (id is String) {
+            final parsed = int.tryParse(id);
+            return parsed;
+          }
+          return null;
+        })
+        .where((id) => id != null)
+        .cast<int>()
+        .toList();
     
     print('🔍 [PendingPaymentScreen] Modification du moyen de paiement');
     print('   👤 VendeurId: $vendeurId');
@@ -1094,6 +1144,17 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> with Widget
     print('   📋 IDs des commandes à mettre à jour: $orderIds');
     for (var order in vendeurOrders) {
       print('      - Commande ID: ${order['id']}, OrderId: ${order['orderId']}, Status: ${order['status']}');
+    }
+
+    // Vérifier que paymentMethods n'est pas null et n'est pas vide
+    if (paymentMethods.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Aucun moyen de paiement disponible'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
     }
 
     Navigator.push(
@@ -1108,7 +1169,7 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> with Widget
       ),
     ).then((result) {
       // result contient {paymentMethod: {...}, numeroPayment: '...'} ou null
-      if (result != null && result is Map<String, dynamic>) {
+      if (result != null && result is Map<String, dynamic> && mounted) {
         setState(() {
           // Stocker dans le state temporaire (non validé)
           _pendingPaymentMethods[vendeurId] = result;
@@ -1122,23 +1183,35 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> with Widget
   Widget build(BuildContext context) {
     // Charger les commandes au premier build
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final orderListState = context.read<OrderCubit>().orderListState;
-      if (orderListState.orders.isEmpty && !orderListState.isLoading) {
-        context.read<OrderCubit>().fetchOrders().then((_) {
+      if (!mounted) return;
+      try {
+        final orderListState = context.read<OrderCubit>().orderListState;
+        if (orderListState.orders.isEmpty && !orderListState.isLoading) {
+          context.read<OrderCubit>().fetchOrders().then((_) {
+            if (mounted) {
+              _loadPaymentMethods(context);
+            }
+          });
+        } else if (_vendeurPaymentMethods == null) {
           _loadPaymentMethods(context);
-        });
-      } else if (_vendeurPaymentMethods == null) {
-        _loadPaymentMethods(context);
+        }
+      } catch (e) {
+        print('Erreur lors du chargement initial: $e');
       }
     });
 
     return BlocConsumer<OrderCubit, OrderState>(
       listener: (context, state) {
+        if (!mounted) return;
         if (state.success) {
           // Recharger les moyens de paiement après mise à jour
           _loadPaymentMethods(context);
           // Rafraîchir les commandes pour avoir les dernières données
-          context.read<OrderCubit>().fetchOrders();
+          try {
+            context.read<OrderCubit>().fetchOrders();
+          } catch (e) {
+            print('Erreur lors du rafraîchissement: $e');
+          }
         } else if (state.error != null) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(

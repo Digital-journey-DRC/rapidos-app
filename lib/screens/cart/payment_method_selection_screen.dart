@@ -199,9 +199,34 @@ class _PaymentMethodSelectionScreenState extends State<PaymentMethodSelectionScr
     }
     
     // Préparer le body AVANT l'envoi
-    final paymentMethodId = _selectedPaymentMethod!['id'] as int;
+    final paymentMethodId = _selectedPaymentMethod!['id'];
+    if (paymentMethodId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Erreur: ID du moyen de paiement manquant'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+    
+    // Convertir en int si nécessaire
+    final paymentMethodIdInt = paymentMethodId is int 
+        ? paymentMethodId 
+        : (paymentMethodId is String ? int.tryParse(paymentMethodId) : null);
+    
+    if (paymentMethodIdInt == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Erreur: ID du moyen de paiement invalide'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+    
     final body = <String, dynamic>{
-      'paymentMethodId': paymentMethodId,
+      'paymentMethodId': paymentMethodIdInt,
     };
     
     if (requiresNumero && numero.isNotEmpty) {
@@ -216,7 +241,7 @@ class _PaymentMethodSelectionScreenState extends State<PaymentMethodSelectionScr
     print('');
     print('Structure détaillée:');
     print('{');
-    print('  "paymentMethodId": $paymentMethodId,');
+    print('  "paymentMethodId": $paymentMethodIdInt,');
     if (requiresNumero && numero.isNotEmpty) {
       print('  "numeroPayment": "$numero"');
     }
@@ -228,7 +253,7 @@ class _PaymentMethodSelectionScreenState extends State<PaymentMethodSelectionScr
     // Les données seront stockées dans le state et validées plus tard
     print('🔄 [PaymentMethodSelection] Retour des données (sans exécution de l\'endpoint)');
     print('📋 [PaymentMethodSelection] Nombre de commandes: ${widget.orderIds.length}');
-    print('💳 [PaymentMethodSelection] Moyen de paiement sélectionné: ID=$paymentMethodId, Nom=${_selectedPaymentMethod!['name']}');
+    print('💳 [PaymentMethodSelection] Moyen de paiement sélectionné: ID=$paymentMethodIdInt, Nom=${_selectedPaymentMethod!['name']}');
     print('📱 [PaymentMethodSelection] Numéro de paiement: ${requiresNumero && numero.isNotEmpty ? numero : 'Non requis'}');
     
     // Préparer les données à retourner
@@ -250,6 +275,24 @@ class _PaymentMethodSelectionScreenState extends State<PaymentMethodSelectionScr
     final paymentMethodName = _selectedPaymentMethod?['name']?.toString() ?? '';
     final requiresNumero = _requiresNumero(paymentMethodName);
     final validPrefixes = _getValidPrefixes(paymentMethodName);
+
+    // Vérifier que paymentMethods n'est pas vide
+    if (widget.paymentMethods.isEmpty) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text(
+            'Moyen de paiement',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          backgroundColor: AppColors.primary,
+          foregroundColor: Colors.white,
+          elevation: 0,
+        ),
+        body: const Center(
+          child: Text('Aucun moyen de paiement disponible'),
+        ),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -283,8 +326,12 @@ class _PaymentMethodSelectionScreenState extends State<PaymentMethodSelectionScr
                     children: [
                       // Liste des moyens de paiement
                       ...widget.paymentMethods.map((method) {
+                        final methodId = method['id'];
+                        final selectedId = _selectedPaymentMethod?['id'];
                         final isSelected = _selectedPaymentMethod != null &&
-                            method['id'] == _selectedPaymentMethod!['id'];
+                            methodId != null &&
+                            selectedId != null &&
+                            methodId == selectedId;
 
                         return Container(
                           margin: const EdgeInsets.only(bottom: 12),

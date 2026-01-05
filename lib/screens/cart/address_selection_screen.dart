@@ -27,13 +27,10 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
   // Variables pour la recherche d'adresse
   final TextEditingController _searchAddressController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
-  final ScrollController _scrollController = ScrollController();
   List<Map<String, dynamic>> _searchResults = [];
   Timer? _searchDebounceTimer;
   bool _isSearching = false;
   bool _isGettingCurrentLocation = false;
-  String _previousSearchText = '';
-  String? _currentSearchQuery; // Pour suivre la requête en cours
 
   // Variable pour suivre l'adresse sélectionnée depuis Google
   Map<String, dynamic>? _selectedGoogleAddress;
@@ -65,7 +62,6 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
     _searchDebounceTimer?.cancel();
     _searchAddressController.dispose();
     _searchFocusNode.dispose();
-    _scrollController.dispose();
     _numeroController.dispose();
     _refAdresseController.dispose();
     super.dispose();
@@ -77,58 +73,30 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
     // Si le texte est vide, effacer les résultats immédiatement
     if (query.isEmpty) {
       _searchDebounceTimer?.cancel();
-      _currentSearchQuery = null;
-      if (mounted) {
-        setState(() {
-          _searchResults.clear();
-          _isSearching = false;
-        });
-      }
-      _previousSearchText = '';
+      setState(() {
+        _searchResults.clear();
+        _isSearching = false;
+      });
       return;
     }
     
     // Annuler la recherche précédente
     _searchDebounceTimer?.cancel();
-    _currentSearchQuery = null;
     
-    // Si la requête a changé et a au moins 1 caractère, lancer la recherche
-    if (query != _previousSearchText && query.length >= 1) {
-      // Ne pas bloquer l'UI - mettre à jour l'état de manière asynchrone
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && _searchAddressController.text.trim() == query) {
-          setState(() {
-            _isSearching = true;
-          });
-        }
-      });
-      
-      // Debounce très court et adaptatif (style Yango - ultra réactif)
-      // Plus court pour les premières lettres pour une réactivité maximale
-      final debounceTime = query.length < 2 ? 100 : (query.length < 4 ? 200 : 300);
-      
-      _searchDebounceTimer = Timer(Duration(milliseconds: debounceTime), () {
-        // Vérifier que la requête n'a pas changé pendant le debounce
-        final currentQuery = _searchAddressController.text.trim();
-        if (currentQuery == query && query.length >= 1 && mounted) {
-          _currentSearchQuery = query;
-          _searchAddress(query);
-        }
-      });
-    }
-    
-    _previousSearchText = query;
+    // Debounce simple
+    _searchDebounceTimer = Timer(const Duration(milliseconds: 500), () {
+      if (mounted && _searchAddressController.text.trim() == query && query.isNotEmpty) {
+        _searchAddress(query);
+      }
+    });
   }
 
   Future<void> _searchAddress(String query) async {
-    // Vérifier que le widget est toujours monté et que la requête n'a pas changé
-    if (!mounted) return;
+    if (!mounted || query.isEmpty) return;
     
-    // Vérifier que c'est toujours la requête actuelle
-    if (_currentSearchQuery != query) {
-      // Une nouvelle recherche a été lancée, ignorer cette requête
-      return;
-    }
+    setState(() {
+      _isSearching = true;
+    });
     
     const apiKey = 'AIzaSyCpJzuEa7jLAcP8ub8AVM8flT2aK5cPdh0';
     final url =
@@ -136,68 +104,43 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
 
     try {
       final response = await http.get(Uri.parse(url)).timeout(
-        const Duration(seconds: 4),
+        const Duration(seconds: 5),
         onTimeout: () {
           throw TimeoutException('La recherche a pris trop de temps');
         },
       );
       
-      // Vérifier à nouveau que la requête n'a pas changé pendant la requête
-      if (!mounted || _currentSearchQuery != query) {
-        // La requête a changé pendant la requête, ignorer les résultats
-        return;
-      }
+      if (!mounted) return;
       
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        if (data['status'] == 'OK' && mounted && _currentSearchQuery == query) {
+        if (data['status'] == 'OK') {
           final predictions = data['predictions'] as List? ?? [];
-          // Mettre à jour de manière asynchrone pour ne pas bloquer
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted && _currentSearchQuery == query) {
-              setState(() {
-                _searchResults = List<Map<String, dynamic>>.from(
-                  predictions.map((prediction) => {
-                    'description': prediction['description'],
-                    'place_id': prediction['place_id'],
-                    'source_type': 'autocomplete',
-                    'relevance_score': 1.0,
-                  }),
-                );
-                _isSearching = false;
-              });
-            }
+          setState(() {
+            _searchResults = List<Map<String, dynamic>>.from(
+              predictions.map((prediction) => {
+                'description': prediction['description'],
+                'place_id': prediction['place_id'],
+              }),
+            );
+            _isSearching = false;
           });
-        } else if (mounted && _currentSearchQuery == query) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted && _currentSearchQuery == query) {
-              setState(() {
-                _searchResults = [];
-                _isSearching = false;
-              });
-            }
+        } else {
+          setState(() {
+            _searchResults = [];
+            _isSearching = false;
           });
         }
-      } else if (mounted && _currentSearchQuery == query) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted && _currentSearchQuery == query) {
-            setState(() {
-              _searchResults = [];
-              _isSearching = false;
-            });
-          }
+      } else {
+        setState(() {
+          _searchResults = [];
+          _isSearching = false;
         });
       }
     } catch (e) {
-      // Ignorer les erreurs silencieusement pour ne pas interrompre l'utilisateur
-      // Seulement mettre à jour l'état si c'est toujours la bonne requête
-      if (mounted && _currentSearchQuery == query) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted && _currentSearchQuery == query) {
-            setState(() {
-              _isSearching = false;
-            });
-          }
+      if (mounted) {
+        setState(() {
+          _isSearching = false;
         });
       }
     }
@@ -750,7 +693,6 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
                               icon: const Icon(Icons.clear),
                               onPressed: () {
                                 _searchAddressController.clear();
-                                _previousSearchText = '';
                                 setState(() {
                                   _searchResults.clear();
                                 });
@@ -996,7 +938,6 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
                               ),
                               onPressed: () {
                                 _searchAddressController.clear();
-                                _previousSearchText = '';
                                 setState(() {
                                   _searchResults.clear();
                                   _isSearching = false;
@@ -1766,7 +1707,6 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
         elevation: 0,
       ),
       body: SingleChildScrollView(
-            controller: _scrollController,
             padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
