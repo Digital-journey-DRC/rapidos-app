@@ -1282,6 +1282,12 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> {
                                   final status = order['status']?.toString().toLowerCase() ?? '';
                                   return status == 'cancelled';
                                 });
+                                
+                                // Vérifier si toutes les commandes sont en attente (pending)
+                                final allPending = vendeurOrders.every((order) {
+                                  final status = order['status']?.toString().toLowerCase() ?? '';
+                                  return status == 'pending';
+                                });
 
                                 return Container(
                                   margin: const EdgeInsets.only(bottom: 16),
@@ -1754,35 +1760,70 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> {
                                             ),
 
                                             // Boutons Confirmer et Annuler (affichés si moyen de paiement sélectionné - pending ou validé)
-                                            if (_selectedPaymentMethods[vendeurId] != null || _pendingPaymentMethods[vendeurId] != null) ...[
+                                            // Si toutes les commandes sont annulées, ne rien afficher
+                                            if (!allCancelled && (_selectedPaymentMethods[vendeurId] != null || _pendingPaymentMethods[vendeurId] != null)) ...[
                                               const SizedBox(height: 12),
-                                              // Bouton Confirmer Commande (caché si toutes les commandes sont annulées)
-                                              if (!allCancelled) ...[
+                                              // Bouton Confirmer Commande
+                                              SizedBox(
+                                                width: double.infinity,
+                                                child: OutlinedButton.icon(
+                                                  onPressed: (_isConfirming[vendeurId] == true)
+                                                      ? null
+                                                      : () => _confirmOrder(vendeurId, vendeurOrders),
+                                                  icon: _isConfirming[vendeurId] == true
+                                                      ? const SizedBox(
+                                                          width: 14,
+                                                          height: 14,
+                                                          child: CircularProgressIndicator(
+                                                            strokeWidth: 2,
+                                                            valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                                                          ),
+                                                        )
+                                                      : const Icon(Icons.check_circle, size: 16),
+                                                  label: Text(
+                                                    _isConfirming[vendeurId] == true
+                                                        ? 'Confirmation...'
+                                                        : 'Confirmer commande',
+                                                  ),
+                                                  style: OutlinedButton.styleFrom(
+                                                    foregroundColor: AppColors.primary,
+                                                    padding: const EdgeInsets.symmetric(vertical: 10),
+                                                    side: BorderSide(color: AppColors.primary, width: 1.5),
+                                                    shape: RoundedRectangleBorder(
+                                                      borderRadius: BorderRadius.circular(8),
+                                                    ),
+                                                    textStyle: const TextStyle(fontSize: 13),
+                                                  ),
+                                                ),
+                                              ),
+                                              // Bouton Annuler Commande (caché si toutes les commandes sont en attente)
+                                              if (!allPending) ...[
+                                                const SizedBox(height: 12),
                                                 SizedBox(
                                                   width: double.infinity,
-                                                  child: ElevatedButton.icon(
-                                                    onPressed: (_isConfirming[vendeurId] == true)
+                                                  child: OutlinedButton.icon(
+                                                    onPressed: (_isCancelling[vendeurId] == true)
                                                         ? null
-                                                        : () => _confirmOrder(vendeurId, vendeurOrders),
-                                                    icon: _isConfirming[vendeurId] == true
+                                                        : () => _showCancelOrderDialog(vendeurId, vendeurOrders),
+                                                    icon: _isCancelling[vendeurId] == true
                                                         ? const SizedBox(
                                                             width: 14,
                                                             height: 14,
                                                             child: CircularProgressIndicator(
                                                               strokeWidth: 2,
-                                                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                                              valueColor: AlwaysStoppedAnimation<Color>(Colors.red),
                                                             ),
                                                           )
-                                                        : const Icon(Icons.check_circle, size: 16),
+                                                        : const Icon(Icons.cancel_outlined, size: 16),
                                                     label: Text(
-                                                      _isConfirming[vendeurId] == true
-                                                          ? 'Confirmation...'
-                                                          : 'Confirmer commande',
+                                                      _isCancelling[vendeurId] == true
+                                                          ? 'Annulation...'
+                                                          : 'Annuler',
                                                     ),
-                                                    style: ElevatedButton.styleFrom(
-                                                      backgroundColor: AppColors.primary,
-                                                      foregroundColor: Colors.white,
+                                                    style: OutlinedButton.styleFrom(
+                                                      foregroundColor: Colors.red,
                                                       padding: const EdgeInsets.symmetric(vertical: 10),
+                                                      side: const BorderSide(color: Colors.red, width: 1.5),
                                                       shape: RoundedRectangleBorder(
                                                         borderRadius: BorderRadius.circular(8),
                                                       ),
@@ -1791,40 +1832,6 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> {
                                                   ),
                                                 ),
                                               ],
-                                              // Bouton Annuler Commande
-                                              const SizedBox(height: 12),
-                                              SizedBox(
-                                                width: double.infinity,
-                                                child: ElevatedButton.icon(
-                                                  onPressed: (_isCancelling[vendeurId] == true)
-                                                      ? null
-                                                      : () => _showCancelOrderDialog(vendeurId, vendeurOrders),
-                                                  icon: _isCancelling[vendeurId] == true
-                                                      ? const SizedBox(
-                                                          width: 14,
-                                                          height: 14,
-                                                          child: CircularProgressIndicator(
-                                                            strokeWidth: 2,
-                                                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                                          ),
-                                                        )
-                                                      : const Icon(Icons.cancel_outlined, size: 16),
-                                                  label: Text(
-                                                    _isCancelling[vendeurId] == true
-                                                        ? 'Annulation...'
-                                                        : 'Annuler',
-                                                  ),
-                                                  style: ElevatedButton.styleFrom(
-                                                    backgroundColor: Colors.red,
-                                                    foregroundColor: Colors.white,
-                                                    padding: const EdgeInsets.symmetric(vertical: 10),
-                                                    shape: RoundedRectangleBorder(
-                                                      borderRadius: BorderRadius.circular(8),
-                                                    ),
-                                                    textStyle: const TextStyle(fontSize: 13),
-                                                  ),
-                                                ),
-                                              ),
                                             ],
                                           ],
                                         ),
