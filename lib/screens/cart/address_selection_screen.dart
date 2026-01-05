@@ -27,11 +27,13 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
   // Variables pour la recherche d'adresse
   final TextEditingController _searchAddressController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
+  final ScrollController _scrollController = ScrollController();
   List<Map<String, dynamic>> _searchResults = [];
   Timer? _searchDebounceTimer;
   bool _isSearching = false;
   bool _isGettingCurrentLocation = false;
   String _previousSearchText = '';
+  String? _currentSearchQuery; // Pour suivre la requête en cours
 
   // Variable pour suivre l'adresse sélectionnée depuis Google
   Map<String, dynamic>? _selectedGoogleAddress;
@@ -63,6 +65,7 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
     _searchDebounceTimer?.cancel();
     _searchAddressController.dispose();
     _searchFocusNode.dispose();
+    _scrollController.dispose();
     _numeroController.dispose();
     _refAdresseController.dispose();
     super.dispose();
@@ -71,32 +74,60 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
   void _onSearchChanged() {
     final query = _searchAddressController.text.trim();
     
-    // Si le texte est vide, effacer les résultats
+    // Si le texte est vide, effacer les résultats immédiatement
     if (query.isEmpty) {
       _searchDebounceTimer?.cancel();
-      setState(() {
-        _searchResults.clear();
-        _isSearching = false;
-      });
+      _currentSearchQuery = null;
+      if (mounted) {
+        // Préserver la position du scroll
+        final scrollPosition = _scrollController.hasClients ? _scrollController.offset : 0.0;
+        setState(() {
+          _searchResults.clear();
+          _isSearching = false;
+        });
+        // Restaurer la position du scroll après le rebuild
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (_scrollController.hasClients && scrollPosition > 0) {
+            _scrollController.jumpTo(scrollPosition);
+          }
+        });
+      }
       _previousSearchText = '';
       return;
     }
     
-    // Recherche en temps réel dès qu'une lettre est tapée (style Yango)
-    // Debounce intelligent : plus court pour les requêtes courtes, plus long pour les longues
+    // Annuler la recherche précédente
     _searchDebounceTimer?.cancel();
+    _currentSearchQuery = null;
     
-    // Si la requête a changé, lancer la recherche
+    // Si la requête a changé et a au moins 1 caractère, lancer la recherche
     if (query != _previousSearchText && query.length >= 1) {
-      setState(() {
-        _isSearching = true;
+      // Ne pas bloquer l'UI - mettre à jour l'état de manière asynchrone
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _searchAddressController.text.trim() == query) {
+          // Préserver la position du scroll
+          final scrollPosition = _scrollController.hasClients ? _scrollController.offset : 0.0;
+          setState(() {
+            _isSearching = true;
+          });
+          // Restaurer la position du scroll après le rebuild
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (_scrollController.hasClients && scrollPosition > 0) {
+              _scrollController.jumpTo(scrollPosition);
+            }
+          });
+        }
       });
       
-      // Debounce adaptatif : 200ms pour les requêtes courtes, 400ms pour les longues
-      final debounceTime = query.length < 3 ? 200 : 400;
+      // Debounce très court et adaptatif (style Yango - ultra réactif)
+      // Plus court pour les premières lettres pour une réactivité maximale
+      final debounceTime = query.length < 2 ? 100 : (query.length < 4 ? 200 : 300);
       
       _searchDebounceTimer = Timer(Duration(milliseconds: debounceTime), () {
-        if (_searchAddressController.text.trim() == query && query.length >= 1) {
+        // Vérifier que la requête n'a pas changé pendant le debounce
+        final currentQuery = _searchAddressController.text.trim();
+        if (currentQuery == query && query.length >= 1 && mounted) {
+          _currentSearchQuery = query;
           _searchAddress(query);
         }
       });
@@ -106,37 +137,109 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
   }
 
   Future<void> _searchAddress(String query) async {
+    // Vérifier que le widget est toujours monté et que la requête n'a pas changé
+    if (!mounted) return;
+    
+    // Vérifier que c'est toujours la requête actuelle
+    if (_currentSearchQuery != query) {
+      // Une nouvelle recherche a été lancée, ignorer cette requête
+      return;
+    }
+    
     const apiKey = 'AIzaSyCpJzuEa7jLAcP8ub8AVM8flT2aK5cPdh0';
     final url =
-        'https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${Uri.encodeComponent(query)}&key=$apiKey&components=country:cd&language=fr';
+        'https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${Uri.encodeComponent(query)}&key=$apiKey&components=country:cd&language=fr&types=geocode|establishment';
 
     try {
-      final response = await http.get(Uri.parse(url));
+      final response = await http.get(Uri.parse(url)).timeout(
+        const Duration(seconds: 4),
+        onTimeout: () {
+          throw TimeoutException('La recherche a pris trop de temps');
+        },
+      );
+      
+      // Vérifier à nouveau que la requête n'a pas changé pendant la requête
+      if (!mounted || _currentSearchQuery != query) {
+        // La requête a changé pendant la requête, ignorer les résultats
+        return;
+      }
+      
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        if (data['status'] == 'OK') {
-          setState(() {
-            _searchResults = List<Map<String, dynamic>>.from(
-              data['predictions'].map((prediction) => {
-                'description': prediction['description'],
-                'place_id': prediction['place_id'],
-                'source_type': 'autocomplete',
-                'relevance_score': 1.0,
-              }),
-            );
-            _isSearching = false;
+        if (data['status'] == 'OK' && mounted && _currentSearchQuery == query) {
+          final predictions = data['predictions'] as List? ?? [];
+          // Mettre à jour de manière asynchrone pour ne pas bloquer
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted && _currentSearchQuery == query) {
+              // Préserver la position du scroll
+              final scrollPosition = _scrollController.hasClients ? _scrollController.offset : 0.0;
+              setState(() {
+                _searchResults = List<Map<String, dynamic>>.from(
+                  predictions.map((prediction) => {
+                    'description': prediction['description'],
+                    'place_id': prediction['place_id'],
+                    'source_type': 'autocomplete',
+                    'relevance_score': 1.0,
+                  }),
+                );
+                _isSearching = false;
+              });
+              // Restaurer la position du scroll après le rebuild
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (_scrollController.hasClients && scrollPosition > 0) {
+                  _scrollController.jumpTo(scrollPosition);
+                }
+              });
+            }
           });
-        } else {
-          setState(() {
-            _searchResults = [];
-            _isSearching = false;
+        } else if (mounted && _currentSearchQuery == query) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted && _currentSearchQuery == query) {
+              // Préserver la position du scroll
+              final scrollPosition = _scrollController.hasClients ? _scrollController.offset : 0.0;
+              setState(() {
+                _searchResults = [];
+                _isSearching = false;
+              });
+              // Restaurer la position du scroll après le rebuild
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (_scrollController.hasClients && scrollPosition > 0) {
+                  _scrollController.jumpTo(scrollPosition);
+                }
+              });
+            }
           });
         }
+      } else if (mounted && _currentSearchQuery == query) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && _currentSearchQuery == query) {
+            // Préserver la position du scroll
+            final scrollPosition = _scrollController.hasClients ? _scrollController.offset : 0.0;
+            setState(() {
+              _searchResults = [];
+              _isSearching = false;
+            });
+            // Restaurer la position du scroll après le rebuild
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (_scrollController.hasClients && scrollPosition > 0) {
+                _scrollController.jumpTo(scrollPosition);
+              }
+            });
+          }
+        });
       }
     } catch (e) {
-      setState(() {
-        _isSearching = false;
-      });
+      // Ignorer les erreurs silencieusement pour ne pas interrompre l'utilisateur
+      // Seulement mettre à jour l'état si c'est toujours la bonne requête
+      if (mounted && _currentSearchQuery == query) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && _currentSearchQuery == query) {
+            setState(() {
+              _isSearching = false;
+            });
+          }
+        });
+      }
     }
   }
 
@@ -634,174 +737,178 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
           ),
         ),
         // Recherche d'adresse Google
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: Colors.grey.shade200),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
+        StatefulBuilder(
+          builder: (context, setSearchState) {
+            return Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.grey.shade200),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(Icons.search, color: AppColors.primary),
-                  const SizedBox(width: 8),
-                  const Text(
-                    'Rechercher une adresse',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _searchAddressController,
-                focusNode: _searchFocusNode,
-                onSubmitted: (value) {
-                  // Si l'utilisateur appuie sur Entrée et qu'il y a du texte, rechercher
-                  if (value.trim().isNotEmpty) {
-                    setState(() {
-                      _isSearching = true;
-                    });
-                    _searchAddress(value.trim());
-                  }
-                },
-                decoration: InputDecoration(
-                  hintText: 'Tapez une adresse...',
-                  prefixIcon: const Icon(Icons.location_on),
-                  suffixIcon: _isSearching
-                      ? const Padding(
-                          padding: EdgeInsets.all(12.0),
-                          child: SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          ),
-                        )
-                      : _searchAddressController.text.isNotEmpty
-                          ? IconButton(
-                              icon: const Icon(Icons.clear),
-                              onPressed: () {
-                                _searchAddressController.clear();
-                                _previousSearchText = '';
-                                setState(() {
-                                  _searchResults.clear();
-                                });
-                              },
-                            )
-                          : null,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-              ),
-              if (_searchResults.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                Container(
-                  constraints: const BoxConstraints(maxHeight: 300),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.grey.shade200, width: 1),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                        spreadRadius: 0,
+                  Row(
+                    children: [
+                      Icon(Icons.search, color: AppColors.primary),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'Rechercher une adresse',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ],
                   ),
-                  child: ListView.separated(
-                    shrinkWrap: true,
-                    padding: const EdgeInsets.symmetric(vertical: 4),
-                    itemCount: _searchResults.length,
-                    separatorBuilder: (context, index) => Divider(
-                      height: 1,
-                      thickness: 1,
-                      color: Colors.grey.shade100,
-                      indent: 48,
-                    ),
-                    itemBuilder: (context, index) {
-                      final result = _searchResults[index];
-                      final description = result['description']?.toString() ?? '';
-                      // Séparer l'adresse principale et les détails
-                      final parts = description.split(', ');
-                      final mainAddress = parts.isNotEmpty ? parts[0] : description;
-                      final details = parts.length > 1 ? parts.sublist(1).join(', ') : '';
-                      
-                      return Material(
-                        color: Colors.transparent,
-                        child: InkWell(
-                          onTap: () => _selectAddress(result),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Container(
-                                  width: 36,
-                                  height: 36,
-                                  decoration: BoxDecoration(
-                                    color: AppColors.primary.withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Icon(
-                                    Icons.place,
-                                    color: AppColors.primary,
-                                    size: 18,
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        mainAddress,
-                                        style: const TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w600,
-                                          color: Colors.black87,
-                                        ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                      if (details.isNotEmpty) ...[
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          details,
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: Colors.grey.shade600,
-                                          ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ],
-                                    ],
-                                  ),
-                                ),
-                                Icon(
-                                  Icons.arrow_forward_ios,
-                                  size: 14,
-                                  color: Colors.grey.shade400,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      );
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _searchAddressController,
+                    focusNode: _searchFocusNode,
+                    onSubmitted: (value) {
+                      // Si l'utilisateur appuie sur Entrée et qu'il y a du texte, rechercher
+                      if (value.trim().isNotEmpty) {
+                        setSearchState(() {
+                          _isSearching = true;
+                        });
+                        _searchAddress(value.trim());
+                      }
                     },
+                    decoration: InputDecoration(
+                      hintText: 'Tapez une adresse...',
+                      prefixIcon: const Icon(Icons.location_on),
+                      suffixIcon: _isSearching
+                          ? const Padding(
+                              padding: EdgeInsets.all(12.0),
+                              child: SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              ),
+                            )
+                          : _searchAddressController.text.isNotEmpty
+                              ? IconButton(
+                                  icon: const Icon(Icons.clear),
+                                  onPressed: () {
+                                    _searchAddressController.clear();
+                                    _previousSearchText = '';
+                                    setSearchState(() {
+                                      _searchResults.clear();
+                                    });
+                                  },
+                                )
+                              : null,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
                   ),
-                ),
-              ],
-            ],
-          ),
+                  if (_searchResults.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      constraints: const BoxConstraints(maxHeight: 300),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.grey.shade200, width: 1),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                            spreadRadius: 0,
+                          ),
+                        ],
+                      ),
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        itemCount: _searchResults.length,
+                        separatorBuilder: (context, index) => Divider(
+                          height: 1,
+                          thickness: 1,
+                          color: Colors.grey.shade100,
+                          indent: 48,
+                        ),
+                        itemBuilder: (context, index) {
+                          final result = _searchResults[index];
+                          final description = result['description']?.toString() ?? '';
+                          // Séparer l'adresse principale et les détails
+                          final parts = description.split(', ');
+                          final mainAddress = parts.isNotEmpty ? parts[0] : description;
+                          final details = parts.length > 1 ? parts.sublist(1).join(', ') : '';
+                          
+                          return Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              onTap: () => _selectAddress(result),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Container(
+                                      width: 36,
+                                      height: 36,
+                                      decoration: BoxDecoration(
+                                        color: AppColors.primary.withOpacity(0.1),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Icon(
+                                        Icons.place,
+                                        color: AppColors.primary,
+                                        size: 18,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            mainAddress,
+                                            style: const TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w600,
+                                              color: Colors.black87,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          if (details.isNotEmpty) ...[
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              details,
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                color: Colors.grey.shade600,
+                                              ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ],
+                                        ],
+                                      ),
+                                    ),
+                                    Icon(
+                                      Icons.arrow_forward_ios,
+                                      size: 14,
+                                      color: Colors.grey.shade400,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            );
+          },
         ),
         const SizedBox(height: 12),
         // Bouton position actuelle
@@ -873,195 +980,199 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // Recherche d'adresse Google
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: Colors.grey.shade200),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
+        StatefulBuilder(
+          builder: (context, setSearchState) {
+            return Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.grey.shade200),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(Icons.search, color: AppColors.primary, size: 18),
-                  const SizedBox(width: 6),
-                  const Text(
-                    'Rechercher une adresse',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: _searchAddressController,
-                focusNode: _searchFocusNode,
-                autofocus: false,
-                decoration: InputDecoration(
-                  hintText: 'Rechercher une adresse...',
-                  hintStyle: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey.shade500,
-                  ),
-                  prefixIcon: Icon(
-                    Icons.search,
-                    color: AppColors.primary,
-                    size: 20,
-                  ),
-                  suffixIcon: _isSearching
-                      ? Padding(
-                          padding: const EdgeInsets.all(12.0),
-                          child: SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
-                            ),
-                          ),
-                        )
-                      : _searchAddressController.text.isNotEmpty
-                          ? IconButton(
-                              icon: Icon(
-                                Icons.clear,
-                                size: 18,
-                                color: Colors.grey.shade600,
-                              ),
-                              onPressed: () {
-                                _searchAddressController.clear();
-                                _previousSearchText = '';
-                                setState(() {
-                                  _searchResults.clear();
-                                  _isSearching = false;
-                                });
-                              },
-                            )
-                          : null,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: Colors.grey.shade300),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: Colors.grey.shade300),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: AppColors.primary, width: 1.5),
-                  ),
-                  filled: true,
-                  fillColor: Colors.grey.shade50,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                ),
-                style: const TextStyle(fontSize: 14),
-              ),
-              if (_searchResults.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                Container(
-                  constraints: const BoxConstraints(maxHeight: 300),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.grey.shade200, width: 1),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                        spreadRadius: 0,
+                  Row(
+                    children: [
+                      Icon(Icons.search, color: AppColors.primary, size: 18),
+                      const SizedBox(width: 6),
+                      const Text(
+                        'Rechercher une adresse',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ],
                   ),
-                  child: ListView.separated(
-                    shrinkWrap: true,
-                    padding: const EdgeInsets.symmetric(vertical: 4),
-                    itemCount: _searchResults.length,
-                    separatorBuilder: (context, index) => Divider(
-                      height: 1,
-                      thickness: 1,
-                      color: Colors.grey.shade100,
-                      indent: 48,
-                    ),
-                    itemBuilder: (context, index) {
-                      final result = _searchResults[index];
-                      final description = result['description']?.toString() ?? '';
-                      // Séparer l'adresse principale et les détails
-                      final parts = description.split(', ');
-                      final mainAddress = parts.isNotEmpty ? parts[0] : description;
-                      final details = parts.length > 1 ? parts.sublist(1).join(', ') : '';
-                      
-                      return Material(
-                        color: Colors.transparent,
-                        child: InkWell(
-                          onTap: () => _selectAddress(result),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Container(
-                                  width: 36,
-                                  height: 36,
-                                  decoration: BoxDecoration(
-                                    color: AppColors.primary.withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Icon(
-                                    Icons.place,
-                                    color: AppColors.primary,
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: _searchAddressController,
+                    focusNode: _searchFocusNode,
+                    autofocus: false,
+                    decoration: InputDecoration(
+                      hintText: 'Rechercher une adresse...',
+                      hintStyle: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey.shade500,
+                      ),
+                      prefixIcon: Icon(
+                        Icons.search,
+                        color: AppColors.primary,
+                        size: 20,
+                      ),
+                      suffixIcon: _isSearching
+                          ? Padding(
+                              padding: const EdgeInsets.all(12.0),
+                              child: SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                                ),
+                              ),
+                            )
+                          : _searchAddressController.text.isNotEmpty
+                              ? IconButton(
+                                  icon: Icon(
+                                    Icons.clear,
                                     size: 18,
+                                    color: Colors.grey.shade600,
                                   ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        mainAddress,
-                                        style: const TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w600,
-                                          color: Colors.black87,
-                                        ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                      if (details.isNotEmpty) ...[
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          details,
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: Colors.grey.shade600,
-                                          ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ],
-                                    ],
-                                  ),
-                                ),
-                                Icon(
-                                  Icons.arrow_forward_ios,
-                                  size: 14,
-                                  color: Colors.grey.shade400,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      );
-                    },
+                                  onPressed: () {
+                                    _searchAddressController.clear();
+                                    _previousSearchText = '';
+                                    setSearchState(() {
+                                      _searchResults.clear();
+                                      _isSearching = false;
+                                    });
+                                  },
+                                )
+                              : null,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.grey.shade300),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.grey.shade300),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: AppColors.primary, width: 1.5),
+                      ),
+                      filled: true,
+                      fillColor: Colors.grey.shade50,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    ),
+                    style: const TextStyle(fontSize: 14),
                   ),
-                ),
-              ],
-            ],
-          ),
+                  if (_searchResults.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      constraints: const BoxConstraints(maxHeight: 300),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.grey.shade200, width: 1),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                            spreadRadius: 0,
+                          ),
+                        ],
+                      ),
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        itemCount: _searchResults.length,
+                        separatorBuilder: (context, index) => Divider(
+                          height: 1,
+                          thickness: 1,
+                          color: Colors.grey.shade100,
+                          indent: 48,
+                        ),
+                        itemBuilder: (context, index) {
+                          final result = _searchResults[index];
+                          final description = result['description']?.toString() ?? '';
+                          // Séparer l'adresse principale et les détails
+                          final parts = description.split(', ');
+                          final mainAddress = parts.isNotEmpty ? parts[0] : description;
+                          final details = parts.length > 1 ? parts.sublist(1).join(', ') : '';
+                          
+                          return Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              onTap: () => _selectAddress(result),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Container(
+                                      width: 36,
+                                      height: 36,
+                                      decoration: BoxDecoration(
+                                        color: AppColors.primary.withOpacity(0.1),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Icon(
+                                        Icons.place,
+                                        color: AppColors.primary,
+                                        size: 18,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            mainAddress,
+                                            style: const TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w600,
+                                              color: Colors.black87,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          if (details.isNotEmpty) ...[
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              details,
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                color: Colors.grey.shade600,
+                                              ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ],
+                                        ],
+                                      ),
+                                    ),
+                                    Icon(
+                                      Icons.arrow_forward_ios,
+                                      size: 14,
+                                      color: Colors.grey.shade400,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            );
+          },
         ),
         const SizedBox(height: 12),
         // Bouton position actuelle
@@ -1703,6 +1814,7 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
         elevation: 0,
       ),
       body: SingleChildScrollView(
+            controller: _scrollController,
             padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
