@@ -1130,11 +1130,17 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> with Widget
       ),
     ).then((result) {
       // result contient {paymentMethod: {...}, numeroPayment: '...'} ou null
+      print('📥 [_showPaymentMethodSelection] Résultat reçu: $result');
       if (result != null && result is Map<String, dynamic>) {
+        print('📥 [_showPaymentMethodSelection] paymentMethod: ${result['paymentMethod']}');
+        print('📥 [_showPaymentMethodSelection] paymentMethod id: ${result['paymentMethod']?['id']}');
         setState(() {
           // Stocker dans le state temporaire (non validé)
           _pendingPaymentMethods[vendeurId] = result;
         });
+        print('✅ [_showPaymentMethodSelection] Stocké dans _pendingPaymentMethods[$vendeurId]');
+      } else {
+        print('⚠️ [_showPaymentMethodSelection] Résultat null ou invalide');
       }
     });
   }
