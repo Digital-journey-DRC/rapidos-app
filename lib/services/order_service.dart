@@ -141,9 +141,11 @@ class OrderService {
       }
 
       // Construire l'URL avec le paramètre de statut si fourni
+      // Ajouter un timestamp pour éviter le cache HTTP
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
       final uri = status != null
-          ? Uri.parse('$baseUrl/ecommerce/commandes/buyer/me?status=$status')
-          : Uri.parse('$baseUrl/ecommerce/commandes/buyer/me');
+          ? Uri.parse('$baseUrl/ecommerce/commandes/buyer/me?status=$status&_t=$timestamp')
+          : Uri.parse('$baseUrl/ecommerce/commandes/buyer/me?_t=$timestamp');
 
       print('🌐 [OrderService] Envoi de la requête GET...');
       print('   URL: $uri');
@@ -154,6 +156,8 @@ class OrderService {
           'Content-Type': 'application/json',
           'accept': 'application/json',
           'Authorization': 'Bearer $token',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
         },
       ).timeout(
         const Duration(seconds: 15),

@@ -286,7 +286,12 @@ class OrderCubit extends Cubit<OrderState> {
         }
       } else {
         // Pour vendeur, utiliser l'endpoint vendeur
+        print('🏪 [OrderCubit] Appel de getVendeurOrders...');
         final result = await _orderService.getVendeurOrders();
+        
+        print('📥 [OrderCubit] Résultat reçu pour vendeur');
+        print('   Success: ${result['success']}');
+        print('   Orders count: ${(result['orders'] ?? []).length}');
         
         if (result['success'] == true) {
           _orderListState = _orderListState.copyWith(
@@ -294,7 +299,9 @@ class OrderCubit extends Cubit<OrderState> {
             orders: result['orders'] ?? [],
             error: null,
           );
+          print('✅ [OrderCubit] Commandes vendeur chargées avec succès');
         } else {
+          print('❌ [OrderCubit] Erreur: ${result['message']}');
           _orderListState = _orderListState.copyWith(
             isLoading: false,
             error: result['message'] ?? 'Erreur lors de la récupération des commandes',

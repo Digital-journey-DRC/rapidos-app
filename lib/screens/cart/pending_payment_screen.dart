@@ -33,11 +33,14 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> with Widget
   Map<int, String?> _numeroPayments = {}; // {vendeurId: numeroPayment} pour stocker le numéro après validation
   Map<int, bool> _isConfirming = {}; // Pour suivre l'état de confirmation par vendeur
   Timer? _refreshTimer; // Timer pour rafraîchir périodiquement
+  bool _isFetchingOrders = false; // Pour éviter les requêtes concurrentes
+  bool _hasInitialLoad = false; // Pour éviter les appels multiples dans build()
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+<<<<<<< HEAD
     // Attendre que le widget soit monté avant d'utiliser le context
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
@@ -56,6 +59,19 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> with Widget
         } catch (e) {
           print('Erreur lors du rafraîchissement: $e');
         }
+=======
+    _loadPaymentMethods(context);
+    // Rafraîchir les commandes toutes les 30 secondes pour détecter les changements de statut
+    _refreshTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
+      if (mounted && !_isFetchingOrders) {
+        _isFetchingOrders = true;
+        context.read<OrderCubit>().fetchOrders().then((_) {
+          _loadPaymentMethods(context);
+          _isFetchingOrders = false;
+        }).catchError((e) {
+          _isFetchingOrders = false;
+        });
+>>>>>>> 3c8b881655fca786b4dd2f61ea09fda2e83adc7f
       }
     });
   }
@@ -69,6 +85,7 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> with Widget
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+<<<<<<< HEAD
     if (state == AppLifecycleState.resumed && mounted) {
       // Rafraîchir les commandes quand l'app revient au premier plan
       try {
@@ -80,6 +97,17 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> with Widget
       } catch (e) {
         print('Erreur lors du rafraîchissement au retour: $e');
       }
+=======
+    if (state == AppLifecycleState.resumed && !_isFetchingOrders) {
+      // Rafraîchir les commandes quand l'app revient au premier plan
+      _isFetchingOrders = true;
+      context.read<OrderCubit>().fetchOrders().then((_) {
+        _loadPaymentMethods(context);
+        _isFetchingOrders = false;
+      }).catchError((e) {
+        _isFetchingOrders = false;
+      });
+>>>>>>> 3c8b881655fca786b4dd2f61ea09fda2e83adc7f
     }
   }
 
@@ -940,6 +968,10 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> with Widget
 
   // Confirme la commande (exécute l'endpoint)
   Future<void> _confirmOrder(int vendeurId, List<Map<String, dynamic>> vendeurOrders) async {
+    print('🔘 [_confirmOrder] Appelé pour vendeurId: $vendeurId');
+    print('🔘 [_confirmOrder] _pendingPaymentMethods[$vendeurId]: ${_pendingPaymentMethods[vendeurId]}');
+    print('🔘 [_confirmOrder] _selectedPaymentMethods[$vendeurId]: ${_selectedPaymentMethods[vendeurId]}');
+    
     // Utiliser les données pending si disponibles, sinon selected
     Map<String, dynamic>? paymentMethod;
     String? numeroPayment;
@@ -947,12 +979,17 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> with Widget
     if (_pendingPaymentMethods[vendeurId] != null) {
       paymentMethod = _pendingPaymentMethods[vendeurId]!['paymentMethod'] as Map<String, dynamic>?;
       numeroPayment = _pendingPaymentMethods[vendeurId]!['numeroPayment']?.toString();
+      print('🔘 [_confirmOrder] Utilisation de pendingPaymentMethod: $paymentMethod');
     } else if (_selectedPaymentMethods[vendeurId] != null) {
       paymentMethod = _selectedPaymentMethods[vendeurId];
       numeroPayment = _numeroPayments[vendeurId];
+      print('🔘 [_confirmOrder] Utilisation de selectedPaymentMethod: $paymentMethod');
     }
     
+    print('🔘 [_confirmOrder] paymentMethod final: $paymentMethod');
+    
     if (paymentMethod == null) {
+      print('⚠️ [_confirmOrder] paymentMethod est NULL - abandon');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Veuillez sélectionner un moyen de paiement'),
@@ -1110,8 +1147,12 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> with Widget
   }
 
   void _showPaymentMethodSelection(int vendeurId, Map<String, dynamic> currentPaymentMethod, List<Map<String, dynamic>> vendeurOrders) {
+    print('🔍 [_showPaymentMethodSelection] Appelé pour vendeurId: $vendeurId');
+    print('🔍 [_showPaymentMethodSelection] _vendeurPaymentMethods keys: ${_vendeurPaymentMethods?.keys.toList()}');
     final paymentMethods = _vendeurPaymentMethods?[vendeurId];
+    print('🔍 [_showPaymentMethodSelection] paymentMethods pour $vendeurId: ${paymentMethods?.length ?? 0} méthodes');
     if (paymentMethods == null || paymentMethods.isEmpty) {
+      print('⚠️ [_showPaymentMethodSelection] Aucun moyen de paiement disponible pour vendeurId: $vendeurId');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Aucun moyen de paiement disponible'),
@@ -1169,11 +1210,21 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> with Widget
       ),
     ).then((result) {
       // result contient {paymentMethod: {...}, numeroPayment: '...'} ou null
+<<<<<<< HEAD
       if (result != null && result is Map<String, dynamic> && mounted) {
+=======
+      print('📥 [_showPaymentMethodSelection] Résultat reçu: $result');
+      if (result != null && result is Map<String, dynamic>) {
+        print('📥 [_showPaymentMethodSelection] paymentMethod: ${result['paymentMethod']}');
+        print('📥 [_showPaymentMethodSelection] paymentMethod id: ${result['paymentMethod']?['id']}');
+>>>>>>> 3c8b881655fca786b4dd2f61ea09fda2e83adc7f
         setState(() {
           // Stocker dans le state temporaire (non validé)
           _pendingPaymentMethods[vendeurId] = result;
         });
+        print('✅ [_showPaymentMethodSelection] Stocké dans _pendingPaymentMethods[$vendeurId]');
+      } else {
+        print('⚠️ [_showPaymentMethodSelection] Résultat null ou invalide');
       }
     });
   }
@@ -1181,6 +1232,7 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> with Widget
 
   @override
   Widget build(BuildContext context) {
+<<<<<<< HEAD
     // Charger les commandes au premier build
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -1199,6 +1251,28 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> with Widget
         print('Erreur lors du chargement initial: $e');
       }
     });
+=======
+    // Charger les commandes au premier build seulement
+    if (!_hasInitialLoad) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!_hasInitialLoad) {
+          _hasInitialLoad = true;
+          final orderListState = context.read<OrderCubit>().orderListState;
+          if (orderListState.orders.isEmpty && !orderListState.isLoading && !_isFetchingOrders) {
+            _isFetchingOrders = true;
+            context.read<OrderCubit>().fetchOrders().then((_) {
+              _loadPaymentMethods(context);
+              _isFetchingOrders = false;
+            }).catchError((e) {
+              _isFetchingOrders = false;
+            });
+          } else if (_vendeurPaymentMethods == null) {
+            _loadPaymentMethods(context);
+          }
+        }
+      });
+    }
+>>>>>>> 3c8b881655fca786b4dd2f61ea09fda2e83adc7f
 
     return BlocConsumer<OrderCubit, OrderState>(
       listener: (context, state) {
@@ -1206,12 +1280,16 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> with Widget
         if (state.success) {
           // Recharger les moyens de paiement après mise à jour
           _loadPaymentMethods(context);
+<<<<<<< HEAD
           // Rafraîchir les commandes pour avoir les dernières données
           try {
             context.read<OrderCubit>().fetchOrders();
           } catch (e) {
             print('Erreur lors du rafraîchissement: $e');
           }
+=======
+          // NE PAS appeler fetchOrders() ici car cela crée une boucle infinie
+>>>>>>> 3c8b881655fca786b4dd2f61ea09fda2e83adc7f
         } else if (state.error != null) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -1291,21 +1369,21 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> with Widget
                 tooltip: 'Retour à l\'accueil',
               ),
             ),
-            body: Center(
+            body: const Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(
                     Icons.payment_outlined,
                     size: 64,
-                    color: Colors.grey.shade400,
+                    color: Color(0xFFBDBDBD),
                   ),
-                  const SizedBox(height: 16),
+                  SizedBox(height: 16),
                   Text(
                     'Aucune commande',
                     style: TextStyle(
                       fontSize: 16,
-                      color: Colors.grey.shade600,
+                      color: Color(0xFF757575),
                     ),
                   ),
                 ],
@@ -1352,32 +1430,31 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> with Widget
                     _loadPaymentMethods(context);
                   },
                   child: groupedOrders.isEmpty
-                      ? ListView(
-                          children: [
-                            SizedBox(
-                              height: MediaQuery.of(context).size.height * 0.5,
-                              child: Center(
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      Icons.payment_outlined,
-                                      size: 48,
-                                      color: Colors.grey.shade400,
+                      ? SingleChildScrollView(
+                          physics: const NeverScrollableScrollPhysics(),
+                          child: const SizedBox(
+                            height: 400,
+                            child: Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.payment_outlined,
+                                    size: 48,
+                                    color: Color(0xFFBDBDBD),
+                                  ),
+                                  SizedBox(height: 12),
+                                  Text(
+                                    'Aucune commande',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: Color(0xFF757575),
                                     ),
-                                    const SizedBox(height: 12),
-                                    Text(
-                                      'Aucune commande',
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        color: Colors.grey.shade600,
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                                  ),
+                                ],
                               ),
                             ),
-                          ],
+                          ),
                         )
                       : SingleChildScrollView(
                           physics: const AlwaysScrollableScrollPhysics(),
@@ -1670,7 +1747,10 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> with Widget
                                                       // Afficher le bouton "ajouter moyen de paiement" si pas de moyen de paiement modifié (pending ou validé)
                                                       if (_selectedPaymentMethods[vendeurId] == null && _pendingPaymentMethods[vendeurId] == null)
                                                         ElevatedButton.icon(
-                                                          onPressed: () => _showPaymentMethodSelection(vendeurId, selectedPaymentMethod ?? {}, vendeurOrders),
+                                                          onPressed: () {
+                                                            print('🔘 [Button] Ajouter moyen de paiement cliqué pour vendeur $vendeurId');
+                                                            _showPaymentMethodSelection(vendeurId, selectedPaymentMethod ?? {}, vendeurOrders);
+                                                          },
                                                           icon: const Icon(Icons.add, size: 14),
                                                           label: const Text(
                                                             'Ajouter moyen de paiement',
@@ -1679,9 +1759,8 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> with Widget
                                                           style: ElevatedButton.styleFrom(
                                                             backgroundColor: AppColors.primary,
                                                             foregroundColor: Colors.white,
-                                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                                                            minimumSize: Size.zero,
-                                                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                                            minimumSize: const Size(44, 36),
                                                           ),
                                                         )
                                                       else
