@@ -40,26 +40,6 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> with Widget
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-<<<<<<< HEAD
-    // Attendre que le widget soit monté avant d'utiliser le context
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        _loadPaymentMethods(context);
-      }
-    });
-    // Rafraîchir les commandes toutes les 10 secondes pour détecter les changements de statut
-    _refreshTimer = Timer.periodic(const Duration(seconds: 10), (timer) {
-      if (mounted) {
-        try {
-          context.read<OrderCubit>().fetchOrders().then((_) {
-            if (mounted) {
-              _loadPaymentMethods(context);
-            }
-          });
-        } catch (e) {
-          print('Erreur lors du rafraîchissement: $e');
-        }
-=======
     _loadPaymentMethods(context);
     // Rafraîchir les commandes toutes les 30 secondes pour détecter les changements de statut
     _refreshTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
@@ -71,7 +51,6 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> with Widget
         }).catchError((e) {
           _isFetchingOrders = false;
         });
->>>>>>> 3c8b881655fca786b4dd2f61ea09fda2e83adc7f
       }
     });
   }
@@ -85,19 +64,6 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> with Widget
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-<<<<<<< HEAD
-    if (state == AppLifecycleState.resumed && mounted) {
-      // Rafraîchir les commandes quand l'app revient au premier plan
-      try {
-        context.read<OrderCubit>().fetchOrders().then((_) {
-          if (mounted) {
-            _loadPaymentMethods(context);
-          }
-        });
-      } catch (e) {
-        print('Erreur lors du rafraîchissement au retour: $e');
-      }
-=======
     if (state == AppLifecycleState.resumed && !_isFetchingOrders) {
       // Rafraîchir les commandes quand l'app revient au premier plan
       _isFetchingOrders = true;
@@ -107,7 +73,6 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> with Widget
       }).catchError((e) {
         _isFetchingOrders = false;
       });
->>>>>>> 3c8b881655fca786b4dd2f61ea09fda2e83adc7f
     }
   }
 
@@ -1210,14 +1175,10 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> with Widget
       ),
     ).then((result) {
       // result contient {paymentMethod: {...}, numeroPayment: '...'} ou null
-<<<<<<< HEAD
-      if (result != null && result is Map<String, dynamic> && mounted) {
-=======
       print('📥 [_showPaymentMethodSelection] Résultat reçu: $result');
       if (result != null && result is Map<String, dynamic>) {
         print('📥 [_showPaymentMethodSelection] paymentMethod: ${result['paymentMethod']}');
         print('📥 [_showPaymentMethodSelection] paymentMethod id: ${result['paymentMethod']?['id']}');
->>>>>>> 3c8b881655fca786b4dd2f61ea09fda2e83adc7f
         setState(() {
           // Stocker dans le state temporaire (non validé)
           _pendingPaymentMethods[vendeurId] = result;
@@ -1232,26 +1193,6 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> with Widget
 
   @override
   Widget build(BuildContext context) {
-<<<<<<< HEAD
-    // Charger les commandes au premier build
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      try {
-        final orderListState = context.read<OrderCubit>().orderListState;
-        if (orderListState.orders.isEmpty && !orderListState.isLoading) {
-          context.read<OrderCubit>().fetchOrders().then((_) {
-            if (mounted) {
-              _loadPaymentMethods(context);
-            }
-          });
-        } else if (_vendeurPaymentMethods == null) {
-          _loadPaymentMethods(context);
-        }
-      } catch (e) {
-        print('Erreur lors du chargement initial: $e');
-      }
-    });
-=======
     // Charger les commandes au premier build seulement
     if (!_hasInitialLoad) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -1272,7 +1213,6 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> with Widget
         }
       });
     }
->>>>>>> 3c8b881655fca786b4dd2f61ea09fda2e83adc7f
 
     return BlocConsumer<OrderCubit, OrderState>(
       listener: (context, state) {
@@ -1280,16 +1220,7 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> with Widget
         if (state.success) {
           // Recharger les moyens de paiement après mise à jour
           _loadPaymentMethods(context);
-<<<<<<< HEAD
-          // Rafraîchir les commandes pour avoir les dernières données
-          try {
-            context.read<OrderCubit>().fetchOrders();
-          } catch (e) {
-            print('Erreur lors du rafraîchissement: $e');
-          }
-=======
           // NE PAS appeler fetchOrders() ici car cela crée une boucle infinie
->>>>>>> 3c8b881655fca786b4dd2f61ea09fda2e83adc7f
         } else if (state.error != null) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
