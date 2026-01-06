@@ -34,6 +34,7 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> with Widget
   Map<int, bool> _isConfirming = {}; // Pour suivre l'état de confirmation par vendeur
   Timer? _refreshTimer; // Timer pour rafraîchir périodiquement
   bool _isFetchingOrders = false; // Pour éviter les requêtes concurrentes
+  bool _hasInitialLoad = false; // Pour éviter les appels multiples dans build()
 
   @override
   void initState() {
@@ -1148,17 +1149,26 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> with Widget
 
   @override
   Widget build(BuildContext context) {
-    // Charger les commandes au premier build
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final orderListState = context.read<OrderCubit>().orderListState;
-      if (orderListState.orders.isEmpty && !orderListState.isLoading) {
-        context.read<OrderCubit>().fetchOrders().then((_) {
-          _loadPaymentMethods(context);
-        });
-      } else if (_vendeurPaymentMethods == null) {
-        _loadPaymentMethods(context);
-      }
-    });
+    // Charger les commandes au premier build seulement
+    if (!_hasInitialLoad) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!_hasInitialLoad) {
+          _hasInitialLoad = true;
+          final orderListState = context.read<OrderCubit>().orderListState;
+          if (orderListState.orders.isEmpty && !orderListState.isLoading && !_isFetchingOrders) {
+            _isFetchingOrders = true;
+            context.read<OrderCubit>().fetchOrders().then((_) {
+              _loadPaymentMethods(context);
+              _isFetchingOrders = false;
+            }).catchError((e) {
+              _isFetchingOrders = false;
+            });
+          } else if (_vendeurPaymentMethods == null) {
+            _loadPaymentMethods(context);
+          }
+        }
+      });
+    }
 
     return BlocConsumer<OrderCubit, OrderState>(
       listener: (context, state) {
@@ -1245,21 +1255,21 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> with Widget
                 tooltip: 'Retour à l\'accueil',
               ),
             ),
-            body: Center(
+            body: const Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(
                     Icons.payment_outlined,
                     size: 64,
-                    color: Colors.grey.shade400,
+                    color: Color(0xFFBDBDBD),
                   ),
-                  const SizedBox(height: 16),
+                  SizedBox(height: 16),
                   Text(
                     'Aucune commande',
                     style: TextStyle(
                       fontSize: 16,
-                      color: Colors.grey.shade600,
+                      color: Color(0xFF757575),
                     ),
                   ),
                 ],
@@ -1306,32 +1316,31 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> with Widget
                     _loadPaymentMethods(context);
                   },
                   child: groupedOrders.isEmpty
-                      ? ListView(
-                          children: [
-                            SizedBox(
-                              height: MediaQuery.of(context).size.height * 0.5,
-                              child: Center(
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      Icons.payment_outlined,
-                                      size: 48,
-                                      color: Colors.grey.shade400,
+                      ? SingleChildScrollView(
+                          physics: const NeverScrollableScrollPhysics(),
+                          child: const SizedBox(
+                            height: 400,
+                            child: Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.payment_outlined,
+                                    size: 48,
+                                    color: Color(0xFFBDBDBD),
+                                  ),
+                                  SizedBox(height: 12),
+                                  Text(
+                                    'Aucune commande',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: Color(0xFF757575),
                                     ),
-                                    const SizedBox(height: 12),
-                                    Text(
-                                      'Aucune commande',
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        color: Colors.grey.shade600,
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                                  ),
+                                ],
                               ),
                             ),
-                          ],
+                          ),
                         )
                       : SingleChildScrollView(
                           physics: const AlwaysScrollableScrollPhysics(),
