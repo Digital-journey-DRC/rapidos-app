@@ -1389,7 +1389,7 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> with Widget
                         )
                       : SingleChildScrollView(
                           physics: const AlwaysScrollableScrollPhysics(),
-                          padding: const EdgeInsets.all(12),
+                          padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -2058,6 +2058,8 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> with Widget
                         ],
                       ),
                     ),
+                    // Espace supplémentaire en bas pour éviter que le contenu soit coupé
+                    const SizedBox(height: 16),
                   ],
                 ),
               ),

@@ -320,7 +320,7 @@ class _PaymentMethodSelectionScreenState extends State<PaymentMethodSelectionScr
             children: [
               Expanded(
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -480,6 +480,8 @@ class _PaymentMethodSelectionScreenState extends State<PaymentMethodSelectionScr
                           ),
                         ),
                       ],
+                      // Espace supplémentaire en bas pour éviter que le contenu soit coupé
+                      const SizedBox(height: 16),
                     ],
                   ),
                 ),
