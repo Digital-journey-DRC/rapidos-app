@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:immo/constants.dart';
 import 'package:immo/cubit/order_cubit.dart';
 import 'package:immo/widgets/ecommerce_loading.dart';
 import 'package:immo/services/payment_method_service.dart';
 import 'package:immo/services/order_service.dart';
 import 'payment_method_selection_screen.dart';
+import 'order_review_screen.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -22,7 +22,7 @@ class PendingPaymentScreen extends StatefulWidget {
   State<PendingPaymentScreen> createState() => _PendingPaymentScreenState();
 }
 
-class _PendingPaymentScreenState extends State<PendingPaymentScreen> with WidgetsBindingObserver {
+class _PendingPaymentScreenState extends State<PendingPaymentScreen> {
   final PaymentMethodService _paymentMethodService = PaymentMethodService();
   final OrderService _orderService = OrderService();
   Map<int, List<Map<String, dynamic>>>? _vendeurPaymentMethods;
@@ -34,46 +34,18 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> with Widget
   Map<int, bool> _isConfirming = {}; // Pour suivre l'état de confirmation par vendeur
   Timer? _refreshTimer; // Timer pour rafraîchir périodiquement
   bool _isFetchingOrders = false; // Pour éviter les requêtes concurrentes
-  bool _hasInitialLoad = false; // Pour éviter les appels multiples dans build()
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
+    // Charger les moyens de paiement une seule fois, sans actualisation automatique
     _loadPaymentMethods(context);
-    // Rafraîchir les commandes toutes les 30 secondes pour détecter les changements de statut
-    _refreshTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
-      if (mounted && !_isFetchingOrders) {
-        _isFetchingOrders = true;
-        context.read<OrderCubit>().fetchOrders().then((_) {
-          _loadPaymentMethods(context);
-          _isFetchingOrders = false;
-        }).catchError((e) {
-          _isFetchingOrders = false;
-        });
-      }
-    });
   }
 
   @override
   void dispose() {
     _refreshTimer?.cancel();
-    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed && !_isFetchingOrders) {
-      // Rafraîchir les commandes quand l'app revient au premier plan
-      _isFetchingOrders = true;
-      context.read<OrderCubit>().fetchOrders().then((_) {
-        _loadPaymentMethods(context);
-        _isFetchingOrders = false;
-      }).catchError((e) {
-        _isFetchingOrders = false;
-      });
-    }
   }
 
   Future<void> _loadPaymentMethods(BuildContext context) async {
@@ -1111,6 +1083,140 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> with Widget
     }
   }
 
+  Future<void> _showHomeWarningDialog() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                Icons.warning_amber_rounded,
+                color: AppColors.primary,
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                'Attention',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Si vous retournez vers l\'accueil, votre commande ne sera pas finalisée.',
+              style: TextStyle(
+                fontSize: 15,
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: AppColors.primary.withOpacity(0.3),
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.info_outline,
+                    size: 18,
+                    color: AppColors.primary,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Vous devrez revenir ici pour compléter votre commande.',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: AppColors.primary.withOpacity(0.9),
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Êtes-vous sûr de vouloir retourner à l\'accueil ?',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Text(
+              'Rester ici',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Text(
+              'Retourner à l\'accueil',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      Navigator.of(context).pushNamedAndRemoveUntil(
+        '/',
+        (route) => false,
+      );
+    }
+  }
+
   void _showPaymentMethodSelection(int vendeurId, Map<String, dynamic> currentPaymentMethod, List<Map<String, dynamic>> vendeurOrders) {
     print('🔍 [_showPaymentMethodSelection] Appelé pour vendeurId: $vendeurId');
     print('🔍 [_showPaymentMethodSelection] _vendeurPaymentMethods keys: ${_vendeurPaymentMethods?.keys.toList()}');
@@ -1179,11 +1285,23 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> with Widget
       if (result != null && result is Map<String, dynamic>) {
         print('📥 [_showPaymentMethodSelection] paymentMethod: ${result['paymentMethod']}');
         print('📥 [_showPaymentMethodSelection] paymentMethod id: ${result['paymentMethod']?['id']}');
-        setState(() {
-          // Stocker dans le state temporaire (non validé)
-          _pendingPaymentMethods[vendeurId] = result;
-        });
-        print('✅ [_showPaymentMethodSelection] Stocké dans _pendingPaymentMethods[$vendeurId]');
+        
+        // Rediriger vers l'écran de récapitulatif au lieu de stocker dans le state
+        final firstOrder = vendeurOrders.first;
+        final vendeur = firstOrder['vendeur'] as Map<String, dynamic>? ?? {};
+        
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => OrderReviewScreen(
+              vendeurId: vendeurId,
+              vendeurOrders: vendeurOrders,
+              paymentMethod: result['paymentMethod'] as Map<String, dynamic>,
+              numeroPayment: result['numeroPayment']?.toString(),
+              vendeur: vendeur,
+            ),
+          ),
+        );
       } else {
         print('⚠️ [_showPaymentMethodSelection] Résultat null ou invalide');
       }
@@ -1193,35 +1311,36 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> with Widget
 
   @override
   Widget build(BuildContext context) {
-    // Charger les commandes au premier build seulement
-    if (!_hasInitialLoad) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!_hasInitialLoad) {
-          _hasInitialLoad = true;
-          final orderListState = context.read<OrderCubit>().orderListState;
-          if (orderListState.orders.isEmpty && !orderListState.isLoading && !_isFetchingOrders) {
-            _isFetchingOrders = true;
-            context.read<OrderCubit>().fetchOrders().then((_) {
-              _loadPaymentMethods(context);
-              _isFetchingOrders = false;
-            }).catchError((e) {
-              _isFetchingOrders = false;
-            });
-          } else if (_vendeurPaymentMethods == null) {
+    // Charger les commandes au premier build seulement (sans actualisation automatique)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _isFetchingOrders) return;
+      
+      final orderListState = context.read<OrderCubit>().orderListState;
+      
+      // Si les commandes sont vides et qu'on n'est pas en train de charger, charger une fois
+      if (orderListState.orders.isEmpty && !orderListState.isLoading) {
+        _isFetchingOrders = true;
+        context.read<OrderCubit>().fetchOrders().then((_) {
+          if (mounted) {
             _loadPaymentMethods(context);
+            _isFetchingOrders = false;
           }
-        }
-      });
-    }
+        }).catchError((e) {
+          if (mounted) {
+            _isFetchingOrders = false;
+          }
+        });
+      } else if (_vendeurPaymentMethods == null && orderListState.orders.isNotEmpty) {
+        // Charger les moyens de paiement si les commandes existent déjà
+        _loadPaymentMethods(context);
+      }
+    });
 
     return BlocConsumer<OrderCubit, OrderState>(
       listener: (context, state) {
         if (!mounted) return;
-        if (state.success) {
-          // Recharger les moyens de paiement après mise à jour
-          _loadPaymentMethods(context);
-          // NE PAS appeler fetchOrders() ici car cela crée une boucle infinie
-        } else if (state.error != null) {
+        // Retirer les actualisations automatiques pour éviter que la liste disparaisse
+        if (state.error != null) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(state.error!),
@@ -1250,17 +1369,23 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> with Widget
         // Ne plus initialiser automatiquement les moyens de paiement
         // Seuls les moyens de paiement modifiés par l'utilisateur seront affichés
         
-        // Grouper les commandes par vendeur
-        final groupedOrders = _groupOrdersByVendeur(displayOrders);
-        final globalTotals = _calculateGlobalTotals(displayOrders);
+        // Récupérer les stats pour détecter si toutes les commandes sont finalisées
+        // On vérifie les stats AVANT le loader pour éviter le clignotement
+        final stats = orderListState.stats;
+        final pendingPaymentCount = (stats['pending_payment'] ?? 0) as int;
+        final pendingCount = (stats['pending'] ?? 0) as int;
+        final totalPending = pendingPaymentCount + pendingCount;
 
-        if (orderListState.isLoading) {
+        // Si la liste est vide ET qu'il n'y a plus de commandes en attente dans les stats,
+        // cela signifie que toutes les commandes sont finalisées
+        // On vérifie cela même pendant le chargement pour éviter le clignotement
+        if (orders.isEmpty && totalPending == 0 && stats.isNotEmpty) {
           return Scaffold(
             appBar: AppBar(
-            title: const Text(
-              'Mes commandes',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
+              title: const Text(
+                'Mes commandes',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
               backgroundColor: AppColors.primary,
               foregroundColor: Colors.white,
               leading: IconButton(
@@ -1274,8 +1399,197 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> with Widget
                 tooltip: 'Retour à l\'accueil',
               ),
             ),
+            body: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      width: 100,
+                      height: 100,
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withOpacity(0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.check_circle_outline,
+                        size: 60,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    const Text(
+                      'Toutes vos commandes sont effectuées',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Vous avez finalisé toutes vos commandes en attente.',
+                      style: TextStyle(
+                        fontSize: 15,
+                        color: Colors.grey.shade700,
+                        height: 1.5,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 32),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          Navigator.of(context).pushNamedAndRemoveUntil(
+                            '/',
+                            (route) => false,
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text(
+                          'Retourner à l\'accueil',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }
+
+        // Filtrer les commandes en attente de paiement ou en attente
+        final pendingOrders = displayOrders.where((order) {
+          final status = order['status']?.toString().toLowerCase() ?? '';
+          return status == 'pending_payment' || status == 'pending';
+        }).toList();
+
+        // Afficher le loader si on est en train de charger (seulement si on n'a pas déjà affiché le message)
+        if (orderListState.isLoading) {
+          return Scaffold(
+            appBar: AppBar(
+            title: const Text(
+              'Mes commandes',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              leading: IconButton(
+                icon: const Icon(Icons.home),
+                onPressed: _showHomeWarningDialog,
+                tooltip: 'Retour à l\'accueil',
+              ),
+            ),
             body: const Center(
               child: EcommerceLoading.overlay(),
+            ),
+          );
+        }
+
+        // Si on a des commandes mais aucune en attente, afficher le message de finalisation
+        if (orders.isNotEmpty && pendingOrders.isEmpty) {
+          return Scaffold(
+            appBar: AppBar(
+              title: const Text(
+                'Mes commandes',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              leading: IconButton(
+                icon: const Icon(Icons.home),
+                onPressed: () {
+                  Navigator.of(context).pushNamedAndRemoveUntil(
+                    '/',
+                    (route) => false,
+                  );
+                },
+                tooltip: 'Retour à l\'accueil',
+              ),
+            ),
+            body: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      width: 100,
+                      height: 100,
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withOpacity(0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.check_circle_outline,
+                        size: 60,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    const Text(
+                      'Toutes vos commandes sont effectuées',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Vous avez finalisé toutes vos commandes en attente.',
+                      style: TextStyle(
+                        fontSize: 15,
+                        color: Colors.grey.shade700,
+                        height: 1.5,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 32),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          Navigator.of(context).pushNamedAndRemoveUntil(
+                            '/',
+                            (route) => false,
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text(
+                          'Retourner à l\'accueil',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           );
         }
@@ -1291,12 +1605,7 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> with Widget
               foregroundColor: Colors.white,
               leading: IconButton(
                 icon: const Icon(Icons.home),
-                onPressed: () {
-                  Navigator.of(context).pushNamedAndRemoveUntil(
-                    '/',
-                    (route) => false,
-                  );
-                },
+                onPressed: _showHomeWarningDialog,
                 tooltip: 'Retour à l\'accueil',
               ),
             ),
@@ -1323,6 +1632,10 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> with Widget
           );
         }
 
+        // Grouper les commandes par vendeur (seulement les commandes en attente)
+        final groupedOrders = _groupOrdersByVendeur(pendingOrders);
+        final globalTotals = _calculateGlobalTotals(pendingOrders);
+
         return Scaffold(
           appBar: AppBar(
             title: const Text(
@@ -1334,12 +1647,7 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> with Widget
             elevation: 0,
             leading: IconButton(
               icon: const Icon(Icons.home),
-              onPressed: () {
-                Navigator.of(context).pushNamedAndRemoveUntil(
-                  '/',
-                  (route) => false,
-                );
-              },
+              onPressed: _showHomeWarningDialog,
               tooltip: 'Retour à l\'accueil',
             ),
             actions: [
@@ -1355,12 +1663,7 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> with Widget
           body: Column(
             children: [
               Expanded(
-                child: RefreshIndicator(
-                  onRefresh: () async {
-                    await context.read<OrderCubit>().fetchOrders();
-                    _loadPaymentMethods(context);
-                  },
-                  child: groupedOrders.isEmpty
+                child: groupedOrders.isEmpty
                       ? SingleChildScrollView(
                           physics: const NeverScrollableScrollPhysics(),
                           child: const SizedBox(
@@ -1393,6 +1696,101 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> with Widget
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
+                              // Message informatif compact et attrayant
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                margin: const EdgeInsets.only(bottom: 16),
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                    colors: [
+                                      AppColors.primary.withOpacity(0.1),
+                                      AppColors.primary.withOpacity(0.05),
+                                    ],
+                                  ),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: AppColors.primary.withOpacity(0.25),
+                                    width: 1.5,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: AppColors.primary.withOpacity(0.08),
+                                      blurRadius: 6,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(
+                                        gradient: LinearGradient(
+                                          colors: [
+                                            AppColors.primary,
+                                            AppColors.primary.withOpacity(0.85),
+                                          ],
+                                        ),
+                                        borderRadius: BorderRadius.circular(10),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: AppColors.primary.withOpacity(0.25),
+                                            blurRadius: 4,
+                                            offset: const Offset(0, 2),
+                                          ),
+                                        ],
+                                      ),
+                                      child: const Icon(
+                                        Icons.shopping_bag_outlined,
+                                        color: Colors.white,
+                                        size: 20,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            'Tu es en train de commander chez ${groupedOrders.length} vendeur${groupedOrders.length > 1 ? 's' : ''}',
+                                            style: const TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.bold,
+                                              color: AppColors.primary,
+                                              height: 1.2,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Row(
+                                            children: [
+                                              Icon(
+                                                Icons.local_shipping_outlined,
+                                                size: 14,
+                                                color: Colors.grey.shade600,
+                                              ),
+                                              const SizedBox(width: 4),
+                                              Expanded(
+                                                child: Text(
+                                                  'Frais de livraison calculé pour chaque vendeur selon la distance',
+                                                  style: TextStyle(
+                                                    fontSize: 11,
+                                                    color: Colors.grey.shade700,
+                                                    height: 1.3,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+
                               // Afficher chaque marchand dans son container
                               ...groupedOrders.entries.map((entry) {
                                 final vendeurId = entry.key;
@@ -1651,174 +2049,6 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> with Widget
 
                                             const SizedBox(height: 12),
 
-
-                                            // Moyen de paiement pour ce vendeur
-                                            Container(
-                                              padding: const EdgeInsets.all(10),
-                                              decoration: BoxDecoration(
-                                                color: Colors.grey.shade50,
-                                                borderRadius: BorderRadius.circular(8),
-                                                border: Border.all(color: Colors.grey.shade200),
-                                              ),
-                                              child: Column(
-                                                crossAxisAlignment: CrossAxisAlignment.start,
-                                                children: [
-                                                  Row(
-                                                    children: [
-                                                      const Icon(Icons.payment, size: 16, color: AppColors.primary),
-                                                      const SizedBox(width: 6),
-                                                      const Text(
-                                                        'Moyen de paiement',
-                                                        style: TextStyle(
-                                                          fontSize: 12,
-                                                          fontWeight: FontWeight.bold,
-                                                        ),
-                                                      ),
-                                                      const Spacer(),
-                                                      // Afficher le bouton "ajouter moyen de paiement" si pas de moyen de paiement modifié (pending ou validé)
-                                                      if (_selectedPaymentMethods[vendeurId] == null && _pendingPaymentMethods[vendeurId] == null)
-                                                        ElevatedButton.icon(
-                                                          onPressed: () {
-                                                            print('🔘 [Button] Ajouter moyen de paiement cliqué pour vendeur $vendeurId');
-                                                            _showPaymentMethodSelection(vendeurId, selectedPaymentMethod ?? {}, vendeurOrders);
-                                                          },
-                                                          icon: const Icon(Icons.add, size: 14),
-                                                          label: const Text(
-                                                            'Ajouter moyen de paiement',
-                                                            style: TextStyle(fontSize: 11),
-                                                          ),
-                                                          style: ElevatedButton.styleFrom(
-                                                            backgroundColor: AppColors.primary,
-                                                            foregroundColor: Colors.white,
-                                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                                                            minimumSize: const Size(44, 36),
-                                                          ),
-                                                        )
-                                                      else
-                                                        IconButton(
-                                                          icon: const Icon(Icons.edit, size: 16),
-                                                          onPressed: () => _showPaymentMethodSelection(vendeurId, _selectedPaymentMethods[vendeurId] ?? _pendingPaymentMethods[vendeurId]?['paymentMethod'] ?? selectedPaymentMethod ?? {}, vendeurOrders),
-                                                          color: AppColors.primary,
-                                                          padding: EdgeInsets.zero,
-                                                          constraints: const BoxConstraints(),
-                                                        ),
-                                                    ],
-                                                  ),
-                                                  // Afficher le moyen de paiement validé ou en attente
-                                                  if (_selectedPaymentMethods[vendeurId] != null) ...[
-                                                    const SizedBox(height: 8),
-                                                    Row(
-                                                      children: [
-                                                        if (_selectedPaymentMethods[vendeurId]!['imageUrl'] != null)
-                                                          ClipRRect(
-                                                            borderRadius: BorderRadius.circular(6),
-                                                            child: CachedNetworkImage(
-                                                              imageUrl: _selectedPaymentMethods[vendeurId]!['imageUrl'],
-                                                              width: 32,
-                                                              height: 32,
-                                                              fit: BoxFit.cover,
-                                                            ),
-                                                          )
-                                                        else
-                                                          Container(
-                                                            width: 32,
-                                                            height: 32,
-                                                            decoration: BoxDecoration(
-                                                              color: Colors.grey.shade200,
-                                                              borderRadius: BorderRadius.circular(6),
-                                                            ),
-                                                            child: const Icon(Icons.payment, size: 16),
-                                                          ),
-                                                        const SizedBox(width: 8),
-                                                        Expanded(
-                                                          child: Column(
-                                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                                            children: [
-                                                              Text(
-                                                                _selectedPaymentMethods[vendeurId]!['name'] ?? 'Cash',
-                                                                style: const TextStyle(
-                                                                  fontSize: 12,
-                                                                  fontWeight: FontWeight.w600,
-                                                                ),
-                                                              ),
-                                                              if (_selectedPaymentMethods[vendeurId]!['numeroCompte'] != null)
-                                                                Text(
-                                                                  _selectedPaymentMethods[vendeurId]!['numeroCompte'],
-                                                                  style: TextStyle(
-                                                                    fontSize: 10,
-                                                                    color: Colors.grey.shade600,
-                                                                  ),
-                                                                ),
-                                                              if (_numeroPayments[vendeurId] != null)
-                                                                Text(
-                                                                  'Numéro: ${_numeroPayments[vendeurId]}',
-                                                                  style: TextStyle(
-                                                                    fontSize: 10,
-                                                                    color: Colors.grey.shade600,
-                                                                  ),
-                                                                ),
-                                                            ],
-                                                          ),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                  ] else if (_pendingPaymentMethods[vendeurId] != null) ...[
-                                                    // Afficher le moyen de paiement en attente
-                                                    const SizedBox(height: 8),
-                                                    Row(
-                                                      children: [
-                                                        if (_pendingPaymentMethods[vendeurId]!['paymentMethod']?['imageUrl'] != null)
-                                                          ClipRRect(
-                                                            borderRadius: BorderRadius.circular(6),
-                                                            child: CachedNetworkImage(
-                                                              imageUrl: _pendingPaymentMethods[vendeurId]!['paymentMethod']!['imageUrl'],
-                                                              width: 32,
-                                                              height: 32,
-                                                              fit: BoxFit.cover,
-                                                            ),
-                                                          )
-                                                        else
-                                                          Container(
-                                                            width: 32,
-                                                            height: 32,
-                                                            decoration: BoxDecoration(
-                                                              color: Colors.grey.shade200,
-                                                              borderRadius: BorderRadius.circular(6),
-                                                            ),
-                                                            child: const Icon(Icons.payment, size: 16),
-                                                          ),
-                                                        const SizedBox(width: 8),
-                                                        Expanded(
-                                                          child: Column(
-                                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                                            children: [
-                                                              Text(
-                                                                _pendingPaymentMethods[vendeurId]!['paymentMethod']?['name'] ?? 'Cash',
-                                                                style: const TextStyle(
-                                                                  fontSize: 12,
-                                                                  fontWeight: FontWeight.w600,
-                                                                ),
-                                                              ),
-                                                              if (_pendingPaymentMethods[vendeurId]!['numeroPayment'] != null)
-                                                                Text(
-                                                                  'Numéro: ${_pendingPaymentMethods[vendeurId]!['numeroPayment']}',
-                                                                  style: TextStyle(
-                                                                    fontSize: 10,
-                                                                    color: Colors.grey.shade600,
-                                                                  ),
-                                                                ),
-                                                            ],
-                                                          ),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                  ],
-                                                ],
-                                              ),
-                                            ),
-
-                                            const SizedBox(height: 10),
-
                                             // Récap pour ce vendeur
                                             Container(
                                               padding: const EdgeInsets.all(10),
@@ -1886,6 +2116,37 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> with Widget
                                                 ],
                                               ),
                                             ),
+
+                                            const SizedBox(height: 16),
+
+                                            // Bouton "Commander chez ce vendeur" - affiché après le total
+                                            if (!allCancelled)
+                                              SizedBox(
+                                                width: double.infinity,
+                                                child: ElevatedButton.icon(
+                                                  onPressed: () {
+                                                    print('🔘 [Button] Commander chez vendeur $vendeurId');
+                                                    _showPaymentMethodSelection(vendeurId, selectedPaymentMethod ?? {}, vendeurOrders);
+                                                  },
+                                                  icon: const Icon(Icons.shopping_cart, size: 20),
+                                                  label: const Text(
+                                                    'Commander chez ce vendeur',
+                                                    style: TextStyle(
+                                                      fontSize: 15,
+                                                      fontWeight: FontWeight.bold,
+                                                    ),
+                                                  ),
+                                                  style: ElevatedButton.styleFrom(
+                                                    backgroundColor: AppColors.primary,
+                                                    foregroundColor: Colors.white,
+                                                    padding: const EdgeInsets.symmetric(vertical: 16),
+                                                    elevation: 3,
+                                                    shape: RoundedRectangleBorder(
+                                                      borderRadius: BorderRadius.circular(12),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
 
                                             // Boutons Confirmer et Annuler (affichés si moyen de paiement sélectionné - pending ou validé)
                                             // Si toutes les commandes sont annulées, ne rien afficher
@@ -1973,7 +2234,6 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> with Widget
                             ],
                           ),
                         ),
-                ),
               ),
               
               // Récap total et bouton en bas

@@ -877,26 +877,75 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Recherche d'adresse Google
+        // En-tête section actions
         Container(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Icon(
+                  Icons.add_location_alt_rounded,
+                  color: AppColors.primary,
+                  size: 16,
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                'Ajouter une adresse',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black87,
+                ),
+              ),
+            ],
+          ),
+        ),
+        
+        // Recherche d'adresse Google - Design compact
+        Container(
+          padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: Colors.grey.shade200),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.grey.shade200, width: 1),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.03),
+                blurRadius: 4,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
-                  Icon(Icons.search, color: AppColors.primary, size: 18),
-                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Icon(
+                      Icons.search_rounded,
+                      color: AppColors.primary,
+                      size: 16,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
                   const Text(
-                    'Rechercher une adresse',
+                    'Rechercher',
                     style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
                     ),
                   ),
                 ],
@@ -1068,64 +1117,67 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
           ),
         ),
         const SizedBox(height: 12),
-        // Bouton position actuelle
-        SizedBox(
-          width: double.infinity,
-          child: OutlinedButton.icon(
-            onPressed: _isGettingCurrentLocation ? null : _getCurrentLocation,
-            icon: _isGettingCurrentLocation
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.my_location),
-            label: Text(_isGettingCurrentLocation
-                ? 'Récupération de la position...'
-                : 'Utiliser ma position actuelle'),
-            style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 12),
-        // Divider avec "OU"
+        
+        // Boutons d'action rapides - Design compact en ligne
         Row(
           children: [
-            Expanded(child: Divider(color: Colors.grey.shade300)),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Text(
-                'OU',
-                style: TextStyle(
-                  color: Colors.grey.shade600,
-                  fontWeight: FontWeight.bold,
+            // Bouton position actuelle
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: _isGettingCurrentLocation ? null : _getCurrentLocation,
+                icon: _isGettingCurrentLocation
+                    ? SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                        ),
+                      )
+                    : Icon(Icons.my_location_rounded, size: 18, color: AppColors.primary),
+                label: Text(
+                  _isGettingCurrentLocation
+                      ? 'Chargement...'
+                      : 'Position actuelle',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.primary,
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  side: BorderSide(color: AppColors.primary, width: 1.5),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
               ),
             ),
-            Expanded(child: Divider(color: Colors.grey.shade300)),
-          ],
-        ),
-        const SizedBox(height: 12),
-        // Bouton créer manuellement
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton.icon(
-            onPressed: () => _showCreateAddressDialog(context),
-            icon: const Icon(Icons.add_location_alt),
-            label: const Text('Créer une adresse manuellement'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+            const SizedBox(width: 10),
+            // Bouton créer manuellement
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: () => _showCreateAddressDialog(context),
+                icon: Icon(Icons.add_rounded, size: 18, color: AppColors.primary),
+                label: const Text(
+                  'Créer manuellement',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.primary,
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  side: BorderSide(color: AppColors.primary, width: 1.5),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
               ),
             ),
-          ),
+          ],
         ),
       ],
     );
@@ -1707,7 +1759,7 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
         elevation: 0,
       ),
       body: SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -1741,57 +1793,61 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(6),
-                              decoration: BoxDecoration(
-                                color: AppColors.primary.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(6),
+                        // En-tête de section compact
+                        Container(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: BoxDecoration(
+                                  color: AppColors.primary.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Icon(
+                                  Icons.bookmark_rounded,
+                                  color: AppColors.primary,
+                                  size: 16,
+                                ),
                               ),
-                              child: Icon(
-                                Icons.bookmark,
-                                color: AppColors.primary,
-                                size: 16,
+                              const SizedBox(width: 8),
+                              const Text(
+                                'Adresses enregistrées',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.black87,
+                                ),
                               ),
-                            ),
-                            const SizedBox(width: 8),
-                            const Text(
-                              'Vos adresses enregistrées',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.black87,
-                              ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
-                        const SizedBox(height: 12),
-                        // Liste des adresses
-                        ...snapshot.data!.docs.map((doc) {
+                        const SizedBox(height: 8),
+                        // Liste des adresses (limité aux 2 premières)
+                        ...snapshot.data!.docs.take(2).map((doc) {
                           final address =
                               doc.data() as Map<String, dynamic>;
                           final isSelected = selectedAddressId == doc.id;
                           return Container(
-                            margin: const EdgeInsets.only(bottom: 6),
+                            margin: const EdgeInsets.only(bottom: 8),
                             decoration: BoxDecoration(
                               color: isSelected
                                   ? AppColors.primary.withOpacity(0.08)
                                   : Colors.white,
-                              borderRadius: BorderRadius.circular(10),
+                              borderRadius: BorderRadius.circular(12),
                               border: Border.all(
                                 color: isSelected
                                     ? AppColors.primary
                                     : Colors.grey.shade200,
-                                width: isSelected ? 1.5 : 1,
+                                width: isSelected ? 2 : 1,
                               ),
                               boxShadow: [
                                 BoxShadow(
                                   color: isSelected
                                       ? AppColors.primary.withOpacity(0.1)
                                       : Colors.black.withOpacity(0.03),
-                                  blurRadius: isSelected ? 4 : 2,
-                                  offset: const Offset(0, 1),
+                                  blurRadius: isSelected ? 6 : 2,
+                                  offset: const Offset(0, 2),
                                   spreadRadius: 0,
                                 ),
                               ],
@@ -1799,7 +1855,7 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
                             child: Material(
                               color: Colors.transparent,
                               child: InkWell(
-                                borderRadius: BorderRadius.circular(10),
+                                borderRadius: BorderRadius.circular(12),
                                 onTap: () {
                                   print('📍 [AddressSelectionScreen] Adresse sélectionnée: ${doc.id}');
                                   setState(() {
@@ -1808,39 +1864,35 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
                                       'id': doc.id,
                                     };
                                     selectedAddressId = doc.id;
-                                    // Réinitialiser le flag pour permettre une nouvelle initialisation
                                     _isProcessingRedirect = false;
                                     _isInitializing = false;
-                                    print('📍 [AddressSelectionScreen] selectedAddress mis à jour: ${selectedAddress != null ? 'Oui' : 'Non'}');
-                                    print('📍 [AddressSelectionScreen] selectedAddressId: $selectedAddressId');
                                   });
-                                  // Forcer la mise à jour du bouton via StatefulBuilder
                                   setStateButton(() {});
                                 },
                                 child: Padding(
-                                  padding: const EdgeInsets.all(8),
+                                  padding: const EdgeInsets.all(12),
                                   child: Row(
                                     children: [
                                       Container(
-                                        width: 32,
-                                        height: 32,
+                                        width: 36,
+                                        height: 36,
                                         decoration: BoxDecoration(
                                           color: isSelected
                                               ? AppColors.primary
-                                              : Colors.grey.shade100,
-                                          borderRadius: BorderRadius.circular(8),
+                                              : AppColors.primary.withOpacity(0.1),
+                                          borderRadius: BorderRadius.circular(10),
                                         ),
                                         child: Icon(
                                           isSelected
-                                              ? Icons.check_circle
+                                              ? Icons.check_circle_rounded
                                               : Icons.location_on_rounded,
                                           color: isSelected
                                               ? Colors.white
-                                              : Colors.grey.shade600,
-                                          size: 18,
+                                              : AppColors.primary,
+                                          size: 20,
                                         ),
                                       ),
-                                      const SizedBox(width: 8),
+                                      const SizedBox(width: 12),
                                       Expanded(
                                         child: Column(
                                           crossAxisAlignment:
@@ -1849,67 +1901,28 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
                                             Text(
                                               '${address['avenue'] ?? ''}, ${address['numero'] ?? ''}',
                                               style: TextStyle(
-                                                fontSize: 13,
+                                                fontSize: 14,
                                                 fontWeight: FontWeight.w600,
                                                 color: isSelected
                                                     ? AppColors.primary
                                                     : Colors.black87,
                                               ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
                                             ),
-                                            const SizedBox(height: 3),
-                                            Row(
-                                              children: [
-                                                Icon(
-                                                  Icons.location_city,
-                                                  size: 10,
-                                                  color: Colors.grey.shade500,
-                                                ),
-                                                const SizedBox(width: 3),
-                                                Expanded(
-                                                  child: Text(
-                                                    '${address['quartier'] ?? ''}, ${address['commune'] ?? ''}',
-                                                    style: TextStyle(
-                                                      fontSize: 11,
-                                                      color: Colors.grey.shade600,
-                                                    ),
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                            const SizedBox(height: 1),
-                                            Row(
-                                              children: [
-                                                Icon(
-                                                  Icons.public,
-                                                  size: 10,
-                                                  color: Colors.grey.shade500,
-                                                ),
-                                                const SizedBox(width: 3),
-                                                Text(
-                                                  '${address['ville'] ?? ''}, ${address['pays'] ?? 'RDC'}',
-                                                  style: TextStyle(
-                                                    fontSize: 11,
-                                                    color: Colors.grey.shade600,
-                                                  ),
-                                                ),
-                                              ],
+                                            const SizedBox(height: 4),
+                                            Text(
+                                              '${address['quartier'] ?? ''}, ${address['commune'] ?? ''}, ${address['ville'] ?? ''}',
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                color: Colors.grey.shade600,
+                                              ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
                                             ),
                                           ],
                                         ),
                                       ),
-                                      if (isSelected)
-                                        Container(
-                                          padding: const EdgeInsets.all(2),
-                                          decoration: BoxDecoration(
-                                            color: AppColors.primary,
-                                            shape: BoxShape.circle,
-                                          ),
-                                          child: const Icon(
-                                            Icons.check,
-                                            color: Colors.white,
-                                            size: 12,
-                                          ),
-                                        ),
                                     ],
                                   ),
                                 ),
@@ -1917,492 +1930,172 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
                             ),
                           );
                         }).toList(),
-                        const SizedBox(height: 16),
-                        // Bouton ajouter une nouvelle adresse
-                        _buildAddNewAddressButton(context),
-                        const SizedBox(height: 16),
+                        // Bouton "Voir plus" si plus de 2 adresses
+                        if (snapshot.data!.docs.length > 2)
+                          Container(
+                            margin: const EdgeInsets.only(top: 8, bottom: 8),
+                            child: OutlinedButton.icon(
+                              onPressed: () {
+                                // Afficher toutes les adresses dans un dialog
+                                showDialog(
+                                  context: context,
+                                  builder: (context) => AlertDialog(
+                                    title: const Text('Toutes vos adresses'),
+                                    content: SizedBox(
+                                      width: double.maxFinite,
+                                      child: ListView.builder(
+                                        shrinkWrap: true,
+                                        itemCount: snapshot.data!.docs.length,
+                                        itemBuilder: (context, index) {
+                                          final doc = snapshot.data!.docs[index];
+                                          final address = doc.data() as Map<String, dynamic>;
+                                          final isSelected = selectedAddressId == doc.id;
+                                          return Container(
+                                            margin: const EdgeInsets.only(bottom: 8),
+                                            decoration: BoxDecoration(
+                                              color: isSelected
+                                                  ? AppColors.primary.withOpacity(0.08)
+                                                  : Colors.white,
+                                              borderRadius: BorderRadius.circular(10),
+                                              border: Border.all(
+                                                color: isSelected
+                                                    ? AppColors.primary
+                                                    : Colors.grey.shade200,
+                                                width: isSelected ? 1.5 : 1,
+                                              ),
+                                            ),
+                                            child: Material(
+                                              color: Colors.transparent,
+                                              child: InkWell(
+                                                borderRadius: BorderRadius.circular(10),
+                                                onTap: () {
+                                                  setState(() {
+                                                    selectedAddress = {
+                                                      ...address,
+                                                      'id': doc.id,
+                                                    };
+                                                    selectedAddressId = doc.id;
+                                                    _isProcessingRedirect = false;
+                                                    _isInitializing = false;
+                                                  });
+                                                  setStateButton(() {});
+                                                  Navigator.pop(context);
+                                                },
+                                                child: Padding(
+                                                  padding: const EdgeInsets.all(12),
+                                                  child: Row(
+                                                    children: [
+                                                      Container(
+                                                        width: 32,
+                                                        height: 32,
+                                                        decoration: BoxDecoration(
+                                                          color: isSelected
+                                                              ? AppColors.primary
+                                                              : Colors.grey.shade100,
+                                                          borderRadius: BorderRadius.circular(8),
+                                                        ),
+                                                        child: Icon(
+                                                          isSelected
+                                                              ? Icons.check_circle
+                                                              : Icons.location_on_rounded,
+                                                          color: isSelected
+                                                              ? Colors.white
+                                                              : Colors.grey.shade600,
+                                                          size: 18,
+                                                        ),
+                                                      ),
+                                                      const SizedBox(width: 12),
+                                                      Expanded(
+                                                        child: Column(
+                                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                                          children: [
+                                                            Text(
+                                                              '${address['avenue'] ?? ''}, ${address['numero'] ?? ''}',
+                                                              style: TextStyle(
+                                                                fontSize: 14,
+                                                                fontWeight: FontWeight.w600,
+                                                                color: isSelected
+                                                                    ? AppColors.primary
+                                                                    : Colors.black87,
+                                                              ),
+                                                            ),
+                                                            const SizedBox(height: 4),
+                                                            Text(
+                                                              '${address['quartier'] ?? ''}, ${address['commune'] ?? ''}, ${address['ville'] ?? ''}',
+                                                              style: TextStyle(
+                                                                fontSize: 12,
+                                                                color: Colors.grey.shade600,
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                      ),
+                                                      if (isSelected)
+                                                        Icon(
+                                                          Icons.check_circle,
+                                                          color: AppColors.primary,
+                                                          size: 20,
+                                                        ),
+                                                    ],
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.pop(context),
+                                        child: const Text('Fermer'),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                                side: BorderSide(
+                                  color: AppColors.primary,
+                                  width: 1.5,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                              ),
+                              icon: Icon(
+                                Icons.expand_more,
+                                color: AppColors.primary,
+                                size: 20,
+                              ),
+                              label: Text(
+                                'Voir ${snapshot.data!.docs.length - 2} adresse${snapshot.data!.docs.length - 2 > 1 ? 's' : ''} de plus',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.primary,
+                                ),
+                              ),
+                            ),
+                          ),
+                        const SizedBox(height: 20),
                       ],
                     );
                   },
                 ),
 
-                // Section recherche d'adresse
-                // Row(
-                //   children: [
-                //     Container(
-                //       padding: const EdgeInsets.all(8),
-                //       decoration: BoxDecoration(
-                //         color: AppColors.primary.withOpacity(0.1),
-                //         borderRadius: BorderRadius.circular(8),
-                //       ),
-                //       child: Icon(
-                //         Icons.search,
-                //         color: AppColors.primary,
-                //         size: 20,
-                //       ),
-                //     ),
-                //     const SizedBox(width: 12),
-                //     const Text(
-                //       'Rechercher une nouvelle adresse',
-                //       style: TextStyle(
-                //         fontSize: 20,
-                //         fontWeight: FontWeight.bold,
-                //         color: Colors.black87,
-                //       ),
-                //     ),
-                //   ],
-                // ),
-                // const SizedBox(height: 16),
+                // Séparateur visuel
+                Container(
+                  margin: const EdgeInsets.symmetric(vertical: 16),
+                  height: 1,
+                  color: Colors.grey.shade200,
+                ),
 
-                // // Bouton utiliser position actuelle
-                // Container(
-                //   width: double.infinity,
-                //   height: 56,
-                //   decoration: BoxDecoration(
-                //     gradient: _isGettingCurrentLocation
-                //         ? null
-                //         : LinearGradient(
-                //             colors: [
-                //               AppColors.primary,
-                //               AppColors.primary.withOpacity(0.8),
-                //             ],
-                //           ),
-                //     color: _isGettingCurrentLocation
-                //         ? Colors.grey.shade200
-                //         : null,
-                //     borderRadius: BorderRadius.circular(14),
-                //     boxShadow: _isGettingCurrentLocation
-                //         ? null
-                //         : [
-                //             BoxShadow(
-                //               color: AppColors.primary.withOpacity(0.3),
-                //               blurRadius: 8,
-                //               offset: const Offset(0, 4),
-                //             ),
-                //           ],
-                //   ),
-                //   child: Material(
-                //     color: Colors.transparent,
-                //     child: InkWell(
-                //       borderRadius: BorderRadius.circular(14),
-                //       onTap: _isGettingCurrentLocation
-                //           ? null
-                //           : () async {
-                //             setState(() {
-                //               _isGettingCurrentLocation = true;
-                //             });
-
-                //             try {
-                //               LocationPermission permission =
-                //                   await Geolocator.checkPermission();
-                //               if (permission == LocationPermission.denied) {
-                //                 permission =
-                //                     await Geolocator.requestPermission();
-                //                 if (permission == LocationPermission.denied) {
-                //                   setState(() {
-                //                     _isGettingCurrentLocation = false;
-                //                   });
-                //                   ScaffoldMessenger.of(context).showSnackBar(
-                //                     const SnackBar(
-                //                       content: Text(
-                //                           'Permission de localisation refusée'),
-                //                       backgroundColor: Colors.red,
-                //                     ),
-                //                   );
-                //                   return;
-                //                 }
-                //               }
-
-                //               if (permission ==
-                //                   LocationPermission.deniedForever) {
-                //                 setState(() {
-                //                   _isGettingCurrentLocation = false;
-                //                 });
-                //                 ScaffoldMessenger.of(context).showSnackBar(
-                //                   const SnackBar(
-                //                     content: Text(
-                //                         'Permission de localisation refusée définitivement'),
-                //                     backgroundColor: Colors.red,
-                //                   ),
-                //                 );
-                //                 return;
-                //               }
-
-                //               Position position =
-                //                   await Geolocator.getCurrentPosition(
-                //                 desiredAccuracy: LocationAccuracy.high,
-                //               );
-
-                //               final addressData = await getAddressFromGoogleAPI(
-                //                 position.latitude,
-                //                 position.longitude,
-                //               );
-
-                //               if (addressData.isEmpty) {
-                //                 setState(() {
-                //                   _isGettingCurrentLocation = false;
-                //                 });
-                //                 ScaffoldMessenger.of(context).showSnackBar(
-                //                   const SnackBar(
-                //                     content: Text(
-                //                         'Impossible d\'extraire l\'adresse depuis votre position actuelle.'),
-                //                     backgroundColor: Colors.orange,
-                //                   ),
-                //                 );
-                //                 return;
-                //               }
-
-                //               setState(() {
-                //                 _extractedAddressData = addressData;
-                //                 selectedAddress = null;
-                //                 selectedAddressId = null;
-                //                 _isGettingCurrentLocation = false;
-                //               });
-
-                //               ScaffoldMessenger.of(context).showSnackBar(
-                //                 const SnackBar(
-                //                   content: Text(
-                //                       'Position actuelle utilisée avec succès !'),
-                //                   backgroundColor: Colors.green,
-                //                 ),
-                //               );
-                //             } catch (e) {
-                //               setState(() {
-                //                 _isGettingCurrentLocation = false;
-                //               });
-                //               ScaffoldMessenger.of(context).showSnackBar(
-                //                 SnackBar(
-                //                   content: Text(
-                //                       'Erreur lors de la récupération de la position: $e'),
-                //                   backgroundColor: Colors.red,
-                //                 ),
-                //               );
-                //             }
-                //           },
-                //       child: Padding(
-                //         padding: const EdgeInsets.symmetric(horizontal: 16),
-                //         child: Row(
-                //           mainAxisAlignment: MainAxisAlignment.center,
-                //           children: [
-                //             _isGettingCurrentLocation
-                //                 ? const EcommerceLoading.inline(color: Colors.white)
-                //                 : const Icon(
-                //                     Icons.location_on_rounded,
-                //                     color: Colors.white,
-                //                     size: 22,
-                //                   ),
-                //             const SizedBox(width: 12),
-                //             Text(
-                //               _isGettingCurrentLocation
-                //                   ? 'Récupération en cours...'
-                //                   : 'Utiliser ma position actuelle',
-                //               style: const TextStyle(
-                //                 color: Colors.white,
-                //                 fontWeight: FontWeight.bold,
-                //                 fontSize: 15,
-                //               ),
-                //             ),
-                //           ],
-                //         ),
-                //       ),
-                //     ),
-                //   ),
-                // ),
-                // const SizedBox(height: 16),
-
-                // // Champ de recherche
-                // Container(
-                //   decoration: BoxDecoration(
-                //     borderRadius: BorderRadius.circular(14),
-                //     boxShadow: [
-                //       BoxShadow(
-                //         color: Colors.black.withOpacity(0.05),
-                //         blurRadius: 8,
-                //         offset: const Offset(0, 2),
-                //       ),
-                //     ],
-                //   ),
-                //   child: TextFormField(
-                //     controller: _searchAddressController,
-                //     focusNode: _searchFocusNode,
-                //     enabled: !_isGettingCurrentLocation,
-                //     decoration: InputDecoration(
-                //       labelText: 'Rechercher une adresse',
-                //       hintText: 'Ex: Kinshasa, Lemba, Avenue du Commerce...',
-                //       prefixIcon: Icon(
-                //         Icons.search_rounded,
-                //         color: AppColors.primary,
-                //       ),
-                //       suffixIcon: _isSearching
-                //           ? const Padding(
-                //               padding: EdgeInsets.all(8.0),
-                //               child: EcommerceLoading.inline(),
-                //             )
-                //           : _searchResults.isNotEmpty
-                //               ? IconButton(
-                //                   icon: Icon(
-                //                     Icons.clear_rounded,
-                //                     color: Colors.grey.shade600,
-                //                   ),
-                //                   onPressed: () {
-                //                     setState(() {
-                //                       _searchResults.clear();
-                //                       _searchAddressController.clear();
-                //                     });
-                //                   },
-                //                 )
-                //               : null,
-                //       border: OutlineInputBorder(
-                //         borderRadius: BorderRadius.circular(14),
-                //         borderSide: BorderSide(color: Colors.grey.shade300),
-                //       ),
-                //       enabledBorder: OutlineInputBorder(
-                //         borderRadius: BorderRadius.circular(14),
-                //         borderSide: BorderSide(color: Colors.grey.shade300),
-                //       ),
-                //       focusedBorder: OutlineInputBorder(
-                //         borderRadius: BorderRadius.circular(14),
-                //         borderSide: BorderSide(
-                //           color: AppColors.primary,
-                //           width: 2,
-                //         ),
-                //       ),
-                //       filled: true,
-                //       fillColor: Colors.white,
-                //       contentPadding: const EdgeInsets.symmetric(
-                //         horizontal: 16,
-                //         vertical: 16,
-                //       ),
-                //     ),
-                //   ),
-                // ),
-
-                // // Résultats de recherche
-                // if (_searchResults.isNotEmpty)
-                //   Container(
-                //     margin: const EdgeInsets.only(top: 12),
-                //     constraints: const BoxConstraints(maxHeight: 250),
-                //     decoration: BoxDecoration(
-                //       color: Colors.white,
-                //       borderRadius: BorderRadius.circular(12),
-                //       border: Border.all(color: Colors.grey.shade300),
-                //       boxShadow: [
-                //         BoxShadow(
-                //           color: Colors.black.withOpacity(0.1),
-                //           blurRadius: 4,
-                //           offset: const Offset(0, 2),
-                //         ),
-                //       ],
-                //     ),
-                //     child: ListView.builder(
-                //       shrinkWrap: true,
-                //       itemCount: _searchResults.length,
-                //       itemBuilder: (context, index) {
-                //         final result = _searchResults[index];
-                //         final isSelected = _selectedGoogleAddress != null &&
-                //             _selectedGoogleAddress!['place_id'] ==
-                //                 result['place_id'];
-                //         return Container(
-                //           margin: const EdgeInsets.only(bottom: 8),
-                //           decoration: BoxDecoration(
-                //             color: isSelected
-                //                 ? AppColors.primary.withOpacity(0.08)
-                //                 : Colors.white,
-                //             borderRadius: BorderRadius.circular(12),
-                //             border: Border.all(
-                //               color: isSelected
-                //                   ? AppColors.primary
-                //                   : Colors.grey.shade200,
-                //               width: isSelected ? 2 : 1,
-                //             ),
-                //           ),
-                //           child: Material(
-                //             color: Colors.transparent,
-                //             child: InkWell(
-                //               borderRadius: BorderRadius.circular(12),
-                //               onTap: () {
-                //                 setState(() {
-                //                   selectedAddress = null;
-                //                   selectedAddressId = null;
-                //                 });
-                //                 _selectAddress(result);
-                //               },
-                //               child: Padding(
-                //                 padding: const EdgeInsets.all(16),
-                //                 child: Row(
-                //                   children: [
-                //                     Icon(
-                //                       Icons.location_on,
-                //                       color: isSelected
-                //                           ? AppColors.primary
-                //                           : Colors.grey.shade600,
-                //                       size: 20,
-                //                     ),
-                //                     const SizedBox(width: 12),
-                //                     Expanded(
-                //                       child: Text(
-                //                         result['description'] ?? '',
-                //                         style: TextStyle(
-                //                           fontSize: 14,
-                //                           fontWeight: isSelected
-                //                               ? FontWeight.w600
-                //                               : FontWeight.w500,
-                //                           color: isSelected
-                //                               ? AppColors.primary
-                //                               : Colors.black87,
-                //                         ),
-                //                         maxLines: 2,
-                //                         overflow: TextOverflow.ellipsis,
-                //                       ),
-                //                     ),
-                //                   ],
-                //                 ),
-                //               ),
-                //             ),
-                //           ),
-                //         );
-                //       },
-                //     ),
-                //   ),
-
-                // // Affichage de l'adresse sélectionnée
-                // if (_extractedAddressData.isNotEmpty &&
-                //     _selectedGoogleAddress != null)
-                //   Container(
-                //     margin: const EdgeInsets.only(top: 16),
-                //     padding: const EdgeInsets.all(20),
-                //     decoration: BoxDecoration(
-                //       gradient: LinearGradient(
-                //         colors: [
-                //           AppColors.primary.withOpacity(0.1),
-                //           AppColors.primary.withOpacity(0.05),
-                //         ],
-                //         begin: Alignment.topLeft,
-                //         end: Alignment.bottomRight,
-                //       ),
-                //       borderRadius: BorderRadius.circular(16),
-                //       border: Border.all(
-                //         color: AppColors.primary,
-                //         width: 2,
-                //       ),
-                //       boxShadow: [
-                //         BoxShadow(
-                //           color: AppColors.primary.withOpacity(0.1),
-                //           blurRadius: 8,
-                //           offset: const Offset(0, 4),
-                //         ),
-                //       ],
-                //     ),
-                //     child: Column(
-                //       crossAxisAlignment: CrossAxisAlignment.start,
-                //       children: [
-                //         Row(
-                //           children: [
-                //             Container(
-                //               padding: const EdgeInsets.all(8),
-                //               decoration: BoxDecoration(
-                //                 color: AppColors.primary,
-                //                 borderRadius: BorderRadius.circular(8),
-                //               ),
-                //               child: const Icon(
-                //                 Icons.check_circle,
-                //                 color: Colors.white,
-                //                 size: 20,
-                //               ),
-                //             ),
-                //             const SizedBox(width: 12),
-                //             const Text(
-                //               'Adresse sélectionnée',
-                //               style: TextStyle(
-                //                 fontWeight: FontWeight.bold,
-                //                 fontSize: 16,
-                //                 color: AppColors.primary,
-                //               ),
-                //             ),
-                //           ],
-                //         ),
-                //         const SizedBox(height: 16),
-                //         Container(
-                //           padding: const EdgeInsets.all(12),
-                //           decoration: BoxDecoration(
-                //             color: Colors.white,
-                //             borderRadius: BorderRadius.circular(12),
-                //           ),
-                //           child: Column(
-                //             crossAxisAlignment: CrossAxisAlignment.start,
-                //             children: [
-                //               Row(
-                //                 children: [
-                //                   Icon(
-                //                     Icons.location_on_rounded,
-                //                     size: 16,
-                //                     color: Colors.grey.shade600,
-                //                   ),
-                //                   const SizedBox(width: 8),
-                //                   Expanded(
-                //                     child: Text(
-                //                       '${_extractedAddressData['avenue'] ?? ''}, ${_extractedAddressData['quartier'] ?? ''}',
-                //                       style: TextStyle(
-                //                         fontSize: 14,
-                //                         fontWeight: FontWeight.w600,
-                //                         color: Colors.grey.shade800,
-                //                       ),
-                //                     ),
-                //                   ),
-                //                 ],
-                //               ),
-                //               const SizedBox(height: 4),
-                //               Padding(
-                //                 padding: const EdgeInsets.only(left: 24),
-                //                 child: Text(
-                //                   '${_extractedAddressData['commune'] ?? ''}, ${_extractedAddressData['ville'] ?? ''}',
-                //                   style: TextStyle(
-                //                     fontSize: 13,
-                //                     color: Colors.grey.shade600,
-                //                   ),
-                //                 ),
-                //               ),
-                //             ],
-                //           ),
-                //         ),
-                //         const SizedBox(height: 16),
-                //         TextFormField(
-                //           controller: _numeroController,
-                //           decoration: InputDecoration(
-                //             labelText: 'Référence de l\'adresse *',
-                //             hintText: 'Numéro, étage, référence...',
-                //             prefixIcon: Icon(
-                //               Icons.home_work_rounded,
-                //               color: AppColors.primary,
-                //             ),
-                //             border: OutlineInputBorder(
-                //               borderRadius: BorderRadius.circular(12),
-                //               borderSide: BorderSide(color: Colors.grey.shade300),
-                //             ),
-                //             enabledBorder: OutlineInputBorder(
-                //               borderRadius: BorderRadius.circular(12),
-                //               borderSide: BorderSide(color: Colors.grey.shade300),
-                //             ),
-                //             focusedBorder: OutlineInputBorder(
-                //               borderRadius: BorderRadius.circular(12),
-                //               borderSide: BorderSide(
-                //                 color: AppColors.primary,
-                //                 width: 2,
-                //               ),
-                //             ),
-                //             filled: true,
-                //             fillColor: Colors.white,
-                //             contentPadding: const EdgeInsets.symmetric(
-                //               horizontal: 16,
-                //               vertical: 16,
-                //             ),
-                //           ),
-                //         ),
-                //       ],
-                //     ),
-                //   ),
-
-                const SizedBox(height: 32),
+                // Section actions rapides
+                _buildAddNewAddressButton(context),
+                
+                const SizedBox(height: 16),
               ],
             ),
           ),
@@ -2511,7 +2204,7 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
               );
             },
           ),
-            );
+        );
           },
         );
       },

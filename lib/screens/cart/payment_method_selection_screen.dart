@@ -155,13 +155,14 @@ class _PaymentMethodSelectionScreenState extends State<PaymentMethodSelectionScr
   }
 
   void _validateAndSave() async {
-    print('🔘 [PaymentMethodSelection] BOUTON CONFIRMER CLIQUÉ');
+    print('🔘 [PaymentMethodSelection] BOUTON SUIVANT CLIQUÉ');
     
     if (_selectedPaymentMethod == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Veuillez sélectionner un moyen de paiement'),
+          content: Text('Veuillez choisir un moyen de paiement avant de continuer'),
           backgroundColor: Colors.orange,
+          duration: Duration(seconds: 3),
         ),
       );
       return;
@@ -523,7 +524,7 @@ class _PaymentMethodSelectionScreenState extends State<PaymentMethodSelectionScr
                             ),
                           )
                         : const Text(
-                            'Valider',
+                            'Suivant',
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 14,
