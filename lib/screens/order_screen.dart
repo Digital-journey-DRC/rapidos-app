@@ -1235,7 +1235,7 @@ class _OrderScreenState extends State<OrderScreen> {
                 } else if (filterStatus == 'pret_a_expedier') {
                   // Accepter toutes les variantes
                   return status == 'pret_a_expedier' || status == 'ready_to_ship' || status == 'prêt à expédier' || status == 'pret a expedier';
-                } else if (filterStatus == 'accepte_livreur') {
+                } else if (filterStatus == 'accepte_livreur' ) {
                   return status == 'accepte_livreur' || status == 'accepté livreur';
                 } else if (filterStatus == 'en_route' || filterStatus == 'in_delivery') {
                   // Accepter les variantes
@@ -2080,11 +2080,11 @@ class _OrderScreenState extends State<OrderScreen> {
                                             ),
                                           ),
                                         ),
-                                        if (codeColis.isNotEmpty) ...[
+                                        if (codeColis.isNotEmpty && !(isLivreur)) ...[
                                           const SizedBox(height: 4),
                                           Text(
                                             'Code: $codeColis',
-                                            style: TextStyle(
+                                            style: const TextStyle(
                                               fontSize: 10,
                                               fontWeight: FontWeight.w600,
                                               color: AppColors.primary,

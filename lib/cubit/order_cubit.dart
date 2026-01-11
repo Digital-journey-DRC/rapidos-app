@@ -486,11 +486,11 @@ class OrderCubit extends Cubit<OrderState> {
   }
 
   /// Accepte une livraison
-  Future<Map<String, dynamic>> acceptLivraison(String livraisonId) async {
+  Future<Map<String, dynamic>> acceptLivraison(String livraisonId, String uidOrder, double latitude, double longitude) async {
     emit(state.copyWith(isLoading: true, error: null, success: false));
 
     try {
-      final result = await _orderService.acceptLivraison(livraisonId);
+      final result = await _orderService.acceptLivraison(livraisonId, uidOrder, latitude, longitude);
 
       if (result['success'] == true) {
         // Rafraîchir les commandes après l'acceptation

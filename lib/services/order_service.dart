@@ -8,7 +8,7 @@ class OrderService {
   /// Initialise une commande multi-vendeurs avec calcul GPS des frais de livraison
   /// Endpoint: POST /ecommerce/commandes/initialize
   /// Authentification: REQUISE
-  /// 
+  ///
   /// Crée automatiquement des sous-commandes séparées par vendeur.
   /// Calcule la distance entre l'acheteur et chaque vendeur pour déterminer les frais de livraison.
   /// Assigne automatiquement le moyen de paiement par défaut de chaque vendeur.
@@ -22,13 +22,15 @@ class OrderService {
     print('📍 Latitude: $latitude, Longitude: $longitude');
     print('📦 Produits: ${products.length}');
     for (var product in products) {
-      print('   - ProductId: ${product['productId']}, Quantite: ${product['quantite']}');
+      print(
+          '   - ProductId: ${product['productId']}, Quantite: ${product['quantite']}');
     }
     print('🏠 Adresse: $address');
-    
+
     try {
       final token = await StorageService().getToken();
-      print('🔑 Token récupéré: ${token != null ? 'Oui (${token.substring(0, 20)}...)' : 'Non'}');
+      print(
+          '🔑 Token récupéré: ${token != null ? 'Oui (${token.substring(0, 20)}...)' : 'Non'}');
 
       if (token == null) {
         print('❌ [OrderService] Token manquant');
@@ -45,23 +47,24 @@ class OrderService {
         'longitude': longitude,
         'address': address,
       };
-      
+
       final bodyJson = jsonEncode(requestBody);
-      
+
       print('🌐 [OrderService] Envoi de la requête...');
       print('   URL: $url');
       print('═══════════════════════════════════════════════════════');
       print('📦 BODY ENVOYÉ:');
       print(bodyJson);
       print('═══════════════════════════════════════════════════════');
-      
+
       // Breakpoint virtuel - peut être utilisé pour debugger
       assert(() {
         print('🛑 BREAKPOINT: Body avant envoi');
         return true;
       }());
 
-      final response = await http.post(
+      final response = await http
+          .post(
         Uri.parse(url),
         headers: {
           'Content-Type': 'application/json',
@@ -69,11 +72,13 @@ class OrderService {
           'Authorization': 'Bearer $token',
         },
         body: jsonEncode(requestBody),
-      ).timeout(
+      )
+          .timeout(
         const Duration(seconds: 15),
         onTimeout: () {
           print('⏱️ [OrderService] Timeout après 15 secondes');
-          throw Exception('Timeout: La connexion au serveur a pris trop de temps');
+          throw Exception(
+              'Timeout: La connexion au serveur a pris trop de temps');
         },
       );
 
@@ -88,28 +93,30 @@ class OrderService {
         print('   Orders count: ${(responseData['orders'] ?? []).length}');
         print('   Summary: ${responseData['summary']}');
         print('   Message: ${responseData['message']}');
-        
+
         return {
           'success': true,
           'orders': responseData['orders'] ?? [],
           'summary': responseData['summary'] ?? {},
-          'message': responseData['message'] ?? 'Commande(s) créée(s) avec succès',
+          'message':
+              responseData['message'] ?? 'Commande(s) créée(s) avec succès',
         };
       } else {
         final errorData = jsonDecode(response.body);
         print('❌ [OrderService] Erreur (${response.statusCode})');
         print('   Error data: $errorData');
-        
+
         return {
           'success': false,
-          'message': errorData['message'] ?? 'Erreur lors de l\'initialisation de la commande',
+          'message': errorData['message'] ??
+              'Erreur lors de l\'initialisation de la commande',
         };
       }
     } catch (e, stackTrace) {
       print('💥 [OrderService] Exception capturée');
       print('   Error: $e');
       print('   StackTrace: $stackTrace');
-      
+
       return {
         'success': false,
         'message': 'Erreur de connexion: $e',
@@ -120,15 +127,16 @@ class OrderService {
   /// Récupère toutes les commandes de l'acheteur connecté avec statistiques par statut
   /// Endpoint: GET /ecommerce/commandes/buyer/me
   /// Authentification: REQUISE
-  /// 
+  ///
   /// [status] (optionnel): Filtrer par statut (pending_payment, pending, en_preparation, etc.)
   Future<Map<String, dynamic>> getBuyerOrders({String? status}) async {
     print('📥 [OrderService] getBuyerOrders - Début');
     print('   Status filter: ${status ?? 'Aucun'}');
-    
+
     try {
       final token = await StorageService().getToken();
-      print('🔑 Token récupéré: ${token != null ? 'Oui (${token.substring(0, 20)}...)' : 'Non'}');
+      print(
+          '🔑 Token récupéré: ${token != null ? 'Oui (${token.substring(0, 20)}...)' : 'Non'}');
 
       if (token == null) {
         print('❌ [OrderService] Token manquant');
@@ -144,7 +152,8 @@ class OrderService {
       // Ajouter un timestamp pour éviter le cache HTTP
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final uri = status != null
-          ? Uri.parse('$baseUrl/ecommerce/commandes/buyer/me?status=$status&_t=$timestamp')
+          ? Uri.parse(
+              '$baseUrl/ecommerce/commandes/buyer/me?status=$status&_t=$timestamp')
           : Uri.parse('$baseUrl/ecommerce/commandes/buyer/me?_t=$timestamp');
 
       print('🌐 [OrderService] Envoi de la requête GET...');
@@ -163,7 +172,8 @@ class OrderService {
         const Duration(seconds: 15),
         onTimeout: () {
           print('⏱️ [OrderService] Timeout après 15 secondes');
-          throw Exception('Timeout: La connexion au serveur a pris trop de temps');
+          throw Exception(
+              'Timeout: La connexion au serveur a pris trop de temps');
         },
       );
 
@@ -177,57 +187,60 @@ class OrderService {
         print('   Orders count: ${(responseData['orders'] ?? []).length}');
         print('   Stats: ${responseData['stats']}');
         print('   Message: ${responseData['message']}');
-        
+
         // Print des statistiques comme dans l'exemple JavaScript
         final stats = responseData['stats'] ?? {};
         print('📊 Statistiques reçues:');
         print('   Total: ${stats['total'] ?? 0} commandes');
         print('   En attente de paiement: ${stats['pending_payment'] ?? 0}');
-        
+
         // Print des commandes comme dans l'exemple JavaScript
         final orders = responseData['orders'] ?? [];
         for (var order in orders) {
           final orderId = order['id']?.toString() ?? '';
           // Convertir total et deliveryFee qui peuvent être String ou double
           final totalValue = order['total'];
-          final total = totalValue is double 
-              ? totalValue 
-              : (totalValue is String 
-                  ? double.tryParse(totalValue) ?? 0.0 
-                  : (totalValue is int 
-                      ? totalValue.toDouble() 
-                      : 0.0));
-          
+          final total = totalValue is double
+              ? totalValue
+              : (totalValue is String
+                  ? double.tryParse(totalValue) ?? 0.0
+                  : (totalValue is int ? totalValue.toDouble() : 0.0));
+
           final deliveryFeeValue = order['deliveryFee'];
-          final deliveryFee = deliveryFeeValue is double 
-              ? deliveryFeeValue 
-              : (deliveryFeeValue is String 
-                  ? double.tryParse(deliveryFeeValue) ?? 0.0 
-                  : (deliveryFeeValue is int 
-                      ? deliveryFeeValue.toDouble() 
+          final deliveryFee = deliveryFeeValue is double
+              ? deliveryFeeValue
+              : (deliveryFeeValue is String
+                  ? double.tryParse(deliveryFeeValue) ?? 0.0
+                  : (deliveryFeeValue is int
+                      ? deliveryFeeValue.toDouble()
                       : 0.0));
-          
+
           final vendeur = order['vendeur'] ?? {};
           final paymentMethod = order['paymentMethod'] ?? {};
-          print('📦 Commande #$orderId: ${total.toStringAsFixed(0)} FC + ${deliveryFee.toStringAsFixed(0)} FC livraison');
-          print('   Vendeur: ${vendeur['firstName'] ?? ''} ${vendeur['lastName'] ?? ''}');
-          print('   Moyen de paiement: ${paymentMethod['name'] ?? ''} (${paymentMethod['numeroCompte'] ?? ''})');
+          print(
+              '📦 Commande #$orderId: ${total.toStringAsFixed(0)} FC + ${deliveryFee.toStringAsFixed(0)} FC livraison');
+          print(
+              '   Vendeur: ${vendeur['firstName'] ?? ''} ${vendeur['lastName'] ?? ''}');
+          print(
+              '   Moyen de paiement: ${paymentMethod['name'] ?? ''} (${paymentMethod['numeroCompte'] ?? ''})');
         }
-        
+
         return {
           'success': true,
           'orders': orders,
           'stats': stats,
-          'message': responseData['message'] ?? 'Commandes récupérées avec succès',
+          'message':
+              responseData['message'] ?? 'Commandes récupérées avec succès',
         };
       } else {
         final errorData = jsonDecode(response.body);
         print('❌ [OrderService] Erreur (${response.statusCode})');
         print('   Error data: $errorData');
-        
+
         return {
           'success': false,
-          'message': errorData['message'] ?? 'Erreur lors de la récupération des commandes',
+          'message': errorData['message'] ??
+              'Erreur lors de la récupération des commandes',
           'orders': [],
           'stats': {},
         };
@@ -236,7 +249,7 @@ class OrderService {
       print('💥 [OrderService] Exception capturée');
       print('   Error: $e');
       print('   StackTrace: $stackTrace');
-      
+
       return {
         'success': false,
         'message': 'Erreur de connexion: $e',
@@ -249,7 +262,7 @@ class OrderService {
   /// Met à jour le moyen de paiement pour une commande spécifique
   /// Endpoint: PATCH /ecommerce/commandes/:id/payment-method
   /// Authentification: REQUISE
-  /// 
+  ///
   /// Le moyen de paiement doit appartenir au vendeur de la commande.
   /// Le statut passe automatiquement de "pending_payment" à "pending" après la mise à jour.
   Future<Map<String, dynamic>> updatePaymentMethod({
@@ -261,7 +274,7 @@ class OrderService {
     print('   📦 OrderId (ID de la commande): $orderId');
     print('   💳 PaymentMethodId: $paymentMethodId');
     print('   📱 NumeroPayment: ${numeroPayment ?? 'Non fourni'}');
-    
+
     try {
       final token = await StorageService().getToken();
 
@@ -276,15 +289,17 @@ class OrderService {
       final body = <String, dynamic>{
         'paymentMethodId': paymentMethodId,
       };
-      
+
       if (numeroPayment != null && numeroPayment.isNotEmpty) {
         body['numeroPayment'] = numeroPayment;
       }
 
-      print('📤 [OrderService] Requête PATCH: $baseUrl/ecommerce/commandes/$orderId/payment-method');
+      print(
+          '📤 [OrderService] Requête PATCH: $baseUrl/ecommerce/commandes/$orderId/payment-method');
       print('📤 [OrderService] Body envoyé: ${jsonEncode(body)}');
 
-      final response = await http.patch(
+      final response = await http
+          .patch(
         Uri.parse('$baseUrl/ecommerce/commandes/$orderId/payment-method'),
         headers: {
           'Content-Type': 'application/json',
@@ -292,31 +307,39 @@ class OrderService {
           'Authorization': 'Bearer $token',
         },
         body: jsonEncode(body),
-      ).timeout(
+      )
+          .timeout(
         const Duration(seconds: 15),
         onTimeout: () {
-          throw Exception('Timeout: La connexion au serveur a pris trop de temps');
+          throw Exception(
+              'Timeout: La connexion au serveur a pris trop de temps');
         },
       );
-      
+
       print('📥 [OrderService] Réponse reçue - Status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(response.body);
-        print('✅ [OrderService] Moyen de paiement mis à jour avec succès pour la commande $orderId');
-        print('📦 [OrderService] Données de la commande mise à jour: ${responseData['order']?['id'] ?? 'N/A'}');
+        print(
+            '✅ [OrderService] Moyen de paiement mis à jour avec succès pour la commande $orderId');
+        print(
+            '📦 [OrderService] Données de la commande mise à jour: ${responseData['order']?['id'] ?? 'N/A'}');
         return {
           'success': true,
           'order': responseData['order'] ?? {},
-          'message': responseData['message'] ?? 'Moyen de paiement mis à jour avec succès',
+          'message': responseData['message'] ??
+              'Moyen de paiement mis à jour avec succès',
         };
       } else {
         final errorData = jsonDecode(response.body);
-        print('❌ [OrderService] Erreur lors de la mise à jour - Status: ${response.statusCode}');
-        print('❌ [OrderService] Message d\'erreur: ${errorData['message'] ?? 'Erreur inconnue'}');
+        print(
+            '❌ [OrderService] Erreur lors de la mise à jour - Status: ${response.statusCode}');
+        print(
+            '❌ [OrderService] Message d\'erreur: ${errorData['message'] ?? 'Erreur inconnue'}');
         return {
           'success': false,
-          'message': errorData['message'] ?? 'Erreur lors de la mise à jour du moyen de paiement',
+          'message': errorData['message'] ??
+              'Erreur lors de la mise à jour du moyen de paiement',
         };
       }
     } catch (e) {
@@ -330,10 +353,10 @@ class OrderService {
   /// Met à jour les moyens de paiement pour plusieurs commandes en une seule requête
   /// Endpoint: PATCH /ecommerce/commandes/batch-update-payment-methods
   /// Authentification: REQUISE
-  /// 
+  ///
   /// Utilise une transaction atomique (tout réussit ou tout échoue).
   /// Idéal pour éviter de faire plusieurs requêtes séparées.
-  /// 
+  ///
   /// [updates] : Liste de mises à jour, chaque élément contient:
   ///   - commandeId (required): ID de la commande
   ///   - paymentMethodId (required): ID du nouveau moyen de paiement
@@ -358,7 +381,8 @@ class OrderService {
         };
       }
 
-      final response = await http.patch(
+      final response = await http
+          .patch(
         Uri.parse('$baseUrl/ecommerce/commandes/batch-update-payment-methods'),
         headers: {
           'Content-Type': 'application/json',
@@ -368,10 +392,12 @@ class OrderService {
         body: jsonEncode({
           'updates': updates,
         }),
-      ).timeout(
+      )
+          .timeout(
         const Duration(seconds: 15),
         onTimeout: () {
-          throw Exception('Timeout: La connexion au serveur a pris trop de temps');
+          throw Exception(
+              'Timeout: La connexion au serveur a pris trop de temps');
         },
       );
 
@@ -381,13 +407,15 @@ class OrderService {
           'success': true,
           'orders': responseData['orders'] ?? [],
           'summary': responseData['summary'] ?? {},
-          'message': responseData['message'] ?? 'Commande(s) mise(s) à jour avec succès',
+          'message': responseData['message'] ??
+              'Commande(s) mise(s) à jour avec succès',
         };
       } else {
         final errorData = jsonDecode(response.body);
         return {
           'success': false,
-          'message': errorData['message'] ?? 'Erreur lors de la mise à jour des moyens de paiement',
+          'message': errorData['message'] ??
+              'Erreur lors de la mise à jour des moyens de paiement',
         };
       }
     } catch (e) {
@@ -403,7 +431,7 @@ class OrderService {
   /// Authentification: REQUISE
   Future<Map<String, dynamic>> getVendeurOrders() async {
     print('🔄 [OrderService] getVendeurOrders - Début');
-    
+
     try {
       final token = await StorageService().getToken();
 
@@ -426,7 +454,8 @@ class OrderService {
       ).timeout(
         const Duration(seconds: 15),
         onTimeout: () {
-          throw Exception('Timeout: La connexion au serveur a pris trop de temps');
+          throw Exception(
+              'Timeout: La connexion au serveur a pris trop de temps');
         },
       );
 
@@ -437,7 +466,7 @@ class OrderService {
         final responseData = jsonDecode(response.body);
         final commandes = responseData['commandes'] ?? [];
         print('✅ [OrderService] ${commandes.length} commandes récupérées');
-        
+
         // Transformer les commandes pour correspondre à la structure attendue
         final orders = commandes.map<Map<String, dynamic>>((commande) {
           // Helper pour parser les montants
@@ -447,18 +476,18 @@ class OrderService {
             if (value is String) return double.tryParse(value) ?? 0.0;
             return 0.0;
           }
-          
+
           // Calculer totalAvecLivraison
           final total = parseAmount(commande['total'] ?? 0);
           final deliveryFee = parseAmount(commande['deliveryFee'] ?? 0);
           final totalAvecLivraison = total + deliveryFee;
-          
+
           // Construire l'objet buyer à partir de client (string) et phone
           final buyer = {
             'email': commande['client'] ?? '',
             'phone': commande['phone'] ?? '',
           };
-          
+
           // Transformer items en products pour la compatibilité
           final products = (commande['items'] as List? ?? []).map((item) {
             return {
@@ -469,7 +498,7 @@ class OrderService {
               'productId': item['productId'] ?? 0,
             };
           }).toList();
-          
+
           return {
             'id': commande['id'],
             'orderId': commande['orderId'],
@@ -478,10 +507,14 @@ class OrderService {
             'buyer': buyer,
             'products': products,
             'items': products, // Pour compatibilité avec OrderDetailsScreen
-            'client': commande['client'] ?? '', // Ajout direct pour OrderDetailsScreen
-            'phone': commande['phone'] ?? '', // Ajout direct pour OrderDetailsScreen
+            'client': commande['client'] ??
+                '', // Ajout direct pour OrderDetailsScreen
+            'phone':
+                commande['phone'] ?? '', // Ajout direct pour OrderDetailsScreen
             'clientName': commande['clientName'] ?? '', // Nom du client
-            'clientPhone': commande['clientPhone'] ?? commande['phone'] ?? '', // Téléphone du client
+            'clientPhone': commande['clientPhone'] ??
+                commande['phone'] ??
+                '', // Téléphone du client
             'total': total.toStringAsFixed(2),
             'deliveryFee': deliveryFee,
             'totalAvecLivraison': totalAvecLivraison,
@@ -499,18 +532,20 @@ class OrderService {
             'updatedAt': commande['updatedAt'],
           };
         }).toList();
-        
+
         return {
           'success': true,
           'orders': orders,
-          'message': responseData['message'] ?? 'Commandes récupérées avec succès',
+          'message':
+              responseData['message'] ?? 'Commandes récupérées avec succès',
         };
       } else {
         final errorData = jsonDecode(response.body);
         print('❌ [OrderService] Erreur (${response.statusCode})');
         return {
           'success': false,
-          'message': errorData['message'] ?? 'Erreur lors de la récupération des commandes',
+          'message': errorData['message'] ??
+              'Erreur lors de la récupération des commandes',
           'orders': [],
         };
       }
@@ -538,7 +573,7 @@ class OrderService {
     print('   📊 Status: $status');
     print('   📝 Reason: ${reason ?? 'Non fourni'}');
     print('   🔐 CodeColis: ${codeColis ?? 'Non fourni'}');
-    
+
     try {
       final token = await StorageService().getToken();
 
@@ -553,19 +588,21 @@ class OrderService {
       final body = <String, dynamic>{
         'status': status,
       };
-      
+
       if (reason != null && reason.isNotEmpty) {
         body['reason'] = reason;
       }
-      
+
       if (codeColis != null && codeColis.isNotEmpty) {
         body['codeColis'] = codeColis;
       }
 
-      print('📤 [OrderService] Requête PATCH: $baseUrl/ecommerce/commandes/$orderId/status');
+      print(
+          '📤 [OrderService] Requête PATCH: $baseUrl/ecommerce/commandes/$orderId/status');
       print('📤 [OrderService] Body envoyé: ${jsonEncode(body)}');
 
-      final response = await http.patch(
+      final response = await http
+          .patch(
         Uri.parse('$baseUrl/ecommerce/commandes/$orderId/status'),
         headers: {
           'Content-Type': 'application/json',
@@ -573,10 +610,12 @@ class OrderService {
           'Authorization': 'Bearer $token',
         },
         body: jsonEncode(body),
-      ).timeout(
+      )
+          .timeout(
         const Duration(seconds: 15),
         onTimeout: () {
-          throw Exception('Timeout: La connexion au serveur a pris trop de temps');
+          throw Exception(
+              'Timeout: La connexion au serveur a pris trop de temps');
         },
       );
 
@@ -589,15 +628,18 @@ class OrderService {
           'success': true,
           'order': responseData['order'] ?? {},
           'message': responseData['message'] ?? 'Statut mis à jour avec succès',
-          'newCodeColis': responseData['newCodeColis'], // Nouveau code généré (étape 3)
+          'newCodeColis':
+              responseData['newCodeColis'], // Nouveau code généré (étape 3)
         };
       } else {
         final errorData = jsonDecode(response.body);
         print('❌ [OrderService] Erreur - Status: ${response.statusCode}');
-        print('❌ [OrderService] Message: ${errorData['message'] ?? 'Erreur inconnue'}');
+        print(
+            '❌ [OrderService] Message: ${errorData['message'] ?? 'Erreur inconnue'}');
         return {
           'success': false,
-          'message': errorData['message'] ?? 'Erreur lors de la mise à jour du statut',
+          'message':
+              errorData['message'] ?? 'Erreur lors de la mise à jour du statut',
         };
       }
     } catch (e) {
@@ -619,7 +661,7 @@ class OrderService {
     print('🔄 [OrderService] uploadPackagePhoto - Début');
     print('   📦 OrderId: $orderId');
     print('   📷 ImagePath: $imagePath');
-    
+
     try {
       final token = await StorageService().getToken();
 
@@ -640,7 +682,7 @@ class OrderService {
         'Authorization': 'Bearer $token',
         'accept': 'application/json',
       });
-      
+
       final file = await http.MultipartFile.fromPath(
         'packagePhoto',
         imagePath,
@@ -665,16 +707,20 @@ class OrderService {
         return {
           'success': true,
           'order': responseData['order'] ?? {},
-          'photoUrl': responseData['photoUrl'] ?? responseData['order']?['packagePhoto'] ?? '',
+          'photoUrl': responseData['photoUrl'] ??
+              responseData['order']?['packagePhoto'] ??
+              '',
           'message': responseData['message'] ?? 'Photo uploadée avec succès',
         };
       } else {
         final errorData = jsonDecode(response.body);
         print('❌ [OrderService] Erreur - Status: ${response.statusCode}');
-        print('❌ [OrderService] Message: ${errorData['message'] ?? 'Erreur inconnue'}');
+        print(
+            '❌ [OrderService] Message: ${errorData['message'] ?? 'Erreur inconnue'}');
         return {
           'success': false,
-          'message': errorData['message'] ?? 'Erreur lors de l\'upload de la photo',
+          'message':
+              errorData['message'] ?? 'Erreur lors de l\'upload de la photo',
         };
       }
     } catch (e) {
@@ -715,7 +761,8 @@ class OrderService {
         };
       }
 
-      final response = await http.post(
+      final response = await http
+          .post(
         Uri.parse('$baseUrl/ecommerce/commandes/store'),
         headers: {
           'Content-Type': 'application/json',
@@ -732,10 +779,12 @@ class OrderService {
           'pays': pays,
           'codePostale': codePostale,
         }),
-      ).timeout(
+      )
+          .timeout(
         const Duration(seconds: 15),
         onTimeout: () {
-          throw Exception('Timeout: La connexion au serveur a pris trop de temps');
+          throw Exception(
+              'Timeout: La connexion au serveur a pris trop de temps');
         },
       );
 
@@ -751,7 +800,8 @@ class OrderService {
         final errorData = jsonDecode(response.body);
         return {
           'success': false,
-          'message': errorData['message'] ?? 'Erreur lors de la création de la commande',
+          'message': errorData['message'] ??
+              'Erreur lors de la création de la commande',
         };
       }
     } catch (e) {
@@ -773,15 +823,16 @@ class OrderService {
   /// Récupère l'historique des commandes de l'acheteur connecté
   /// Endpoint: GET /ecommerce/commandes/acheteur
   /// Authentification: REQUISE
-  /// 
+  ///
   /// [status] (optionnel): Filtrer par statut (pending_payment, pending, en_preparation, etc.)
   Future<Map<String, dynamic>> getAcheteurOrders({String? status}) async {
     print('📥 [OrderService] getAcheteurOrders - Début');
     print('   Status filter: ${status ?? 'Aucun'}');
-    
+
     try {
       final token = await StorageService().getToken();
-      print('🔑 Token récupéré: ${token != null ? 'Oui (${token.substring(0, 20)}...)' : 'Non'}');
+      print(
+          '🔑 Token récupéré: ${token != null ? 'Oui (${token.substring(0, 20)}...)' : 'Non'}');
 
       if (token == null) {
         print('❌ [OrderService] Token manquant');
@@ -812,7 +863,8 @@ class OrderService {
         const Duration(seconds: 15),
         onTimeout: () {
           print('⏱️ [OrderService] Timeout après 15 secondes');
-          throw Exception('Timeout: La connexion au serveur a pris trop de temps');
+          throw Exception(
+              'Timeout: La connexion au serveur a pris trop de temps');
         },
       );
 
@@ -823,31 +875,34 @@ class OrderService {
       if (response.statusCode == 200) {
         final responseData = jsonDecode(response.body);
         print('✅ [OrderService] Succès (200)');
-        print('   Commandes count: ${(responseData['commandes'] ?? []).length}');
-        
+        print(
+            '   Commandes count: ${(responseData['commandes'] ?? []).length}');
+
         // Récupérer les commandes (nouvelle structure avec 'commandes')
         final commandes = responseData['commandes'] ?? [];
-        
+
         // Transformer les commandes pour correspondre à la structure attendue par l'UI
         final orders = commandes.map<Map<String, dynamic>>((commande) {
           // Convertir items en products pour compatibilité
           final items = commande['items'] as List? ?? [];
-          final products = items.map((item) => {
-            'name': item['name'] ?? '',
-            'price': item['price'] ?? 0,
-            'quantity': item['quantity'] ?? 1,
-            'productId': item['productId'] ?? 0,
-            'idVendeur': item['idVendeur'] ?? commande['vendorId'],
-          }).toList();
-          
+          final products = items
+              .map((item) => {
+                    'name': item['name'] ?? '',
+                    'price': item['price'] ?? 0,
+                    'quantity': item['quantity'] ?? 1,
+                    'productId': item['productId'] ?? 0,
+                    'idVendeur': item['idVendeur'] ?? commande['vendorId'],
+                  })
+              .toList();
+
           // Calculer totalAvecLivraison
           final total = _parseAmount(commande['total'] ?? 0);
           final deliveryFee = _parseAmount(commande['deliveryFee'] ?? 0);
           final totalAvecLivraison = total + deliveryFee;
-          
+
           // Créer l'objet vendeur à partir de vendorId (on n'a pas les détails du vendeur)
           final vendorId = commande['vendorId'];
-          
+
           return {
             'id': commande['id'],
             'orderId': commande['orderId'],
@@ -870,30 +925,34 @@ class OrderService {
             'packagePhoto': commande['packagePhoto'],
           };
         }).toList();
-        
+
         // Print des commandes
         for (var order in orders) {
           final orderId = order['id']?.toString() ?? '';
           final total = _parseAmount(order['total']);
           final deliveryFee = _parseAmount(order['deliveryFee']);
           final paymentMethod = order['paymentMethod'] ?? {};
-          print('📦 Commande #$orderId: ${total.toStringAsFixed(0)} FC + ${deliveryFee.toStringAsFixed(0)} FC livraison');
-          print('   Moyen de paiement: ${paymentMethod['name'] ?? ''} (${paymentMethod['numeroCompte'] ?? ''})');
+          print(
+              '📦 Commande #$orderId: ${total.toStringAsFixed(0)} FC + ${deliveryFee.toStringAsFixed(0)} FC livraison');
+          print(
+              '   Moyen de paiement: ${paymentMethod['name'] ?? ''} (${paymentMethod['numeroCompte'] ?? ''})');
         }
-        
+
         return {
           'success': true,
           'orders': orders,
-          'message': responseData['message'] ?? 'Commandes récupérées avec succès',
+          'message':
+              responseData['message'] ?? 'Commandes récupérées avec succès',
         };
       } else {
         final errorData = jsonDecode(response.body);
         print('❌ [OrderService] Erreur (${response.statusCode})');
         print('   Error data: $errorData');
-        
+
         return {
           'success': false,
-          'message': errorData['message'] ?? 'Erreur lors de la récupération des commandes',
+          'message': errorData['message'] ??
+              'Erreur lors de la récupération des commandes',
           'orders': [],
           'stats': {},
         };
@@ -913,7 +972,7 @@ class OrderService {
   /// Authentification: REQUISE
   Future<Map<String, dynamic>> getLivreurOrders() async {
     print('🔄 [OrderService] getLivreurOrders - Début');
-    
+
     try {
       final token = await StorageService().getToken();
 
@@ -936,7 +995,8 @@ class OrderService {
       ).timeout(
         const Duration(seconds: 15),
         onTimeout: () {
-          throw Exception('Timeout: La connexion au serveur a pris trop de temps');
+          throw Exception(
+              'Timeout: La connexion au serveur a pris trop de temps');
         },
       );
 
@@ -951,15 +1011,16 @@ class OrderService {
         print('📊 [OrderService] Structure de la réponse JSON:');
         print('   - Clés disponibles: ${responseData.keys.toList()}');
         print('   - Type de responseData: ${responseData.runtimeType}');
-        
+
         // Le backend peut retourner 'livraison' ou 'orders' ou directement un tableau
-        final rawOrders = responseData['livraison'] ?? 
-                       responseData['orders'] ?? 
-                       (responseData is List ? responseData : []);
-        
-        print('✅ [OrderService] ${rawOrders.length} commandes récupérées pour le livreur');
+        final rawOrders = responseData['livraison'] ??
+            responseData['orders'] ??
+            (responseData is List ? responseData : []);
+
+        print(
+            '✅ [OrderService] ${rawOrders.length} commandes récupérées pour le livreur');
         print('📦 [OrderService] Type de rawOrders: ${rawOrders.runtimeType}');
-        
+
         // Log des données brutes pour debug - AFFICHAGE COMPLET
         for (var i = 0; i < rawOrders.length; i++) {
           final order = rawOrders[i];
@@ -975,8 +1036,10 @@ class OrderService {
           print('   - vendorId: ${order['vendorId']}');
           print('   - vendorName: ${order['vendorName']}');
           print('   - vendorPhone: ${order['vendorPhone']}');
-          print('   - total: ${order['total']} (type: ${order['total'].runtimeType})');
-          print('   - deliveryFee: ${order['deliveryFee']} (type: ${order['deliveryFee'].runtimeType})');
+          print(
+              '   - total: ${order['total']} (type: ${order['total'].runtimeType})');
+          print(
+              '   - deliveryFee: ${order['deliveryFee']} (type: ${order['deliveryFee'].runtimeType})');
           print('   - codeColis: ${order['codeColis']}');
           print('   - distanceKm: ${order['distanceKm']}');
           print('   - address: ${order['address']}');
@@ -994,9 +1057,10 @@ class OrderService {
           print('   - livreur: ${order['livreur']}');
           print('═══════════════════════════════════════════════════════════');
         }
-        
+
         // Transformer les commandes pour correspondre à la structure attendue (comme vendeur)
-        final orders = (rawOrders as List).map<Map<String, dynamic>>((commande) {
+        final orders =
+            (rawOrders as List).map<Map<String, dynamic>>((commande) {
           // Helper pour parser les montants
           double parseAmount(dynamic value) {
             if (value is double) return value;
@@ -1004,29 +1068,35 @@ class OrderService {
             if (value is String) return double.tryParse(value) ?? 0.0;
             return 0.0;
           }
-          
+
           // Calculer totalAvecLivraison
           final total = parseAmount(commande['total'] ?? 0);
           final deliveryFee = parseAmount(commande['deliveryFee'] ?? 0);
           final totalAvecLivraison = total + deliveryFee;
-          
+
           // Construire l'objet buyer à partir de client (string) et phone
-          final buyer = commande['buyer'] ?? {
-            'email': commande['client'] ?? '',
-            'phone': commande['phone'] ?? '',
-          };
-          
+          final buyer = commande['buyer'] ??
+              {
+                'email': commande['client'] ?? '',
+                'phone': commande['phone'] ?? '',
+              };
+
           // Transformer items en products pour la compatibilité
-          final products = (commande['items'] as List? ?? commande['products'] as List? ?? []).map((item) {
+          final products = (commande['items'] as List? ??
+                  commande['products'] as List? ??
+                  [])
+              .map((item) {
             return {
               'name': item['name'] ?? '',
               'price': item['price'] ?? 0,
               'quantity': item['quantity'] ?? 1,
-              'idVendeur': item['idVendeur'] ?? commande['vendorId'] ?? commande['vendeurId'],
+              'idVendeur': item['idVendeur'] ??
+                  commande['vendorId'] ??
+                  commande['vendeurId'],
               'productId': item['productId'] ?? 0,
             };
           }).toList();
-          
+
           return {
             'id': commande['id'],
             'orderId': commande['orderId'],
@@ -1061,26 +1131,29 @@ class OrderService {
             'livreur': commande['livreur'],
           };
         }).toList();
-        
+
         print('✅ [OrderService] Commandes livreur transformées avec succès');
-        print('📊 [OrderService] Nombre de commandes transformées: ${orders.length}');
+        print(
+            '📊 [OrderService] Nombre de commandes transformées: ${orders.length}');
         print('📊 [OrderService] Structure finale retournée:');
         if (orders.isNotEmpty) {
           print('   - Exemple de commande transformée (première):');
           print('     ${orders.first}');
         }
-        
+
         return {
           'success': true,
           'orders': orders,
-          'message': responseData['message'] ?? 'Commandes récupérées avec succès',
+          'message':
+              responseData['message'] ?? 'Commandes récupérées avec succès',
         };
       } else {
         final errorData = jsonDecode(response.body);
         print('❌ [OrderService] Erreur (${response.statusCode})');
         return {
           'success': false,
-          'message': errorData['message'] ?? 'Erreur lors de la récupération des commandes',
+          'message': errorData['message'] ??
+              'Erreur lors de la récupération des commandes',
           'orders': [],
         };
       }
@@ -1094,15 +1167,66 @@ class OrderService {
     }
   }
 
+  Future<Map<String, dynamic>> saveLocation(
+      String uidOrder, double latitude, double longitude) async {
+    final token = await StorageService().getToken();
+
+    if (token == null) {
+      print('❌ [OrderService] Token manquant');
+      return {
+        'success': false,
+        'message': 'Token d\'authentification manquant',
+      };
+    }
+
+    var body = {
+      "orderId": uidOrder,
+      "latitude": latitude,
+      "longitude": longitude
+    };
+
+    final response = await http.post(
+      Uri.parse('$baseUrl/ecommerce/location/livreur'),
+      headers: {
+        'Content-Type': 'application/json',
+        'accept': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode(body),
+    ).timeout(
+      const Duration(seconds: 15),
+      onTimeout: () {
+        throw Exception(
+            'Timeout: La connexion au serveur a pris trop de temps');
+      },
+    );
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      final responseData = jsonDecode(response.body);
+      return {
+        'success': true,
+        'message': responseData['message'] ?? 'Localisation enregistrée avec succès',
+        'data': responseData,
+      };
+    } else {
+      final errorData = jsonDecode(response.body);
+      return {
+        'success': false,
+        'message': errorData['message'] ?? 'Erreur lors de l\'enregistrement de la localisation',
+      };
+    }
+  }
+
   /// Accepte une livraison
   /// Endpoint: POST /ecommerce/livraison/:orderId/take
   /// Description: Le livreur accepte une livraison. Change automatiquement le statut de pret_a_expedier à accepte_livreur et assigne le livreur.
   /// Authentification: REQUISE
   /// Conditions: Utilisateur doit être un livreur, commande doit être en statut pret_a_expedier, commande ne doit pas être déjà assignée
-  Future<Map<String, dynamic>> acceptLivraison(String orderId) async {
+  Future<Map<String, dynamic>> acceptLivraison(
+      String orderId, String uidOrder, double latitude, double longitude) async {
     print('🔄 [OrderService] acceptLivraison - Début');
     print('   📦 OrderId: $orderId');
-    
+
     try {
       final token = await StorageService().getToken();
 
@@ -1124,7 +1248,8 @@ class OrderService {
       ).timeout(
         const Duration(seconds: 15),
         onTimeout: () {
-          throw Exception('Timeout: La connexion au serveur a pris trop de temps');
+          throw Exception(
+              'Timeout: La connexion au serveur a pris trop de temps');
         },
       );
 
@@ -1133,10 +1258,13 @@ class OrderService {
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         final responseData = jsonDecode(response.body);
+
+        await saveLocation(uidOrder, latitude, longitude);
         print('✅ [OrderService] Livraison acceptée avec succès');
         return {
           'success': true,
-          'message': responseData['message'] ?? 'Livraison prise en charge avec succès',
+          'message': responseData['message'] ??
+              'Livraison prise en charge avec succès',
           'order': responseData['order'] ?? responseData['livraison'],
         };
       } else {
@@ -1144,7 +1272,8 @@ class OrderService {
         print('❌ [OrderService] Erreur (${response.statusCode})');
         return {
           'success': false,
-          'message': errorData['message'] ?? 'Erreur lors de l\'acceptation de la livraison',
+          'message': errorData['message'] ??
+              'Erreur lors de l\'acceptation de la livraison',
         };
       }
     } catch (e) {
@@ -1156,4 +1285,3 @@ class OrderService {
     }
   }
 }
-
