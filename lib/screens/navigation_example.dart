@@ -48,7 +48,7 @@ class _NavigationExampleState extends State<NavigationExample> {
 
   Future<void> _initializeNavigation() async {
     try {
-      MapBoxNavigation.instance.setDefaultOptions(MapBoxOptions(
+      final options = MapBoxOptions(
         initialLatitude: 36.1175275,
         initialLongitude: -115.1839524,
         zoom: 13.0,
@@ -56,17 +56,21 @@ class _NavigationExampleState extends State<NavigationExample> {
         bearing: 0.0,
         enableRefresh: false,
         alternatives: true,
-        voiceInstructionsEnabled: true,
+        voiceInstructionsEnabled: true, // 🔊 Instructions vocales activées
         bannerInstructionsEnabled: true,
         allowsUTurnAtWayPoints: true,
         mode: MapBoxNavigationMode.drivingWithTraffic,
         units: VoiceUnits.metric,
         simulateRoute: false,
-        language: "fr",
-      ));
-
+        language: "fr", // 🇫🇷 Langue française pour les instructions vocales
+      );
+      
+      MapBoxNavigation.instance.setDefaultOptions(options);
       MapBoxNavigation.instance.registerRouteEventListener(_onRouteEvent);
+      
       print("✅ Navigation initialized successfully");
+      print("🔊 Voice instructions enabled: ${options.voiceInstructionsEnabled}");
+      print("🇫🇷 Language: ${options.language}");
     } catch (e) {
       print("❌ Error initializing navigation: $e");
     }
@@ -615,6 +619,24 @@ class _NavigationExampleState extends State<NavigationExample> {
 
   Future<void> _startNavigation() async {
     try {
+      // Configurer les options de navigation avec la voix activée
+      final navigationOptions = MapBoxOptions(
+        initialLatitude: 36.1175275,
+        initialLongitude: -115.1839524,
+        zoom: 13.0,
+        tilt: 0.0,
+        bearing: 0.0,
+        enableRefresh: false,
+        alternatives: true,
+        voiceInstructionsEnabled: true, // 🔊 Instructions vocales activées
+        bannerInstructionsEnabled: true,
+        allowsUTurnAtWayPoints: true,
+        mode: MapBoxNavigationMode.drivingWithTraffic,
+        units: VoiceUnits.metric,
+        simulateRoute: false,
+        language: "fr", // 🇫🇷 Langue française pour les instructions vocales
+      );
+
       // Utiliser les positions réelles du livreur et du client si disponibles
       if (_livreurPosition != null && _acheteurPosition != null) {
         final wayPoints = [
@@ -630,8 +652,12 @@ class _NavigationExampleState extends State<NavigationExample> {
           ),
         ];
 
-        await MapBoxNavigation.instance.startNavigation(wayPoints: wayPoints);
+        await MapBoxNavigation.instance.startNavigation(
+          wayPoints: wayPoints,
+          options: navigationOptions, // 🔊 Passer les options avec la voix activée
+        );
         print("🚀 Navigation started with real positions");
+        print("🔊 Voice instructions enabled: ${navigationOptions.voiceInstructionsEnabled}");
       } else {
         // Fallback vers la méthode originale
         Position position = await Geolocator.getCurrentPosition(
@@ -651,8 +677,12 @@ class _NavigationExampleState extends State<NavigationExample> {
           ),
         ];
 
-        await MapBoxNavigation.instance.startNavigation(wayPoints: wayPoints);
+        await MapBoxNavigation.instance.startNavigation(
+          wayPoints: wayPoints,
+          options: navigationOptions, // 🔊 Passer les options avec la voix activée
+        );
         print("🚀 Navigation started with fallback positions");
+        print("🔊 Voice instructions enabled: ${navigationOptions.voiceInstructionsEnabled}");
       }
     } catch (e) {
       print("❌ Error starting navigation: $e");
