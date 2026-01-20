@@ -854,7 +854,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                               child: Text(
                                 'Tous les produits',
                                 style: TextStyle(
-                                    fontSize: 20,
+                                    fontSize: 16,
                                     fontWeight: FontWeight.bold,
                                     color: Colors.black87,
                                     letterSpacing: 0.3),
@@ -964,7 +964,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                               const Text(
                                 'Restaurants & Repas',
                                 style: TextStyle(
-                                  fontSize: 20,
+                                  fontSize: 16,
                                   fontWeight: FontWeight.bold,
                                   color: Colors.black87,
                                 ),
@@ -1038,7 +1038,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                               const Text(
                                 'Mode, Beauté & Accessoires',
                                 style: TextStyle(
-                                  fontSize: 20,
+                                  fontSize: 16,
                                   fontWeight: FontWeight.bold,
                                   color: Colors.black87,
                                 ),
@@ -1112,7 +1112,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                               const Text(
                                 'Téléphones & Accessoires',
                                 style: TextStyle(
-                                  fontSize: 20,
+                                  fontSize: 16,
                                   fontWeight: FontWeight.bold,
                                   color: Colors.black87,
                                 ),
@@ -1187,7 +1187,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                         const Text(
                           'Produits choisis pour vous',
                           style: TextStyle(
-                            fontSize: 20,
+                            fontSize: 16,
                             fontWeight: FontWeight.bold,
                             color: Colors.black87,
                             letterSpacing: 0.3,
@@ -1265,7 +1265,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                             const Text(
                               'Top Marchands',
                               style: TextStyle(
-                                  fontSize: 20,
+                                  fontSize: 16,
                                   fontWeight: FontWeight.bold,
                                   color: Colors.black87,
                                   letterSpacing: 0.3),
@@ -1416,7 +1416,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                           const Text(
                             'Ma position',
                             style: TextStyle(
-                              fontSize: 20,
+                              fontSize: 16,
                               fontWeight: FontWeight.bold,
                               color: Colors.black87,
                               letterSpacing: 0.3,
@@ -2387,7 +2387,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
               Text(
                 title,
                 style: const TextStyle(
-                  fontSize: 20,
+                  fontSize: 16,
                   fontWeight: FontWeight.bold,
                   color: Colors.black87,
                   letterSpacing: 0.3,

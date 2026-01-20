@@ -183,7 +183,7 @@ class PromoProductsSection extends StatelessWidget {
                   child: Text(
                     'Produits en promo',
                     style: TextStyle(
-                      fontSize: 20,
+                      fontSize: 16,
                       fontWeight: FontWeight.bold,
                       color: Colors.black87,
                       letterSpacing: 0.3,
@@ -264,7 +264,7 @@ class PromoProductsSection extends StatelessWidget {
                 child: Text(
                   'Produits en promo',
                   style: TextStyle(
-                    fontSize: 20,
+                    fontSize: 16,
                     fontWeight: FontWeight.bold,
                     color: Colors.black87,
                     letterSpacing: 0.3,
@@ -321,7 +321,7 @@ class PromoProductsSection extends StatelessWidget {
                 child: Text(
                   'Produits en promo',
                   style: TextStyle(
-                    fontSize: 20,
+                    fontSize: 16,
                     fontWeight: FontWeight.bold,
                     color: Colors.black87,
                     letterSpacing: 0.3,

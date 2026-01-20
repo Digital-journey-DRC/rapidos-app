@@ -169,7 +169,7 @@ class RecommendedProductsSection extends StatelessWidget {
                 child: Text(
                   'Produits recommandés',
                   style: TextStyle(
-                    fontSize: 20,
+                    fontSize: 16,
                     fontWeight: FontWeight.bold,
                     color: Colors.black87,
                     letterSpacing: 0.3,
@@ -226,7 +226,7 @@ class RecommendedProductsSection extends StatelessWidget {
                 child: Text(
                   'Produits recommandés',
                   style: TextStyle(
-                    fontSize: 20,
+                    fontSize: 16,
                     fontWeight: FontWeight.bold,
                     color: Colors.black87,
                     letterSpacing: 0.3,
