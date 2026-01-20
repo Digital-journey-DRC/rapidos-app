@@ -1399,6 +1399,8 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                       ],
                     ),
                   ),
+                  // Espacement en bas de la section Top Marchands pour éviter que les cards soient collées
+                  const SizedBox(height: 24),
 
                   // Espacement entre sections
                   if (_commandes.isNotEmpty || _currentPosition != null)
@@ -2424,6 +2426,8 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
               },
             ),
           ),
+          // Espacement en bas de la section pour éviter que le card soit collé
+          const SizedBox(height: 24),
         ],
       ),
     );

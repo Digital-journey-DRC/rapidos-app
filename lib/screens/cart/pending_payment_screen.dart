@@ -34,12 +34,22 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> {
   Map<int, bool> _isConfirming = {}; // Pour suivre l'état de confirmation par vendeur
   Timer? _refreshTimer; // Timer pour rafraîchir périodiquement
   bool _isFetchingOrders = false; // Pour éviter les requêtes concurrentes
+  bool _isInitialLoading = true; // Flag pour gérer le loading initial de 3 secondes
 
   @override
   void initState() {
     super.initState();
     // Charger les moyens de paiement une seule fois, sans actualisation automatique
     _loadPaymentMethods(context);
+    
+    // Timer de 3 secondes pour le loading initial
+    Timer(const Duration(seconds: 3), () {
+      if (mounted) {
+        setState(() {
+          _isInitialLoading = false;
+        });
+      }
+    });
   }
 
   @override
@@ -1376,10 +1386,33 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> {
         final pendingCount = (stats['pending'] ?? 0) as int;
         final totalPending = pendingPaymentCount + pendingCount;
 
+        // Afficher un loading de 3 secondes lors de l'ouverture initiale de l'écran
+        // pour éviter d'afficher immédiatement le message "Toutes vos commandes sont effectuées"
+        if (_isInitialLoading) {
+          return Scaffold(
+            appBar: AppBar(
+              title: const Text(
+                'Mes commandes',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              leading: IconButton(
+                icon: const Icon(Icons.home),
+                onPressed: _showHomeWarningDialog,
+                tooltip: 'Retour à l\'accueil',
+              ),
+            ),
+            body: const Center(
+              child: EcommerceLoading.overlay(),
+            ),
+          );
+        }
+
         // Si la liste est vide ET qu'il n'y a plus de commandes en attente dans les stats,
         // cela signifie que toutes les commandes sont finalisées
         // On vérifie cela même pendant le chargement pour éviter le clignotement
-        if (orders.isEmpty && totalPending == 0 && stats.isNotEmpty) {
+        if (!orderListState.isLoading && orders.isEmpty && totalPending == 0 && stats.isNotEmpty) {
           return Scaffold(
             appBar: AppBar(
               title: const Text(
