@@ -903,7 +903,7 @@ class _SettingScreenState extends State<SettingScreen>
       ),
       child: Column(
         children: [
-          const SizedBox(height: 40),
+          const SizedBox(height: 12),
           // Photo de profil avec design distinct
           Container(
             decoration: BoxDecoration(
@@ -919,21 +919,21 @@ class _SettingScreenState extends State<SettingScreen>
               boxShadow: [
                 BoxShadow(
                   color: AppColors.primary.withOpacity(0.2),
-                  blurRadius: 25,
-                  offset: const Offset(0, 8),
-                  spreadRadius: 2,
+                  blurRadius: 15,
+                  offset: const Offset(0, 4),
+                  spreadRadius: 1,
                 ),
               ],
             ),
-            padding: const EdgeInsets.all(5),
+            padding: const EdgeInsets.all(3),
             child: Stack(
               alignment: Alignment.bottomRight,
               children: [
                 CircleAvatar(
-                  radius: 65,
+                  radius: 35,
                   backgroundColor: Colors.white,
                   child: CircleAvatar(
-                    radius: 62,
+                    radius: 33,
                     backgroundColor: Colors.grey.shade100,
                     backgroundImage: _selectedImage != null
                         ? FileImage(_selectedImage!) as ImageProvider
@@ -943,7 +943,7 @@ class _SettingScreenState extends State<SettingScreen>
                     child: _selectedImage == null && profileImage.isEmpty
                         ? Icon(
                             Icons.person,
-                            size: 65,
+                            size: 35,
                             color: AppColors.primary.withOpacity(0.3),
                           )
                         : null,
@@ -955,7 +955,7 @@ class _SettingScreenState extends State<SettingScreen>
                     _showImageSourceDialog();
                   },
                   child: Container(
-                    padding: const EdgeInsets.all(10),
+                    padding: const EdgeInsets.all(6),
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: [
@@ -966,30 +966,30 @@ class _SettingScreenState extends State<SettingScreen>
                       shape: BoxShape.circle,
                       border: Border.all(
                         color: Colors.white,
-                        width: 3,
+                        width: 2,
                       ),
                       boxShadow: [
                         BoxShadow(
                           color: AppColors.primary.withOpacity(0.4),
-                          blurRadius: 12,
-                          offset: const Offset(0, 4),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
                         ),
                       ],
                     ),
                     child: const Icon(
                       Icons.camera_alt,
                       color: Colors.white,
-                      size: 18,
+                      size: 14,
                     ),
                   ),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 8),
           // Nom avec style distinct
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
             decoration: BoxDecoration(
               color: Colors.white.withOpacity(0.7),
               borderRadius: BorderRadius.circular(30),
@@ -1002,7 +1002,7 @@ class _SettingScreenState extends State<SettingScreen>
               fullName,
               style: TextStyle(
                 color: Colors.grey.shade900,
-                fontSize: 22,
+                fontSize: 18,
                 fontWeight: FontWeight.bold,
                 letterSpacing: 0.3,
               ),
@@ -1054,7 +1054,7 @@ class _SettingScreenState extends State<SettingScreen>
         color: Colors.grey.shade50,
       ),
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(8.0),
         child: _buildOptionsMenuBlock(user),
       ),
     );
@@ -1612,7 +1612,7 @@ class _SettingScreenState extends State<SettingScreen>
                       );
                     },
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 12),
                   _buildDashboardSection(
                     'Configuration',
                     [
@@ -1661,7 +1661,7 @@ class _SettingScreenState extends State<SettingScreen>
                     ],
                   ),
             ],
-          const SizedBox(height: 24),
+          const SizedBox(height: 12),
           _buildDashboardSection(
             'Profil',
             [
@@ -1703,7 +1703,7 @@ class _SettingScreenState extends State<SettingScreen>
               ),
             ],
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 12),
           _buildDashboardSection(
             'Compte',
             [
@@ -1736,10 +1736,10 @@ class _SettingScreenState extends State<SettingScreen>
   Widget _buildDashboardSection(String title, List<Widget> cards) {
     return Container(
       width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 20),
+      margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: Colors.grey.shade200,
           width: 1,
@@ -1747,7 +1747,7 @@ class _SettingScreenState extends State<SettingScreen>
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
+            blurRadius: 8,
             offset: const Offset(0, 2),
             spreadRadius: 0,
           ),
@@ -1757,7 +1757,7 @@ class _SettingScreenState extends State<SettingScreen>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
             decoration: BoxDecoration(
               border: Border(
                 bottom: BorderSide(
@@ -1769,18 +1769,18 @@ class _SettingScreenState extends State<SettingScreen>
             child: Row(
               children: [
                 Container(
-                  width: 4,
-                  height: 20,
+                  width: 3,
+                  height: 16,
                   decoration: BoxDecoration(
                     color: AppColors.primary,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 10),
                 Text(
                   title,
                   style: TextStyle(
-                    fontSize: 17,
+                    fontSize: 15,
                     fontWeight: FontWeight.bold,
                     color: Colors.grey.shade800,
                     letterSpacing: 0.2,
@@ -1789,11 +1789,16 @@ class _SettingScreenState extends State<SettingScreen>
               ],
             ),
           ),
-          ...cards.map((card) => Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                child: card,
-              )),
-          const SizedBox(height: 12),
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Column(
+              children: cards.map((card) => Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+                    child: card,
+                  )).toList(),
+            ),
+          ),
+          const SizedBox(height: 8),
         ],
       ),
     );

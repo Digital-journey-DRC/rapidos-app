@@ -12,6 +12,7 @@ import 'package:immo/screens/home/voir_plus_produits.dart';
 import 'package:immo/screens/navigation_example.dart';
 import 'package:immo/screens/order_screen.dart';
 import 'package:immo/screens/order/commande_client_screen.dart';
+import 'package:immo/screens/dashboard/setting_screen.dart';
 
 import '../constants.dart';
 import '../cubit/auth_cubit.dart';
@@ -162,6 +163,24 @@ class _MainScreenState extends State<MainScreen> {
     super.dispose();
   }
 
+  Widget _buildMapsIcon(bool isSelected) {
+    return Transform.translate(
+      offset: const Offset(0, -8),
+      child: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.primary : Colors.grey.shade300,
+          shape: BoxShape.circle,
+        ),
+        child: Icon(
+          Icons.place_outlined,
+          color: isSelected ? Colors.white : Colors.grey.shade600,
+          size: 20,
+        ),
+      ),
+    );
+  }
+
   void _onItemTapped(int index) {
     if (!mounted) return;
     
@@ -217,42 +236,22 @@ class _MainScreenState extends State<MainScreen> {
         authState.user != null &&
         authState.user!['phone']?.toString() == "+243842613999";
 
-    List<BottomNavigationBarItem> navigationItems = [
-      const BottomNavigationBarItem(
-        icon: Icon(Icons.home_outlined),
-        label: 'Accueil',
-      ),
-      const BottomNavigationBarItem(
-        icon: CartBadge(),
-        label: 'Panier',
-      ),
-      const BottomNavigationBarItem(
-        icon: Icon(Icons.favorite_border),
-        label: 'Favoris',
-      ),
-      const BottomNavigationBarItem(
-        icon: Icon(Icons.shopping_bag_outlined),
-        label: 'Commandes',
-      ),
-      const BottomNavigationBarItem(
-        icon: Icon(Icons.place_outlined),
-        label: 'Maps',
-      ),
-    ];
-
     // Filtrer les écrans en fonction du rôle
     List<Widget> filteredScreens = [];
+    List<BottomNavigationBarItem> navigationItems = [];
 
     if (isAcheteur) {
       filteredScreens = [
         _screens[0], // NewHomeScreen
         _screens[1], // CartScreen
-        _screens[2], // FavorisScreen
+        _screens[6], // NavigationExample (Maps) - maintenant au milieu
         const CommandeClientScreen(backNavigation: false), // Historique des commandes client
-        _screens[6] // NavigationExample (Maps)
+        const SettingScreen(), // Profil - remplace Maps
         // _screens[10]
         // HomeMarchantScreen
       ];
+      // Les items seront créés dans le BottomNavigationBar pour avoir accès à _currentIndex
+      navigationItems = [];
     } else if (isVendeur) {
       filteredScreens = [
         _screens[3], // HomeMarchantScreen
@@ -291,6 +290,7 @@ class _MainScreenState extends State<MainScreen> {
       ];
     } else {
       filteredScreens = _screens;
+      navigationItems = [];
     }
 
     return Scaffold(
@@ -299,15 +299,46 @@ class _MainScreenState extends State<MainScreen> {
         children: filteredScreens,
       ),
       // Cacher la barre de navigation pour l'utilisateur restreint
-      bottomNavigationBar: isRestrictedUser ? null : BottomNavigationBar(
-        backgroundColor: const Color.fromARGB(255, 250, 250, 250),
-        currentIndex: _currentIndex,
-        onTap: _onItemTapped,
-        items: navigationItems,
-        type: BottomNavigationBarType.fixed,
-        selectedItemColor: AppColors.primary,
-        unselectedItemColor: Colors.grey,
-      ),
+      bottomNavigationBar: isRestrictedUser ? null : (isAcheteur 
+        ? BottomNavigationBar(
+            backgroundColor: const Color.fromARGB(255, 250, 250, 250),
+            currentIndex: _currentIndex,
+            onTap: _onItemTapped,
+            items: [
+              const BottomNavigationBarItem(
+                icon: Icon(Icons.home_outlined),
+                label: 'Accueil',
+              ),
+              const BottomNavigationBarItem(
+                icon: CartBadge(),
+                label: 'Panier',
+              ),
+              BottomNavigationBarItem(
+                icon: _buildMapsIcon(_currentIndex == 2),
+                label: 'Maps',
+              ),
+              const BottomNavigationBarItem(
+                icon: Icon(Icons.shopping_bag_outlined),
+                label: 'Commandes',
+              ),
+              const BottomNavigationBarItem(
+                icon: Icon(Icons.person_outline),
+                label: 'Profil',
+              ),
+            ],
+            type: BottomNavigationBarType.fixed,
+            selectedItemColor: AppColors.primary,
+            unselectedItemColor: Colors.grey,
+          )
+        : BottomNavigationBar(
+            backgroundColor: const Color.fromARGB(255, 250, 250, 250),
+            currentIndex: _currentIndex,
+            onTap: _onItemTapped,
+            items: navigationItems,
+            type: BottomNavigationBarType.fixed,
+            selectedItemColor: AppColors.primary,
+            unselectedItemColor: Colors.grey,
+          )),
     );
   }
 
