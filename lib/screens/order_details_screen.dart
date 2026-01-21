@@ -332,18 +332,18 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
           final userId = authState.user!['id'].toString();
           final userPhone = authState.user!['phone'] as String?;
           
-          await FirebaseFirestore.instance
-              .collection('locations')
-              .doc(userId)
-              .set({
-                'userId': userId,
-                'role': 'livreur',
-                'orderId': orderId,
-                'latitude': position.latitude,
-                'longitude': position.longitude,
-                'phone': userPhone ?? '',
-                'timestamp': FieldValue.serverTimestamp(),
-              }, SetOptions(merge: true));
+          // await FirebaseFirestore.instance
+          //     .collection('locations')
+          //     .doc(userId)
+          //     .set({
+          //       'userId': userId,
+          //       'role': 'livreur',
+          //       'orderId': orderId,
+          //       'latitude': position.latitude,
+          //       'longitude': position.longitude,
+          //       'phone': userPhone ?? '',
+          //       'timestamp': FieldValue.serverTimestamp(),
+          //     }, SetOptions(merge: true));
           
           print('✅ [Location] Firestore mis à jour avec orderId: $orderId');
         }
@@ -800,7 +800,8 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     final status = orderData['status']?.toString() ?? 'pending';
     final createdAt = orderData['createdAt']?.toString() ?? '';
     final updatedAt = orderData['updatedAt']?.toString() ?? '';
-    final address = orderData['address'] as Map<String, dynamic>? ?? {};
+    // final address = orderData['address'] as Map<String, dynamic>? ?? {};
+    final address = orderData['address'] != null ? Map<String, dynamic>.from(orderData['address']) : {};
     final phone = orderData['phone']?.toString() ?? '';
     // Utiliser clientName de l'API ou extraire depuis l'email
     final clientEmail = orderData['client']?.toString() ?? '';
@@ -813,7 +814,8 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     final vendorPhone = orderData['vendorPhone']?.toString() ?? '';
     
     final packagePhoto = orderData['packagePhoto']?.toString();
-    final paymentMethod = orderData['paymentMethod'] as Map<String, dynamic>? ?? {};
+    // final paymentMethod = orderData['paymentMethod'] as Map<String, dynamic>? ?? {};
+    final paymentMethod = orderData['paymentMethod'] != null ? Map<String, dynamic>.from(orderData['paymentMethod']) : {};
     final numeroPayment = orderData['numeroPayment']?.toString();
     final codeColis = orderData['codeColis']?.toString();
     final distanceKm = orderData['distanceKm']?.toString() ?? '';
@@ -1432,7 +1434,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                                 const SizedBox(width: 12),
                                 Text(
                                   '$itemTotal FC',
-                                  style: TextStyle(
+                                  style: const TextStyle(
                                     fontSize: 11,
                                     fontWeight: FontWeight.bold,
                                     color: AppColors.primary,
@@ -1563,7 +1565,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                       icon: Icons.info_outline,
                       child: Column(
                         children: [
-                          if (codeColis != null && codeColis.isNotEmpty) ...[
+                          if (codeColis != null && codeColis.isNotEmpty && !(userRole == 'livreur')) ...[
                             _buildInfoRow(
                               icon: Icons.qr_code,
                               label: 'Code colis',
@@ -1884,12 +1886,20 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                                   
                                   try {
                                     // Utiliser orderId pour l'endpoint /ecommerce/livraison/:orderId/take
-                                    final orderId = orderData['orderId']?.toString() ?? 
+                                    final orderId = orderData['id']?.toString() ?? 
                                                    widget.orderId;
+
+                                    Position position = await Geolocator.getCurrentPosition(
+                                      desiredAccuracy: LocationAccuracy.high,
+                                    );
+
+                                    final latitude = position.latitude;
+                                    final longitude = position.longitude;
+                                    final uidOrder = orderData['orderId']?.toString() ?? widget.orderId;
                                     
                                     print('🚚 [OrderDetailsScreen] Acceptation livraison - orderId: $orderId');
                                     
-                                    final result = await context.read<OrderCubit>().acceptLivraison(orderId);
+                                    final result = await context.read<OrderCubit>().acceptLivraison(orderId, uidOrder, latitude, longitude);
                                     
                                     if (mounted) {
                                       if (result['success'] == true) {
@@ -1947,7 +1957,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                             padding: const EdgeInsets.symmetric(vertical: 8),
                                     ),
                           child: _isAcceptingLivraison
-                              ? Row(
+                              ? const Row(
                                       mainAxisAlignment: MainAxisAlignment.center,
                                       children: [
                                     SizedBox(
@@ -1958,8 +1968,8 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                                         valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                                       ),
                                     ),
-                                    const SizedBox(width: 10),
-                                        const Text(
+                                    SizedBox(width: 10),
+                                        Text(
                                       'Traitement...',
                                           style: TextStyle(
                                         color: Colors.white,
@@ -2037,7 +2047,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                             padding: const EdgeInsets.symmetric(vertical: 8),
                           ),
                           child: _isMarkingEnRoute
-                              ? Row(
+                              ? const Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
                                     SizedBox(

@@ -234,23 +234,25 @@ class _TrackingMapPageState extends State<TrackingMapPage> {
 
       print("📍 Position obtenue: ${position.latitude}, ${position.longitude}");
 
-      // Créer le document de position pour le livreur (champs essentiels seulement)
-      Map<String, dynamic> positionData = {
-        'userId': userId,           // Identifiant unique du livreur
-        'role': 'livreur',          // Rôle pour filtrer les positions
-        'latitude': position.latitude,    // Position GPS
-        'longitude': position.longitude,  // Position GPS
-        'phone': userPhone,         // Numéro pour les appels
-        'timestamp': FieldValue.serverTimestamp(), // Moment de la mise à jour
-      };
-
-      // Sauvegarder la position dans Firestore
-      await FirebaseFirestore.instance
+      // Chercher un document existant par le champ userId
+      final locationQuery = await FirebaseFirestore.instance
           .collection('locations')
-          .doc(userId)
-          .set(positionData, SetOptions(merge: true));
+          .where('userId', isEqualTo: userId)
+          .where('role', isEqualTo: 'livreur')
+          .limit(1)
+          .get();
 
-      print("✅ Position du livreur mise à jour avec succès");
+      // Si le document existe, mettre à jour seulement latitude et longitude
+      if (locationQuery.docs.isNotEmpty) {
+        await locationQuery.docs.first.reference.update({
+          'latitude': position.latitude,
+          'longitude': position.longitude,
+          'timestamp': FieldValue.serverTimestamp(),
+        });
+        print("✅ Position du livreur mise à jour avec succès");
+      } else {
+        print("ℹ️ Aucun document trouvé pour ce livreur, pas de mise à jour");
+      }
 
       // Mettre à jour la position locale pour l'affichage
       setState(() {

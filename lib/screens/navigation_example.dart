@@ -97,23 +97,25 @@ class _NavigationExampleState extends State<NavigationExample> {
 
       print("📍 Position obtenue: ${position.latitude}, ${position.longitude}");
 
-      // Créer le document de position pour le livreur
-      Map<String, dynamic> positionData = {
-        'userId': userId,
-        'role': 'livreur',
-        'latitude': position.latitude,
-        'longitude': position.longitude,
-        'phone': userPhone,
-        'timestamp': FieldValue.serverTimestamp(),
-      };
-
-      // Sauvegarder la position dans Firestore
-      await FirebaseFirestore.instance
+      // Chercher un document existant par le champ userId
+      final locationQuery = await FirebaseFirestore.instance
           .collection('locations')
-          .doc(userId)
-          .set(positionData, SetOptions(merge: true));
+          .where('userId', isEqualTo: userId)
+          .where('role', isEqualTo: 'livreur')
+          .limit(1)
+          .get();
 
-      print("✅ Position du livreur mise à jour avec succès");
+      // Si le document existe, mettre à jour seulement latitude et longitude
+      if (locationQuery.docs.isNotEmpty) {
+        await locationQuery.docs.first.reference.update({
+          'latitude': position.latitude,
+          'longitude': position.longitude,
+          'timestamp': FieldValue.serverTimestamp(),
+        });
+        print("✅ Position du livreur mise à jour avec succès");
+      } else {
+        print("ℹ️ Aucun document trouvé pour ce livreur, pas de mise à jour");
+      }
 
       // Mettre à jour la position locale pour l'affichage
       setState(() {
@@ -153,21 +155,22 @@ class _NavigationExampleState extends State<NavigationExample> {
       final authState = context.read<AuthCubit>().state;
       if (authState is! AuthSuccess || authState.user == null) return;
 
-      final userPhone = authState.user!['phone'] as String?;
-
-      Map<String, dynamic> positionData = {
-        'userId': userId,
-        'role': 'livreur',
-        'latitude': position.latitude,
-        'longitude': position.longitude,
-        'phone': userPhone,
-        'timestamp': FieldValue.serverTimestamp(),
-      };
-
-      await FirebaseFirestore.instance
+      // Chercher un document existant par le champ userId
+      final locationQuery = await FirebaseFirestore.instance
           .collection('locations')
-          .doc(userId)
-          .set(positionData, SetOptions(merge: true));
+          .where('userId', isEqualTo: userId)
+          .where('role', isEqualTo: 'livreur')
+          .limit(1)
+          .get();
+
+      // Si le document existe, mettre à jour seulement latitude et longitude
+      if (locationQuery.docs.isNotEmpty) {
+        await locationQuery.docs.first.reference.update({
+          'latitude': position.latitude,
+          'longitude': position.longitude,
+          'timestamp': FieldValue.serverTimestamp(),
+        });
+      }
 
       setState(() {
         _livreurPosition = LatLng(position.latitude, position.longitude);
@@ -289,22 +292,21 @@ class _NavigationExampleState extends State<NavigationExample> {
               print('📍 [Navigation] Acheteur orderId actuel: $myOrderId');
               
               if (myOrderId != null && myOrderId.isNotEmpty) {
-                // Écouter les livreurs avec le même orderId
+                // Écouter toutes les positions (livreur et acheteur) avec le même orderId
                 FirebaseFirestore.instance
                     .collection('locations')
                     .where('orderId', isEqualTo: myOrderId)
-                    .where('role', isEqualTo: 'livreur')
                     .snapshots()
-                    .listen((livreurSnapshot) {
-                      print('📍 [Navigation] Received ${livreurSnapshot.docs.length} livreur locations for orderId: $myOrderId');
+                    .listen((allLocationsSnapshot) {
+                      print('📍 [Navigation] Received ${allLocationsSnapshot.docs.length} locations for orderId: $myOrderId');
                       
                       setState(() {
-                        _hasActiveOrders = livreurSnapshot.docs.isNotEmpty;
+                        _hasActiveOrders = allLocationsSnapshot.docs.isNotEmpty;
                         _isLoading = false;
                       });
                       
-                      if (livreurSnapshot.docs.isNotEmpty) {
-                        _updateMarkersFromLocations(livreurSnapshot.docs, userRole, userId);
+                      if (allLocationsSnapshot.docs.isNotEmpty) {
+                        _updateMarkersFromLocations(allLocationsSnapshot.docs, userRole, userId);
                       } else {
                         _clearMapData();
                       }
@@ -340,22 +342,21 @@ class _NavigationExampleState extends State<NavigationExample> {
               print('📍 [Navigation] Livreur orderId actuel: $myOrderId');
               
               if (myOrderId != null && myOrderId.isNotEmpty) {
-                // Écouter les acheteurs avec le même orderId
+                // Écouter toutes les positions (livreur et acheteur) avec le même orderId
                 FirebaseFirestore.instance
                     .collection('locations')
                     .where('orderId', isEqualTo: myOrderId)
-                    .where('role', isEqualTo: 'acheteur')
                     .snapshots()
-                    .listen((acheteurSnapshot) {
-                      print('📍 [Navigation] Received ${acheteurSnapshot.docs.length} acheteur locations for orderId: $myOrderId');
+                    .listen((allLocationsSnapshot) {
+                      print('📍 [Navigation] Received ${allLocationsSnapshot.docs.length} locations for orderId: $myOrderId');
                       
                       setState(() {
-                        _hasActiveOrders = acheteurSnapshot.docs.isNotEmpty;
+                        _hasActiveOrders = allLocationsSnapshot.docs.isNotEmpty;
                         _isLoading = false;
                       });
                       
-                      if (acheteurSnapshot.docs.isNotEmpty) {
-                        _updateMarkersFromLocations(acheteurSnapshot.docs, userRole, userId);
+                      if (allLocationsSnapshot.docs.isNotEmpty) {
+                        _updateMarkersFromLocations(allLocationsSnapshot.docs, userRole, userId);
                       } else {
                         _clearMapData();
                       }
@@ -406,8 +407,8 @@ class _NavigationExampleState extends State<NavigationExample> {
       
       final position = LatLng(lat, lng);
       
-      if (userRole == 'acheteur' && role == 'livreur') {
-        // Afficher le livreur (icône bleue)
+      // Afficher le livreur (icône bleue)
+      if (role == 'livreur') {
         _livreurPosition = position;
         _livreurPhone = phone;
         
@@ -418,13 +419,15 @@ class _NavigationExampleState extends State<NavigationExample> {
             icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
             infoWindow: InfoWindow(
               title: 'Livreur',
-              snippet: phone != null ? 'Tél: $phone' : 'En route vers vous',
+              snippet: phone != null ? 'Tél: $phone' : 'En route',
             ),
           ),
         );
         print('📍 [Navigation] Added livreur marker at $position');
-      } else if (userRole == 'livreur' && role == 'acheteur') {
-        // Afficher l'acheteur (icône rouge)
+      }
+      
+      // Afficher l'acheteur (icône rouge)
+      if (role == 'acheteur') {
         _acheteurPosition = position;
         _acheteurPhone = phone;
         
@@ -653,12 +656,35 @@ class _NavigationExampleState extends State<NavigationExample> {
       }
     } catch (e) {
       print("❌ Error starting navigation: $e");
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erreur: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      
+      // Vérifier si l'erreur est liée à la distance maximale
+      String errorMessage = e.toString().toLowerCase();
+      if (errorMessage.contains('maximum distance') || 
+          errorMessage.contains('exceeds') && errorMessage.contains('distance') ||
+          errorMessage.contains('distance limitation') ||
+          errorMessage.contains('route exceeds')) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'La distance entre le livreur et l\'acheteur est trop longue. Le livreur est peut-être dans un autre pays.',
+                style: TextStyle(fontSize: 14),
+              ),
+              backgroundColor: Colors.orange,
+              duration: Duration(seconds: 5),
+            ),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Erreur: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
     }
   }
 
