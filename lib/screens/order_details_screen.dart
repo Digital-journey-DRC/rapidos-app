@@ -2600,8 +2600,13 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
               backgroundColor: Colors.green,
             ),
           );
-          // Retourner à la liste des commandes
-          Navigator.pop(context);
+          // Rester sur la page et rafraîchir les données si renvoyées
+          setState(() {
+            _isUploadingPhoto = false;
+            if (result['order'] != null) {
+              _currentOrderData = Map<String, dynamic>.from(result['order']);
+            }
+          });
         } else {
           print('❌ [OrderDetailsScreen] Erreur: ${result['message']}');
           if (mounted) {
@@ -2656,8 +2661,18 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
               backgroundColor: Colors.green,
             ),
           );
-          // Retourner à la liste des commandes
-          Navigator.pop(context);
+          // Rester sur la page et rafraîchir les données si renvoyées
+          setState(() {
+            _isMarkingReady = false;
+            if (result['order'] != null) {
+              _currentOrderData = Map<String, dynamic>.from(result['order']);
+            } else {
+              // Au minimum, mettre à jour le statut localement
+              final current = Map<String, dynamic>.from(_currentOrderData ?? widget.orderData);
+              current['status'] = 'pret_a_expedier';
+              _currentOrderData = current;
+            }
+          });
         } else {
           print('❌ [OrderDetailsScreen] Erreur: ${result['message']}');
           if (mounted) {

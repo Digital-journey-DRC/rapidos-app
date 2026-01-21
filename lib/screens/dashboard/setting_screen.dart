@@ -27,6 +27,7 @@ import '../merchant/location_screen.dart';
 import '../../cubit/product_cubit.dart';
 import '../../services/promotion_service.dart';
 import '../../models/promotion.dart';
+import '../favoris_screen.dart';
 
 class SettingScreen extends StatefulWidget {
   const SettingScreen({super.key});
@@ -782,15 +783,19 @@ class _SettingScreenState extends State<SettingScreen>
       value: _profileCubit,
       child: Scaffold(
         appBar: AppBarWithLogo(
-          leading: InkWell(
-              onTap: () {
-                Navigator.pop(context);
-              },
-              child: Icon(Icons.arrow_back_ios, color: Colors.grey.shade800)),
+          leading: Navigator.canPop(context) 
+            ? InkWell(
+                onTap: () {
+                  Navigator.pop(context);
+                },
+                child: Icon(Icons.arrow_back_ios, color: Colors.grey.shade800))
+            : const SizedBox.shrink(),
+          automaticallyImplyLeading: false,
           title: 'Paramètres du compte',
           backgroundColor: Colors.white,
           elevation: 0,
           useWhiteLogo: false,
+          showProfileButton: false, // Ne pas afficher le bouton de profil puisqu'on est déjà dans le profil
         ),
         body: BlocConsumer<ProfileCubit, ProfileState>(
           listener: (context, state) {
@@ -1504,6 +1509,7 @@ class _SettingScreenState extends State<SettingScreen>
   /// Construit le bloc de menu des options avec design moderne
   Widget _buildOptionsMenuBlock(Map<String, dynamic> user) {
     final isVendeur = user['role'] == 'vendeur';
+    final isAcheteur = user['role'] == 'acheteur';
     
     return SingleChildScrollView(
       child: Column(
@@ -1665,6 +1671,21 @@ class _SettingScreenState extends State<SettingScreen>
           _buildDashboardSection(
             'Profil',
             [
+              if (isAcheteur)
+                MerchantSectionCard(
+                  title: 'Mes favoris',
+                  subtitle: 'Voir vos produits favoris',
+                  icon: Icons.favorite_outline,
+                  iconColor: Colors.red,
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const FavorisScreen(),
+                      ),
+                    );
+                  },
+                ),
               MerchantSectionCard(
                 title: 'Informations personnelles',
                 subtitle: 'Mettre à jour vos données',

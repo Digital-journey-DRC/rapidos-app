@@ -302,7 +302,7 @@ class _OrderSuccessScreenState extends State<OrderSuccessScreen> {
                         )
                       : Icon(Icons.picture_as_pdf, size: 22, color: AppColors.primary),
                   label: Text(
-                    _isGeneratingPdf ? 'Génération...' : 'Télécharger PDF pour cette commande',
+                    _isGeneratingPdf ? 'Génération...' : 'Télécharger PDF',
                     style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
