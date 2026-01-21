@@ -2593,6 +2593,9 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
       if (context.mounted) {
         if (result['success'] == true) {
           print('✅ [OrderDetailsScreen] Photo uploadée avec succès');
+          print('📦 [OrderDetailsScreen] Result keys: ${result.keys.toList()}');
+          print('📦 [OrderDetailsScreen] result[order]: ${result['order']}');
+          print('📦 [OrderDetailsScreen] result[photoUrl]: ${result['photoUrl']}');
           
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -2600,12 +2603,41 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
               backgroundColor: Colors.green,
             ),
           );
-          // Rester sur la page et rafraîchir les données si renvoyées
+          // Rester sur la page et rafraîchir les données
           setState(() {
             _isUploadingPhoto = false;
-            if (result['order'] != null) {
+            final current = Map<String, dynamic>.from(_currentOrderData ?? widget.orderData);
+            
+            // Priorité 1: Si l'API renvoie l'ordre complet, l'utiliser
+            if (result['order'] != null && result['order'] is Map) {
               _currentOrderData = Map<String, dynamic>.from(result['order']);
+              print('✅ [OrderDetailsScreen] Ordre complet mis à jour depuis result[order]');
+            } else {
+              // Priorité 2: Chercher l'URL de la photo dans différents champs possibles
+              String? photoUrl;
+              if (result['photoUrl'] != null && result['photoUrl'].toString().isNotEmpty) {
+                photoUrl = result['photoUrl'].toString();
+              } else if (result['packagePhoto'] != null && result['packagePhoto'].toString().isNotEmpty) {
+                photoUrl = result['packagePhoto'].toString();
+              } else if (result['imageUrl'] != null && result['imageUrl'].toString().isNotEmpty) {
+                photoUrl = result['imageUrl'].toString();
+              } else if (result['order'] != null && result['order'] is Map) {
+                final orderData = result['order'] as Map;
+                if (orderData['packagePhoto'] != null && orderData['packagePhoto'].toString().isNotEmpty) {
+                  photoUrl = orderData['packagePhoto'].toString();
+                }
+              }
+              
+              if (photoUrl != null) {
+                current['packagePhoto'] = photoUrl;
+                print('✅ [OrderDetailsScreen] Photo mise à jour: $photoUrl');
+              }
+              
+              _currentOrderData = current;
             }
+            
+            // Vérifier que la photo est bien dans _currentOrderData
+            print('📸 [OrderDetailsScreen] packagePhoto final: ${_currentOrderData?['packagePhoto']}');
           });
         } else {
           print('❌ [OrderDetailsScreen] Erreur: ${result['message']}');
