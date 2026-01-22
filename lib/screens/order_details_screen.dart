@@ -839,13 +839,18 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
         elevation: 0,
         centerTitle: true,
       ),
-      body: SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).padding.bottom + 20,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+      body: SafeArea(
+        bottom: true,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).padding.bottom + 20,
+            left: 16,
+            right: 16,
+            top: 8,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
             // En-tête élégant avec gradient
@@ -2262,7 +2267,8 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                 ],
               ),
             ),
-          ],
+            ],
+          ),
         ),
       ),
       // Bouton flottant pour générer la facture PDF (uniquement pour les marchands)
@@ -2605,12 +2611,60 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
         return;
       }
       
-      // Capturer l'image avec des limites strictes pour éviter les problèmes de mémoire
+      // Détecter la résolution de l'écran pour adapter la qualité et la taille
+      final mediaQuery = MediaQuery.of(context);
+      final screenWidth = mediaQuery.size.width;
+      final screenHeight = mediaQuery.size.height;
+      final devicePixelRatio = mediaQuery.devicePixelRatio;
+      
+      // Calculer la résolution réelle de l'écran
+      final realWidth = screenWidth * devicePixelRatio;
+      final realHeight = screenHeight * devicePixelRatio;
+      final totalPixels = realWidth * realHeight;
+      
+      print('📱 [OrderDetailsScreen] Résolution écran: ${realWidth.toInt()}x${realHeight.toInt()}');
+      print('📱 [OrderDetailsScreen] DevicePixelRatio: $devicePixelRatio');
+      print('📱 [OrderDetailsScreen] Total pixels: ${(totalPixels / 1000000).toStringAsFixed(2)}M');
+      
+      // Adapter la taille maximale en fonction de la résolution
+      // Pour les écrans haute résolution (Samsung, etc.), on augmente la taille
+      // Pour les écrans basse résolution, on la réduit
+      int maxWidth;
+      int maxHeight;
+      int imageQuality;
+      
+      if (totalPixels > 5000000) {
+        // Écrans haute résolution (Full HD+, QHD, etc.) - Samsung flagships
+        maxWidth = 1200;
+        maxHeight = 1200;
+        imageQuality = 85;
+        print('📱 [OrderDetailsScreen] Mode haute résolution activé');
+      } else if (totalPixels > 2000000) {
+        // Écrans résolution moyenne (HD+, Full HD)
+        maxWidth = 1000;
+        maxHeight = 1000;
+        imageQuality = 80;
+        print('📱 [OrderDetailsScreen] Mode résolution moyenne activé');
+      } else {
+        // Écrans basse résolution (HD)
+        maxWidth = 800;
+        maxHeight = 800;
+        imageQuality = 75;
+        print('📱 [OrderDetailsScreen] Mode basse résolution activé');
+      }
+      
+      // S'assurer que les valeurs ne dépassent pas la résolution réelle de l'écran
+      maxWidth = maxWidth > realWidth ? realWidth.toInt() : maxWidth;
+      maxHeight = maxHeight > realHeight ? realHeight.toInt() : maxHeight;
+      
+      print('📷 [OrderDetailsScreen] Paramètres image: ${maxWidth}x${maxHeight}, qualité: $imageQuality%');
+      
+      // Capturer l'image avec des paramètres adaptés à la résolution
       image = await _imagePicker.pickImage(
         source: ImageSource.camera,
-        imageQuality: 75, // Réduire encore la qualité pour éviter les problèmes
-        maxWidth: 800,
-        maxHeight: 800,
+        imageQuality: imageQuality,
+        maxWidth: maxWidth.toDouble(),
+        maxHeight: maxHeight.toDouble(),
         preferredCameraDevice: CameraDevice.rear,
       );
 
