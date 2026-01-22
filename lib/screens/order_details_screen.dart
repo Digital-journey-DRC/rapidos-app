@@ -40,6 +40,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
   bool _isAcceptingLivraison = false; // Pour le loader du bouton accepter livraison
   bool _isMarkingEnRoute = false; // Pour le loader du bouton marquer en route
   bool _isDelivering = false; // Pour le loader du bouton livrer
+  final ImagePicker _imagePicker = ImagePicker(); // Instance unique pour éviter les problèmes de mémoire
 
   @override
   void initState() {
@@ -1782,10 +1783,24 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                     if (status == 'pending_payment' || status == 'pending')
                       _VendeurOrderActionsWidget(
                         orderId: widget.orderId,
-                        orderData: widget.orderData,
+                        orderData: _currentOrderData ?? widget.orderData,
                         onStatusChanged: () {
-                          // Ne pas naviguer, juste rafraîchir les données
-                          // Les données sont déjà mises à jour via setState dans les méthodes
+                          print('🔄 [OrderDetailsScreen] onStatusChanged appelé - Mise à jour du statut à en_preparation');
+                          // Mettre à jour immédiatement _currentOrderData avec le nouveau statut
+                          if (mounted) {
+                            setState(() {
+                              final current = Map<String, dynamic>.from(_currentOrderData ?? widget.orderData);
+                              current['status'] = 'en_preparation';
+                              _currentOrderData = current;
+                              print('✅ [OrderDetailsScreen] _currentOrderData mis à jour - status: ${_currentOrderData?['status']}');
+                            });
+                          }
+                          // Rafraîchir les données depuis l'API en arrière-plan
+                          context.read<OrderCubit>().fetchVendeurOrders().then((_) {
+                            if (mounted) {
+                              setState(() {});
+                            }
+                          });
                         },
                       ),
                     // Boutons pour en_preparation (workflow séquentiel)
@@ -2406,17 +2421,32 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
               child: ElevatedButton(
                 onPressed: _isUploadingPhoto
                     ? null
-                    : () async {
+                    : () {
+                        // Vérifier que le widget est monté
+                        if (!mounted) return;
+                        
+                        // Mettre à jour l'état de chargement
                         setState(() {
                           _isUploadingPhoto = true;
                         });
-                        await _uploadPackagePhoto(context, orderId);
-                        setState(() {
-                          _isUploadingPhoto = false;
+                        
+                        // Appeler la méthode d'upload
+                        // Cette méthode gère tout : upload, redirection, et réinitialisation de l'état
+                        _uploadPackagePhoto(context, orderId).catchError((error) {
+                          // Gérer les erreurs non capturées
+                          print('💥 [OrderDetailsScreen] Erreur non capturée dans callback: $error');
+                          if (mounted) {
+                            setState(() {
+                              _isUploadingPhoto = false;
+                            });
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Erreur: $error'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          }
                         });
-                        if (onStatusChanged != null) {
-                          onStatusChanged();
-                        }
                       },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.blue,
@@ -2564,15 +2594,31 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
   }
 
   Future<void> _uploadPackagePhoto(BuildContext context, String orderId) async {
+    XFile? image;
     try {
       print('🔄 [OrderDetailsScreen] Étape 3: Uploader photo du colis');
       print('   📦 OrderId: $orderId');
       
-      final ImagePicker picker = ImagePicker();
-      final XFile? image = await picker.pickImage(
+      // Vérifier que le widget est toujours monté avant de lancer le picker
+      if (!mounted) {
+        print('❌ [OrderDetailsScreen] Widget non monté, annulation');
+        return;
+      }
+      
+      // Capturer l'image avec des limites strictes pour éviter les problèmes de mémoire
+      image = await _imagePicker.pickImage(
         source: ImageSource.camera,
-        imageQuality: 85,
+        imageQuality: 75, // Réduire encore la qualité pour éviter les problèmes
+        maxWidth: 800,
+        maxHeight: 800,
+        preferredCameraDevice: CameraDevice.rear,
       );
+
+      // Vérifier à nouveau que le widget est monté après le picker
+      if (!mounted) {
+        print('❌ [OrderDetailsScreen] Widget non monté après sélection image');
+        return;
+      }
 
       if (image == null) {
         print('❌ [OrderDetailsScreen] Aucune image sélectionnée');
@@ -2586,97 +2632,125 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
 
       print('📷 [OrderDetailsScreen] Image sélectionnée: ${image.path}');
 
+      // Afficher le message de chargement
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Upload de la photo en cours...'),
             backgroundColor: Colors.blue,
+            duration: Duration(seconds: 2),
           ),
         );
       }
 
+      // Upload de l'image
       final result = await context.read<OrderCubit>().uploadPackagePhoto(
         orderId: orderId,
         imagePath: image.path,
       );
 
-      if (context.mounted) {
-        if (result['success'] == true) {
-          print('✅ [OrderDetailsScreen] Photo uploadée avec succès');
-          print('📦 [OrderDetailsScreen] Result keys: ${result.keys.toList()}');
-          print('📦 [OrderDetailsScreen] result[order]: ${result['order']}');
-          print('📦 [OrderDetailsScreen] result[photoUrl]: ${result['photoUrl']}');
-          
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Photo uploadée avec succès'),
-              backgroundColor: Colors.green,
-            ),
-          );
-          // Rester sur la page et rafraîchir les données
+      // Libérer la référence à l'image après l'upload pour libérer la mémoire
+      image = null;
+
+      // Vérifier que le widget est toujours monté avant de continuer
+      if (!context.mounted) {
+        print('❌ [OrderDetailsScreen] Widget non monté après upload');
+        return;
+      }
+
+      if (result['success'] == true) {
+        print('✅ [OrderDetailsScreen] Photo uploadée avec succès');
+        print('📦 [OrderDetailsScreen] Result keys: ${result.keys.toList()}');
+        print('📦 [OrderDetailsScreen] result[order]: ${result['order']}');
+        print('📦 [OrderDetailsScreen] result[photoUrl]: ${result['photoUrl']}');
+        
+        // Réinitialiser l'état avant la redirection
+        if (mounted) {
           setState(() {
             _isUploadingPhoto = false;
-            final current = Map<String, dynamic>.from(_currentOrderData ?? widget.orderData);
-            
-            // Priorité 1: Si l'API renvoie l'ordre complet, l'utiliser
-            if (result['order'] != null && result['order'] is Map) {
-              _currentOrderData = Map<String, dynamic>.from(result['order']);
-              print('✅ [OrderDetailsScreen] Ordre complet mis à jour depuis result[order]');
-            } else {
-              // Priorité 2: Chercher l'URL de la photo dans différents champs possibles
-              String? photoUrl;
-              if (result['photoUrl'] != null && result['photoUrl'].toString().isNotEmpty) {
-                photoUrl = result['photoUrl'].toString();
-              } else if (result['packagePhoto'] != null && result['packagePhoto'].toString().isNotEmpty) {
-                photoUrl = result['packagePhoto'].toString();
-              } else if (result['imageUrl'] != null && result['imageUrl'].toString().isNotEmpty) {
-                photoUrl = result['imageUrl'].toString();
-              } else if (result['order'] != null && result['order'] is Map) {
-                final orderData = result['order'] as Map;
-                if (orderData['packagePhoto'] != null && orderData['packagePhoto'].toString().isNotEmpty) {
-                  photoUrl = orderData['packagePhoto'].toString();
-                }
-              }
-              
-              if (photoUrl != null) {
-                current['packagePhoto'] = photoUrl;
-                print('✅ [OrderDetailsScreen] Photo mise à jour: $photoUrl');
-              }
-              
-              _currentOrderData = current;
-            }
-            
-            // Vérifier que la photo est bien dans _currentOrderData
-            print('📸 [OrderDetailsScreen] packagePhoto final: ${_currentOrderData?['packagePhoto']}');
           });
-        } else {
-          print('❌ [OrderDetailsScreen] Erreur: ${result['message']}');
-          if (mounted) {
-            setState(() {
-              _isUploadingPhoto = false;
-            });
-          }
+        }
+        
+        // Afficher le message de succès
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Photo uploadée avec succès ! Cliquez sur "Marquer prêt à expédier" dans la liste pour finaliser.'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 3),
+          ),
+        );
+        
+        // Attendre un court instant pour que le message s'affiche
+        await Future.delayed(const Duration(milliseconds: 500));
+        
+        // Vérifier une dernière fois que le widget est monté avant la redirection
+        if (!mounted || !context.mounted) {
+          print('❌ [OrderDetailsScreen] Widget ou contexte non monté avant redirection');
+          return;
+        }
+        
+        // Utiliser pushReplacement au lieu de pushAndRemoveUntil pour éviter les conflits de Hero tags
+        // Cela remplace simplement l'écran actuel sans créer de conflits
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const OrderScreen(
+              backNavigation: true,
+              initialStatusFilter: 'en_preparation',
+            ),
+          ),
+        );
+        
+        // Retourner immédiatement après la redirection
+        return;
+      } else {
+        print('❌ [OrderDetailsScreen] Erreur: ${result['message']}');
+        if (mounted) {
+          setState(() {
+            _isUploadingPhoto = false;
+          });
+        }
+        if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(result['message'] ?? 'Erreur lors de l\'upload'),
               backgroundColor: Colors.red,
+              duration: const Duration(seconds: 3),
             ),
           );
         }
       }
-    } catch (e) {
-      print('💥 [OrderDetailsScreen] Exception: $e');
-      if (context.mounted) {
+    } catch (e, stackTrace) {
+      print('💥 [OrderDetailsScreen] Exception dans _uploadPackagePhoto: $e');
+      print('💥 [OrderDetailsScreen] StackTrace: $stackTrace');
+      
+      // Libérer la référence à l'image en cas d'erreur
+      image = null;
+      
+      if (mounted) {
         setState(() {
           _isUploadingPhoto = false;
         });
+      }
+      
+      if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Erreur: $e'),
+            content: Text('Erreur lors de l\'upload: ${e.toString()}'),
             backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
           ),
         );
       }
+    } finally {
+      // S'assurer que l'état est toujours réinitialisé
+      if (mounted) {
+        setState(() {
+          _isUploadingPhoto = false;
+        });
+      }
+      // Forcer le garbage collection de l'image si elle existe encore
+      image = null;
     }
   }
 
@@ -2844,8 +2918,12 @@ class _VendeurOrderActionsWidgetState extends State<_VendeurOrderActionsWidget> 
               backgroundColor: Colors.orange,
             ),
           );
-          // Retourner à la liste des commandes
-          Navigator.pop(context);
+          // Actualiser sur place sans redirection
+          setState(() {
+            _isProcessing = false;
+          });
+          // Notifier le parent pour qu'il mette à jour les données
+          widget.onStatusChanged();
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -2904,8 +2982,12 @@ class _VendeurOrderActionsWidgetState extends State<_VendeurOrderActionsWidget> 
               duration: Duration(seconds: 2),
             ),
           );
-          // Retourner à la liste des commandes
-          Navigator.pop(context);
+          // Actualiser sur place sans redirection
+          setState(() {
+            _isProcessing = false;
+          });
+          // Notifier le parent pour qu'il mette à jour les données
+          widget.onStatusChanged();
         } else {
           print('❌ [OrderDetailsScreen] Erreur: ${result['message']}');
           ScaffoldMessenger.of(context).showSnackBar(
