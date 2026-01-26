@@ -35,6 +35,7 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> {
   Timer? _refreshTimer; // Timer pour rafraîchir périodiquement
   bool _isFetchingOrders = false; // Pour éviter les requêtes concurrentes
   bool _isInitialLoading = true; // Flag pour gérer le loading initial de 3 secondes
+  bool _hasInitiallyFetched = false; // Flag pour éviter de fetch en boucle si la liste est vide
 
   @override
   void initState() {
@@ -1328,8 +1329,10 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> {
       final orderListState = context.read<OrderCubit>().orderListState;
       
       // Si les commandes sont vides et qu'on n'est pas en train de charger, charger une fois
-      if (orderListState.orders.isEmpty && !orderListState.isLoading) {
+      // Mais seulement si on n'a pas déjà fait le fetch initial (éviter la boucle)
+      if (orderListState.orders.isEmpty && !orderListState.isLoading && !_hasInitiallyFetched) {
         _isFetchingOrders = true;
+        _hasInitiallyFetched = true; // Marquer qu'on a fait le fetch initial
         context.read<OrderCubit>().fetchOrders().then((_) {
           if (mounted) {
             _loadPaymentMethods(context);
@@ -1567,7 +1570,7 @@ class _PendingPaymentScreenState extends State<PendingPaymentScreen> {
                         color: AppColors.primary.withOpacity(0.1),
                         shape: BoxShape.circle,
                       ),
-                      child: Icon(
+                      child: const Icon(
                         Icons.check_circle_outline,
                         size: 60,
                         color: AppColors.primary,

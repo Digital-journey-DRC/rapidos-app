@@ -134,7 +134,7 @@ class FirebaseMessagingService {
         'role': role ?? 'user',
         'userId': userId,
         'permission_status': (await FirebaseMessaging.instance.getNotificationSettings()).authorizationStatus.toString(),
-      }, SetOptions(merge: true)); // merge pour ne pas effacer d'autres champs
+      }); // Remplace complètement le document (pas de merge)
 
       print("✅ Token saved to Firestore successfully (by userId)");
     } catch (e) {
