@@ -615,23 +615,47 @@ class _NavigationExampleState extends State<NavigationExample> {
 
   Future<void> _startNavigation() async {
     try {
+      // Récupérer le rôle de l'utilisateur connecté
+      final authState = context.read<AuthCubit>().state;
+      String? userRole;
+      if (authState is AuthSuccess && authState.user != null) {
+        userRole = authState.user!['role'] as String?;
+      }
+      final bool isLivreur = userRole == 'livreur';
+      
       // Utiliser les positions réelles du livreur et du client si disponibles
       if (_livreurPosition != null && _acheteurPosition != null) {
-        final wayPoints = [
-          WayPoint(
-            name: "Ma position",
-            latitude: _livreurPosition!.latitude,
-            longitude: _livreurPosition!.longitude,
-          ),
-          WayPoint(
-            name: "Destination",
-            latitude: _acheteurPosition!.latitude,
-            longitude: _acheteurPosition!.longitude,
-          ),
-        ];
+        // Adapter les waypoints selon le rôle de l'utilisateur
+        final wayPoints = isLivreur
+            ? [
+                // LIVREUR: de ma position (livreur) vers l'acheteur
+                WayPoint(
+                  name: "Ma position",
+                  latitude: _livreurPosition!.latitude,
+                  longitude: _livreurPosition!.longitude,
+                ),
+                WayPoint(
+                  name: "Destination",
+                  latitude: _acheteurPosition!.latitude,
+                  longitude: _acheteurPosition!.longitude,
+                ),
+              ]
+            : [
+                // ACHETEUR: de ma position (acheteur) vers le livreur
+                WayPoint(
+                  name: "Ma position",
+                  latitude: _acheteurPosition!.latitude,
+                  longitude: _acheteurPosition!.longitude,
+                ),
+                WayPoint(
+                  name: "Destination",
+                  latitude: _livreurPosition!.latitude,
+                  longitude: _livreurPosition!.longitude,
+                ),
+              ];
 
         await MapBoxNavigation.instance.startNavigation(wayPoints: wayPoints);
-        print("🚀 Navigation started with real positions");
+        print("🚀 Navigation started with real positions (${isLivreur ? 'Livreur' : 'Acheteur'})");
       } else {
         // Fallback vers la méthode originale
         Position position = await Geolocator.getCurrentPosition(
